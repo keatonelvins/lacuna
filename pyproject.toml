@@ -4,10 +4,24 @@ version = "0.1.0"
 description = "pretrain and finetune hf models"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "datasets>=4.0.0",
+    "liger-kernel>=0.6.1",
+    "torch>=2.8.0",
+    "torchvision>=0.23.0",
+    "transformers>=4.55.2",
+    "wandb>=0.21.1",
+]
 
 [dependency-groups]
 dev = [
     "ruff>=0.12.9",
     "ty>=0.0.1a18",
 ]
+
+[project.optional-dependencies]
+flash-attn = ["flash-attn>=2.8.3"]
+
+[tool.uv]
+no-build-isolation-package = ["flash-attn"]
+prerelease = "allow"
