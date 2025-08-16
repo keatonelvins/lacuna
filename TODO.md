@@ -1,4 +1,4 @@
-# Lacuna Training Framework TODO
+# lacuna Training Framework TODO
 
 ## Philosophy: Opinionated & Correct
 - **No abstractions** without clear value

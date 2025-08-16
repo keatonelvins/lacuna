@@ -14,6 +14,10 @@ dependencies = [
     "wandb>=0.21.1",
 ]
 
+[project.scripts]
+pt = "lacuna.train:pretrain_main"
+sft = "lacuna.train:sft_main"
+
 [dependency-groups]
 dev = [
     "ruff>=0.12.9",
@@ -22,6 +26,10 @@ dev = [
 
 [project.optional-dependencies]
 flash-attn = ["flash-attn>=2.8.3"]
+
+[build-system]
+requires = ["uv_build>=0.8.11,<0.9.0"]
+build-backend = "uv_build"
 
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]

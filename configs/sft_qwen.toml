@@ -1,0 +1,32 @@
+epochs = 1
+log_interval = 10
+eval_interval = 100
+gradient_accumulation_steps = 1
+gradient_clipping = 1.0
+
+[model]
+name = "Qwen/Qwen2.5-0.5B-Instruct"
+
+[data]
+dataset_name = "trl-internal-testing/dolly-chatml-sft"
+batch_size = 32
+micro_batch_size = 8
+seq_len = 2048
+packing = true
+num_workers = 0
+
+[optimizer]
+type = "adamw"
+lr = 5e-5
+weight_decay = 0.1
+betas = [0.9, 0.95]
+
+[scheduler]
+type = "cosine"
+warmup_steps = 50
+min_lr_ratio = 0.1
+
+[checkpoint]
+save_interval = 100
+keep_latest = 3
+save_dir = "checkpoints"
