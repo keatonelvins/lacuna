@@ -155,3 +155,5 @@ __marimo__/
 
 # LLMS
 .claude
+REFS/*
+CLAUDE.md
