@@ -43,6 +43,19 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     logger = setup_logger("lacuna")
 
+    # Detect number of GPUs and calculate batch sizes
+    num_gpus = torch.cuda.device_count() or 1
+    batch_size = config.trainer.batch_size
+
+    # Calculate optimal micro_batch_size and gradient accumulation
+    micro_batch_size = max(1, batch_size // num_gpus)
+    gradient_accumulation_steps = max(1, batch_size // (micro_batch_size * num_gpus))
+
+    logger.info(
+        f"GPU setup: {num_gpus} GPUs, batch_size={batch_size}, "
+        f"micro_batch_size={micro_batch_size}, grad_accum={gradient_accumulation_steps}"
+    )
+
     # Setup model and tokenizer
     logger.info(f"Loading model: {config.model.name}")
     model = setup_model(config.model)
@@ -58,9 +71,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     # Setup scheduler (always cosine with warmup)
     if isinstance(config, PretrainConfig):
-        max_steps = config.max_steps
+        max_steps = config.trainer.steps
     else:  # SFTConfig
-        max_steps = config.epochs * 1000  # Estimate steps for SFT
+        max_steps = config.trainer.epochs * 1000  # TODO: find actual steps
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,
         num_warmup_steps=config.scheduler.warmup_steps,
@@ -72,14 +85,14 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     # Setup dataloader
     logger.info("Setting up dataloader")
-    dataloader = setup_dataloader(config)
+    dataloader = setup_dataloader(config, micro_batch_size)
 
     # Training state
     step = 0
     total_tokens = 0
 
-    # Calculate gradient accumulation steps
-    grad_accum_steps = config.data.batch_size // config.data.micro_batch_size
+    # Use calculated gradient accumulation steps
+    grad_accum_steps = gradient_accumulation_steps
 
     logger.info(
         f"Starting training: {max_steps} steps, {grad_accum_steps} grad accumulation"
@@ -110,7 +123,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             # Optimizer step with gradient clipping
             scaler.unscale_(optimizer)
             grad_norm = torch.nn.utils.clip_grad_norm_(
-                model.parameters(), config.gradient_clipping
+                model.parameters(), config.optimizer.grad_clip
             )
             scaler.step(optimizer)
             scaler.update()
@@ -118,11 +131,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             scheduler.step()
 
             # Update counters
-            step_tokens = config.data.batch_size * config.data.seq_len
+            step_tokens = batch_size * config.data.seq_len
             total_tokens += step_tokens
 
             # Logging
-            if step % config.log_interval == 0:
+            if step % config.metrics.log_every == 0:
                 step_time = time.time() - step_start_time
                 tokens_per_sec = step_tokens / step_time
                 current_lr = scheduler.get_last_lr()[0]
@@ -135,7 +148,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 )
 
             # Checkpoint saving
-            if step > 0 and step % config.checkpoint.save_interval == 0:
+            if step > 0 and step % config.checkpoint.save_every == 0:
                 logger.info(f"Saving checkpoint at step {step}")
                 checkpoint_path = config.checkpoint.save_dir / f"step_{step}.pt"
                 save_checkpoint(

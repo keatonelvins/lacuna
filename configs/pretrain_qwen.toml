@@ -1,25 +1,23 @@
-max_steps = 10000
-log_interval = 10
-eval_interval = 1000
-gradient_accumulation_steps = 1
-gradient_clipping = 1.0
-
 [model]
 name = "Qwen/Qwen2.5-0.5B"
 
 [data]
 dataset_name = "stas/c4-en-10k"
 split = "train"
-batch_size = 32
-micro_batch_size = 8
 seq_len = 2048
 num_workers = 0
+
+[trainer]
+steps = 10000
+eval_every = 1000
+batch_size = 32
 
 [optimizer]
 type = "adamw"
 lr = 3e-4
 weight_decay = 0.1
 betas = [0.9, 0.95]
+grad_clip = 1.0
 
 [scheduler]
 type = "cosine"
@@ -27,6 +25,9 @@ warmup_steps = 100
 min_lr_ratio = 0.1
 
 [checkpoint]
-save_interval = 1000
+save_every = 1000
 keep_latest = 3
-save_dir = "checkpoints"
+save_dir = "weights"
+
+[metrics]
+log_every = 10

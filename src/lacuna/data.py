@@ -66,7 +66,9 @@ def tokenize_sft_batch(
     }
 
 
-def setup_dataloader(config: PretrainConfig | SFTConfig) -> Iterator[dict]:
+def setup_dataloader(
+    config: PretrainConfig | SFTConfig, micro_batch_size: int
+) -> Iterator[dict]:
     """Setup dataloader for training."""
     logger.info(f"Loading dataset: {config.data.dataset_name}")
 
@@ -98,13 +100,11 @@ def setup_dataloader(config: PretrainConfig | SFTConfig) -> Iterator[dict]:
     # Create DataLoader
     dataloader = DataLoader(
         tokenized_dataset,
-        batch_size=config.data.micro_batch_size,
+        batch_size=micro_batch_size,
         num_workers=config.data.num_workers,
         pin_memory=True,
     )
 
-    logger.info(
-        f"Dataloader created with micro_batch_size={config.data.micro_batch_size}"
-    )
+    logger.info(f"Dataloader created with micro_batch_size={micro_batch_size}")
 
     return iter(dataloader)
