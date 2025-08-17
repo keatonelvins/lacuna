@@ -45,12 +45,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     # Detect number of GPUs and calculate batch sizes
     num_gpus = torch.cuda.device_count() or 1
     batch_size = config.trainer.batch_size
-    micro_batch_size = batch_size / num_gpus
 
-    if not isinstance(micro_batch_size, int):
-        raise ValueError(
-            f"Batch size {batch_size} must be divisible by the number of GPUs {num_gpus}"
-        )
+    if not batch_size % num_gpus == 0:
+        raise ValueError(f"Batch size {batch_size} must be divisible by {num_gpus}")
+
+    micro_batch_size = batch_size // num_gpus
 
     logger.info(
         f"GPU setup: {num_gpus} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"

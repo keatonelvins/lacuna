@@ -271,10 +271,7 @@ class PretrainDataset(Dataset):
 
 
 class SFTDataset(Dataset):
-    """SFT dataset w/ packing support
-
-    TODO: assistant-only loss
-    """
+    """SFT dataset w/ packing support and assistant-only loss masking."""
 
     def __init__(
         self,
@@ -293,24 +290,39 @@ class SFTDataset(Dataset):
             logger.error(f"Expected 'messages' column, found: {dataset.column_names}")
             raise ValueError("SFTDataset requires a 'messages' column in OpenAI format")
 
-        logger.info("Tokenizing...")
+        logger.info("Tokenizing with assistant-only loss...")
         tokenized_samples = []
 
         for example in dataset:
             try:
-                input_ids = tokenizer.apply_chat_template(
+                formatted_text = tokenizer.apply_chat_template(
                     example["messages"],
-                    tokenize=True,
-                    padding=False,
-                    truncation=False,
+                    tokenize=False,
                     add_generation_prompt=False,
                 )
+
+                # Tokenize with offset mapping to track text positions
+                tokenized = tokenizer(
+                    formatted_text,
+                    return_offsets_mapping=True,
+                    add_special_tokens=False,
+                )
+
+                input_ids = tokenized["input_ids"]
+                offset_mapping = tokenized["offset_mapping"]
+
+                # Create assistant-only loss masks
+                labels = self._get_assistant_masks(
+                    example["messages"],
+                    formatted_text,
+                    input_ids,
+                    offset_mapping,
+                    tokenizer,
+                )
+
             except Exception as e:
                 logger.warning(f"Failed to apply chat template: {e}")
                 continue
-
-            # TODO: support assistant-only loss
-            labels = input_ids.copy()
 
             sample = {
                 "input_ids": input_ids,
@@ -369,6 +381,45 @@ class SFTDataset(Dataset):
             )
 
         return packed_samples
+
+    def _get_assistant_masks(
+        self,
+        messages: list[dict],
+        formatted_text: str,
+        input_ids: list[int],
+        offset_mapping: list[tuple[int, int]],
+        tokenizer: PreTrainedTokenizerBase,
+    ) -> list[int]:
+        """Create labels with assistant-only loss masking."""
+        # Start with all tokens masked
+        labels = [-100] * len(input_ids)
+
+        # Find assistant message boundaries in the formatted text
+        assistant_ranges = []
+        for message in messages:
+            if message["role"] == "assistant":
+                content = message["content"]
+                # Find this assistant content in the formatted text
+                start_pos = formatted_text.find(content)
+                if start_pos != -1:
+                    end_pos = start_pos + len(content)
+                    assistant_ranges.append((start_pos, end_pos))
+
+        # Map text positions to token positions and unmask assistant tokens
+        for token_idx, (start_char, end_char) in enumerate(offset_mapping):
+            # Check if this token falls within any assistant message
+            for assist_start, assist_end in assistant_ranges:
+                if start_char >= assist_start and end_char <= assist_end:
+                    labels[token_idx] = input_ids[token_idx]
+                    break
+                # Include EOS token immediately after assistant messages
+                elif start_char >= assist_end and start_char < assist_end + 10:
+                    # Check if this token is EOS
+                    if input_ids[token_idx] == tokenizer.eos_token_id:
+                        labels[token_idx] = input_ids[token_idx]
+                        break
+
+        return labels
 
     def __len__(self) -> int:
         return len(self.samples)
