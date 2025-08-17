@@ -112,12 +112,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     dataloader_iter = iter(dataloader)
                     batch = next(dataloader_iter)
 
-                input_ids = batch["input_ids"].cuda()
-                labels = batch["labels"].cuda()
+                model_inputs = {k: v.cuda() for k, v in batch.items()}
 
                 # Forward pass
                 with autocast("cuda", dtype=torch.bfloat16):
-                    outputs = model(input_ids=input_ids, labels=labels)
+                    outputs = model(**model_inputs)
                     loss = (
                         outputs.loss / gradient_accumulation_steps
                     )  # Scale by accumulation steps

@@ -13,7 +13,7 @@ lacuna/
 ├── src/lacuna/
 │   ├── __init__.py         # Package init
 │   ├── config.py           # Pydantic configs (pretrain + sft)
-│   ├── train.py            # Entry point, arg parsing
+│   ├── cli.py              # Entry point, arg parsing
 │   ├── trainer.py          # Core training loop
 │   ├── data.py             # Dataloader, tokenization, packing
 │   ├── checkpoint.py       # Save/load with torch.save
@@ -33,7 +33,7 @@ lacuna/
 
 - [x] **Config System** ✅
   - [x] Pydantic models for PretrainConfig and SFTConfig in `config.py`
-  - [x] TOML loading with CLI overrides in `train.py`
+  - [x] TOML loading with CLI overrides in `cli.py`
   - [x] Opinionated defaults (AdamW, cosine, bf16)
 
 - [x] **Model Loading** ✅

@@ -14,11 +14,12 @@ dependencies = [
     "wandb>=0.21.1",
     "flash-attn>=2.8.3",
     "loguru>=0.7.3",
+    "pyarrow>=21.0.0",
 ]
 
 [project.scripts]
-pt = "lacuna.train:pretrain_main"
-sft = "lacuna.train:sft_main"
+pt = "lacuna.cli:pretrain_main"
+sft = "lacuna.cli:sft_main"
 
 [dependency-groups]
 dev = [

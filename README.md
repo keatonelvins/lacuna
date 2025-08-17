@@ -39,3 +39,4 @@ There are a ton of great training repos out there already! Some I have used/enjo
 - [torchtitan](https://github.com/pytorch/torchtitan)
 - [ArticTraining](https://github.com/snowflakedb/ArcticTraining)
 - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
+- [trl](https://github.com/huggingface/trl/)

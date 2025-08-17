@@ -45,16 +45,14 @@ class DataConfig(BaseModel):
 class PretrainDataConfig(DataConfig):
     """Pretraining data config"""
 
-    dataset_name: str = Field("stas/c4-en-10k", description="HF dataset name")
+    dataset_name: str = Field("keatone/TinierStories", description="HF dataset name")
 
 
 class SFTDataConfig(DataConfig):
     """SFT data config"""
 
-    dataset_name: str = Field(
-        "trl-internal-testing/dolly-chatml-sft", description="HuggingFace dataset name"
-    )
-    packing: bool = Field(True, description="Pack multiple conversations per sequence")
+    dataset_name: str = Field("keatone/s1K", description="HF dataset name")
+    packing: bool = Field(True, description="Pack multiple message lists per sample")
 
 
 class TrainerConfig(BaseModel):
