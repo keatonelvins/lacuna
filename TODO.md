@@ -48,7 +48,6 @@ lacuna/
 
 - [x] **Training Loop** ✅
   - [x] Forward, backward, optimizer.step() in `trainer.py`
-  - [x] Gradient accumulation with proper loss scaling
   - [x] Loss, throughput, memory logging every N steps
   - [x] Checkpoint saving with automatic cleanup in `checkpoint.py`
 
@@ -110,7 +109,6 @@ lacuna/
 - **bf16 mixed precision** - Good range, fast on modern GPUs
 - **Flash Attention 2** - When available (most GPUs now)
 - **Liger kernels** - Auto-detect and apply
-- **Gradient accumulation** - For effective batch size
 - **FSDP** - Simpler than DDP+ZeRO, built into PyTorch
 
 ### Never Add (Keep It Simple):

@@ -44,21 +44,21 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
 
-    # Enable TF32 for free speedup
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
+    # Enable TF32, use "highest" for FP32
+    torch.set_float32_matmul_precision("high")
 
     # Detect number of GPUs and calculate batch sizes
     num_gpus = torch.cuda.device_count() or 1
     batch_size = config.trainer.batch_size
+    micro_batch_size = batch_size / num_gpus
 
-    # Calculate optimal micro_batch_size and gradient accumulation
-    micro_batch_size = max(1, batch_size // num_gpus)
-    gradient_accumulation_steps = max(1, batch_size // (micro_batch_size * num_gpus))
+    if not isinstance(micro_batch_size, int):
+        raise ValueError(
+            f"Batch size {batch_size} must be divisible by the number of GPUs {num_gpus}"
+        )
 
     logger.info(
-        f"GPU setup: {num_gpus} GPUs, batch_size={batch_size}, "
-        f"micro_batch_size={micro_batch_size}, grad_accum={gradient_accumulation_steps}"
+        f"GPU setup: {num_gpus} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
     )
 
     # Setup model
@@ -101,29 +101,25 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             accumulated_loss = 0.0
             optimizer.zero_grad()
 
-            # Gradient accumulation loop
-            for micro_step in range(gradient_accumulation_steps):
-                try:
-                    batch = next(dataloader_iter)
-                except StopIteration:
-                    # Reset dataloader if we run out of data
-                    dataloader_iter = iter(dataloader)
-                    batch = next(dataloader_iter)
+            try:
+                batch = next(dataloader_iter)
+            except StopIteration:
+                # Reset dataloader if we run out of data
+                dataloader_iter = iter(dataloader)
+                batch = next(dataloader_iter)
 
-                model_inputs = {k: v.cuda() for k, v in batch.items()}
+            model_inputs = {k: v.cuda() for k, v in batch.items()}
 
-                # Forward pass
-                with autocast("cuda", dtype=torch.bfloat16):
-                    outputs = model(**model_inputs)
-                    loss = (
-                        outputs.loss / gradient_accumulation_steps
-                    )  # Scale by accumulation steps
+            # Forward pass
+            with autocast("cuda", dtype=torch.bfloat16):
+                outputs = model(**model_inputs)
+                loss = outputs.loss
 
-                # Backward pass
-                loss.backward()
-                accumulated_loss += loss.item()
+            # Backward pass
+            loss.backward()
+            accumulated_loss += loss.item()
 
-            # APply grad clip
+            # Apply grad clip
             grad_norm = torch.nn.utils.clip_grad_norm_(
                 model.parameters(), config.optimizer.grad_clip
             )

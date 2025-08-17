@@ -302,8 +302,7 @@ class SFTDataset(Dataset):
             logger.error(f"Expected 'messages' column, found: {dataset.column_names}")
             raise ValueError("SFTDataset requires a 'messages' column in OpenAI format")
 
-        # Tokenize conversations
-        logger.info("Tokenizing conversations...")
+        logger.info("Tokenizing...")
         tokenized_samples = []
 
         for example in dataset:
@@ -327,7 +326,7 @@ class SFTDataset(Dataset):
                 "labels": labels,
             }
 
-            # Filter out samples that are too long
+            # Filter out over-long samples
             if len(sample["input_ids"]) <= seq_len:
                 tokenized_samples.append(sample)
             else:
@@ -335,7 +334,6 @@ class SFTDataset(Dataset):
                     f"Sample is too long, skipping: {len(sample['input_ids'])} > {seq_len}"
                 )
 
-        # Apply packing or padding
         if packing:
             logger.info("Packing samples...")
             pre_packing_sample_count = len(tokenized_samples)
@@ -351,7 +349,7 @@ class SFTDataset(Dataset):
         logger.info(f"Created {len(self.samples)} samples")
 
     def _pack_samples(self, samples: list[dict], seq_len: int) -> list[dict]:
-        """Pack samples into sequences of length `seq_len`"""
+        """Pack samples into sequences of length `seq_len` using Best Fit Decreasing"""
         input_ids_list = [sample["input_ids"] for sample in samples]
         labels_list = [sample["labels"] for sample in samples]
         table_data = {

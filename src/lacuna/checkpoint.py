@@ -19,7 +19,7 @@ def save_checkpoint(
     # Create parent directory if needed
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Prepare checkpoint data
+    # Save checkpoint data
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
@@ -27,8 +27,6 @@ def save_checkpoint(
         "step": step,
         "total_tokens": total_tokens,
     }
-
-    # Save checkpoint
     torch.save(checkpoint, path)
     logger.info(f"Saved checkpoint to {path}")
 
@@ -49,7 +47,6 @@ def cleanup_old_checkpoints(save_dir: Path, keep_latest: int) -> None:
     if not save_dir.exists():
         return
 
-    # Find all checkpoint files (excluding final.pt)
     checkpoint_files = [f for f in save_dir.glob("step_*.pt") if f.is_file()]
 
     if len(checkpoint_files) <= keep_latest:
