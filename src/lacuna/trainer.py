@@ -1,8 +1,172 @@
 """Core training loop for pretraining and SFT."""
 
+import time
 from typing import Any
 
+import torch
+from torch.amp import GradScaler, autocast
+from liger_kernel.transformers import AutoLigerKernelForCausalLM
+from transformers import AutoTokenizer, PreTrainedModel, get_cosine_schedule_with_warmup
 
-def train(config: Any) -> None:
+from .checkpoint import cleanup_old_checkpoints, save_checkpoint
+from .config import ModelConfig, PretrainConfig, SFTConfig
+from .data import setup_dataloader
+from .utils import setup_logger
+
+
+def setup_model(config: ModelConfig) -> PreTrainedModel:
+    """Load model with flash attention and liger kernels"""
+
+    # Make sure TF32 is enabled
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+
+    return AutoLigerKernelForCausalLM.from_pretrained(
+        config.name,
+        torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
+        use_cache=False,
+    )
+
+
+def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
+    """Setup AdamW optimizer with opinionated defaults."""
+    return torch.optim.AdamW(
+        model.parameters(),
+        lr=config.optimizer.lr,
+        weight_decay=config.optimizer.weight_decay,
+        betas=config.optimizer.betas,
+    )
+
+
+def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
-    pass
+    logger = setup_logger("lacuna")
+
+    # Setup model and tokenizer
+    logger.info(f"Loading model: {config.model.name}")
+    model = setup_model(config.model)
+    _tokenizer = AutoTokenizer.from_pretrained(config.model.name)
+
+    # Move model to GPU
+    model = model.cuda()
+    model.train()
+
+    # Setup optimizer
+    logger.info("Setting up optimizer and scheduler")
+    optimizer = setup_optimizer(model, config)
+
+    # Setup scheduler (always cosine with warmup)
+    if isinstance(config, PretrainConfig):
+        max_steps = config.max_steps
+    else:  # SFTConfig
+        max_steps = config.epochs * 1000  # Estimate steps for SFT
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=config.scheduler.warmup_steps,
+        num_training_steps=max_steps,
+    )
+
+    # Setup mixed precision
+    scaler = GradScaler("cuda")
+
+    # Setup dataloader
+    logger.info("Setting up dataloader")
+    dataloader = setup_dataloader(config)
+
+    # Training state
+    step = 0
+    total_tokens = 0
+
+    # Calculate gradient accumulation steps
+    grad_accum_steps = config.data.batch_size // config.data.micro_batch_size
+
+    logger.info(
+        f"Starting training: {max_steps} steps, {grad_accum_steps} grad accumulation"
+    )
+
+    try:
+        for step in range(max_steps):
+            step_start_time = time.time()
+            accumulated_loss = 0.0
+
+            # Gradient accumulation loop
+            for micro_step in range(grad_accum_steps):
+                batch = next(dataloader)
+                input_ids = batch["input_ids"].cuda()
+                labels = batch.get("labels", input_ids).cuda()
+
+                # Forward pass with mixed precision
+                with autocast("cuda"):
+                    outputs = model(input_ids=input_ids, labels=labels)
+                    loss = (
+                        outputs.loss / grad_accum_steps
+                    )  # Scale by accumulation steps
+
+                # Backward pass
+                scaler.scale(loss).backward()
+                accumulated_loss += loss.item()
+
+            # Optimizer step with gradient clipping
+            scaler.unscale_(optimizer)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                model.parameters(), config.gradient_clipping
+            )
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+            scheduler.step()
+
+            # Update counters
+            step_tokens = config.data.batch_size * config.data.seq_len
+            total_tokens += step_tokens
+
+            # Logging
+            if step % config.log_interval == 0:
+                step_time = time.time() - step_start_time
+                tokens_per_sec = step_tokens / step_time
+                current_lr = scheduler.get_last_lr()[0]
+
+                logger.info(
+                    f"Step {step} | Loss: {accumulated_loss:.4f} | "
+                    f"Grad Norm: {grad_norm:.4f} | LR: {current_lr:.2e} | "
+                    f"Tokens/s: {tokens_per_sec:.0f} | "
+                    f"Memory: {torch.cuda.max_memory_allocated() / 1024**3:.1f}GB"
+                )
+
+            # Checkpoint saving
+            if step > 0 and step % config.checkpoint.save_interval == 0:
+                logger.info(f"Saving checkpoint at step {step}")
+                checkpoint_path = config.checkpoint.save_dir / f"step_{step}.pt"
+                save_checkpoint(
+                    model=model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    step=step,
+                    total_tokens=total_tokens,
+                    path=checkpoint_path,
+                )
+                # Cleanup old checkpoints
+                cleanup_old_checkpoints(
+                    config.checkpoint.save_dir, config.checkpoint.keep_latest
+                )
+
+    except KeyboardInterrupt:
+        logger.info("Training interrupted by user")
+
+    finally:
+        # Save final checkpoint
+        logger.info("Saving final checkpoint")
+        final_path = config.checkpoint.save_dir / "final.pt"
+        save_checkpoint(
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            step=step,
+            total_tokens=total_tokens,
+            path=final_path,
+        )
+
+        logger.info(
+            f"Training completed! Final step: {step}, Total tokens: {total_tokens:,}"
+        )

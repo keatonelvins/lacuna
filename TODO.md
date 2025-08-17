@@ -36,10 +36,10 @@ lacuna/
   - [x] TOML loading with CLI overrides in `train.py`
   - [x] Opinionated defaults (AdamW, cosine, bf16)
 
-- [ ] **Model Loading**
-  - [ ] Direct `AutoModelForCausalLM.from_pretrained()` in `trainer.py`
-  - [ ] Automatic liger patching if available
-  - [ ] Flash attention via `attn_implementation="flash_attention_2"`
+- [x] **Model Loading** ✅
+  - [x] Direct `AutoModelForCausalLM.from_pretrained()` in `trainer.py`
+  - [x] Automatic liger patching if available
+  - [x] Flash attention via `attn_implementation="flash_attention_2"`
 
 - [ ] **Data Pipeline**
   - [ ] StreamingDataset from HF datasets in `data.py`
