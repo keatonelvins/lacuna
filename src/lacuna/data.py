@@ -1,10 +1,10 @@
 """Data loading, tokenization, and packing for training."""
 
 import logging
-from typing import Iterator
 
+import torch
 from datasets import load_dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .config import PretrainConfig, SFTConfig
@@ -23,88 +23,84 @@ def setup_tokenizer(model_name: str) -> PreTrainedTokenizerBase:
     return tokenizer
 
 
-def tokenize_pretrain_batch(
-    examples: dict, tokenizer: PreTrainedTokenizerBase, seq_len: int
-) -> dict:
-    """Tokenize batch for pretraining (simple concatenation and chunking)."""
-    # Concatenate all text
-    texts = examples["text"]
-    combined_text = "\n".join(texts)
+class PretrainDataset(Dataset):
+    """Simple dataset loader for continued pretraining."""
 
-    # Tokenize and chunk into fixed sequences
-    tokens = tokenizer(
-        combined_text, truncation=False, padding=False, return_tensors="np"
-    )["input_ids"][0]
+    def __init__(
+        self,
+        dataset_name: str,
+        split: str,
+        tokenizer: PreTrainedTokenizerBase,
+        seq_len: int,
+    ):
+        logger.info(f"Loading dataset: {dataset_name}")
 
-    # Create fixed-length chunks
-    chunks = []
-    for i in range(0, len(tokens) - seq_len + 1, seq_len):
-        chunk = tokens[i : i + seq_len]
-        if len(chunk) == seq_len:
-            chunks.append(chunk)
+        # TODO: support streaming
+        dataset = load_dataset(dataset_name, split=split)
 
-    return {"input_ids": chunks}
+        logger.info("Tokenizing dataset...")
+        all_tokens = []
 
+        for text in dataset["text"]:
+            text_with_eos = text + tokenizer.eos_token
+            tokens = tokenizer(text_with_eos, truncation=False, padding=False)[
+                "input_ids"
+            ]
+            all_tokens.extend(tokens)
 
-def tokenize_sft_batch(
-    examples: dict, tokenizer: PreTrainedTokenizerBase, seq_len: int
-) -> dict:
-    """Tokenize batch for SFT (chat format)."""
-    # For now, use simple text processing
-    # TODO: Implement proper chat template parsing and loss masking
-    tokenized = tokenizer(
-        examples["text"],
-        truncation=True,
-        padding="max_length",
-        max_length=seq_len,
-        return_tensors="pt",
-    )
+        tokens = all_tokens
 
-    return {
-        "input_ids": tokenized["input_ids"],
-        "labels": tokenized["input_ids"].clone(),  # For now, no masking
-    }
+        # Chunk into fixed-length sequences
+        self.chunks = []
+        for i in range(0, len(tokens) - seq_len, seq_len):
+            input_chunk = tokens[i : i + seq_len]
+            label_chunk = tokens[
+                i + 1 : i + seq_len + 1
+            ]  # Labels are input shifted by 1
+
+            if len(input_chunk) == seq_len and len(label_chunk) == seq_len:
+                self.chunks.append(
+                    {
+                        "input_ids": torch.tensor(input_chunk, dtype=torch.long),
+                        "labels": torch.tensor(label_chunk, dtype=torch.long),
+                    }
+                )
+
+        logger.info(f"Created {len(self.chunks)} chunks of length {seq_len}")
+
+    def __len__(self) -> int:
+        return len(self.chunks)
+
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        return self.chunks[idx]
 
 
 def setup_dataloader(
     config: PretrainConfig | SFTConfig, micro_batch_size: int
-) -> Iterator[dict]:
-    """Setup dataloader for training."""
-    logger.info(f"Loading dataset: {config.data.dataset_name}")
-
-    dataset = load_dataset(
-        config.data.dataset_name,
-        split=config.data.split,
-        streaming=True,
-    )
+) -> DataLoader:
+    """Setup simple dataloader for training."""
 
     # Setup tokenizer
     tokenizer = setup_tokenizer(config.model.name)
 
-    # Tokenize dataset
+    # Create dataset based on config type
     if isinstance(config, PretrainConfig):
+        dataset = PretrainDataset(
+            config.data.dataset_name, config.data.split, tokenizer, config.data.seq_len
+        )
+    else:  # SFTConfig - TODO: implement later
+        raise NotImplementedError("SFT dataset not implemented yet")
 
-        def tokenize_fn(examples: dict) -> dict:
-            return tokenize_pretrain_batch(examples, tokenizer, config.data.seq_len)
-    else:  # SFTConfig
-
-        def tokenize_fn(examples: dict) -> dict:
-            return tokenize_sft_batch(examples, tokenizer, config.data.seq_len)
-
-    tokenized_dataset = dataset.map(
-        tokenize_fn,
-        batched=True,
-        remove_columns=dataset.column_names,
-    )
-
-    # Create DataLoader
     dataloader = DataLoader(
-        tokenized_dataset,
+        dataset,
         batch_size=micro_batch_size,
+        shuffle=True,
         num_workers=config.data.num_workers,
         pin_memory=True,
     )
 
-    logger.info(f"Dataloader created with micro_batch_size={micro_batch_size}")
+    logger.info(
+        f"Dataloader created with {len(dataset)} samples, micro_batch_size={micro_batch_size}"
+    )
 
-    return iter(dataloader)
+    return dataloader

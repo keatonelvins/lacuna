@@ -157,3 +157,6 @@ __marimo__/
 .claude
 REFS/*
 CLAUDE.md
+
+# Artifacts
+weights/**

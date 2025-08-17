@@ -2,15 +2,15 @@
 name = "Qwen/Qwen2.5-0.5B"
 
 [data]
-dataset_name = "stas/c4-en-10k"
+dataset_name = "keatone/TinierStories"
 split = "train"
 seq_len = 2048
 num_workers = 0
 
 [trainer]
-steps = 10000
-eval_every = 1000
-batch_size = 32
+steps = 20
+eval_every = 10
+batch_size = 4
 
 [optimizer]
 type = "adamw"
@@ -21,13 +21,13 @@ grad_clip = 1.0
 
 [scheduler]
 type = "cosine"
-warmup_steps = 100
+warmup_steps = 5
 min_lr_ratio = 0.1
 
 [checkpoint]
-save_every = 1000
-keep_latest = 3
+save_every = 10
+keep_latest = 2
 save_dir = "weights"
 
 [metrics]
-log_every = 10
+log_every = 2
