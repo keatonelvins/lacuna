@@ -1,12 +1,10 @@
 """Checkpoint saving and loading with torch.save."""
 
-import logging
 from pathlib import Path
 from typing import Any
 
 import torch
-
-logger = logging.getLogger("lacuna")
+from loguru import logger
 
 
 def save_checkpoint(

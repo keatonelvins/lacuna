@@ -1,15 +1,12 @@
 """Data loading, tokenization, and packing for training."""
 
-import logging
-
 import torch
 from datasets import load_dataset
+from loguru import logger
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .config import PretrainConfig, SFTConfig
-
-logger = logging.getLogger("lacuna")
 
 
 def setup_tokenizer(model_name: str) -> PreTrainedTokenizerBase:

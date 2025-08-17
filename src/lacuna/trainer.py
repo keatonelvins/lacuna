@@ -12,6 +12,7 @@ from .checkpoint import cleanup_old_checkpoints, save_checkpoint
 from .config import ModelConfig, PretrainConfig, SFTConfig
 from .data import setup_dataloader
 from .utils import setup_logger
+from loguru import logger
 
 
 def setup_model(config: ModelConfig) -> PreTrainedModel:
@@ -41,7 +42,7 @@ def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
 
 def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
-    logger = setup_logger("lacuna")
+    setup_logger()
 
     # Enable TF32 for free speedup
     torch.backends.cuda.matmul.allow_tf32 = True

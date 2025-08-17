@@ -2,7 +2,7 @@
 name = "Qwen/Qwen2.5-0.5B"
 
 [data]
-dataset_name = "trl-internal-testing/dolly-chatml-sft"
+dataset_name = "keatone/s1K"
 split = "train"
 seq_len = 2048
 num_workers = 0
