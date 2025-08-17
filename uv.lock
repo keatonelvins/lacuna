@@ -419,17 +419,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
+    { name = "flash-attn" },
     { name = "liger-kernel" },
     { name = "pydantic-settings" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "transformers" },
     { name = "wandb" },
-]
-
-[package.optional-dependencies]
-flash-attn = [
-    { name = "flash-attn" },
 ]
 
 [package.dev-dependencies]
@@ -442,7 +438,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "datasets", specifier = ">=4.0.0" },
-    { name = "flash-attn", marker = "extra == 'flash-attn'", specifier = ">=2.8.3" },
+    { name = "flash-attn", specifier = ">=2.8.3" },
     { name = "liger-kernel", specifier = ">=0.6.1" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "torch", specifier = ">=2.8.0" },
@@ -450,7 +446,6 @@ requires-dist = [
     { name = "transformers", specifier = ">=4.55.2" },
     { name = "wandb", specifier = ">=0.21.1" },
 ]
-provides-extras = ["flash-attn"]
 
 [package.metadata.requires-dev]
 dev = [
