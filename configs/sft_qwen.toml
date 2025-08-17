@@ -4,14 +4,14 @@ name = "Qwen/Qwen2.5-0.5B"
 [data]
 dataset_name = "keatone/s1K"
 split = "train"
-seq_len = 2048
+seq_len = 8192
 num_workers = 0
 packing = true
 
 [trainer]
 epochs = 1
 eval_every = 1
-batch_size = 32
+batch_size = 2
 
 [optimizer]
 type = "adamw"
@@ -26,7 +26,7 @@ warmup_steps = 100
 min_lr_ratio = 0.1
 
 [checkpoint]
-save_every = 1000
+save_every = 50
 keep_latest = 3
 save_dir = "weights"
 

@@ -72,10 +72,13 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)
 
+    logger.info("Setting up dataloader")
+    dataloader = setup_dataloader(config, micro_batch_size)
+
     if isinstance(config, PretrainConfig):
         max_steps = config.trainer.steps
     else:  # SFTConfig
-        max_steps = config.trainer.epochs * 1000  # TODO: calculate from dataset size
+        max_steps = len(dataloader) * config.trainer.epochs
 
     # TODO: support linear, wsd, etc.
     scheduler = get_cosine_schedule_with_warmup(
@@ -84,16 +87,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         num_training_steps=max_steps,
     )
 
-    logger.info("Setting up dataloader")
-    dataloader = setup_dataloader(config, micro_batch_size)
-
     # Training state
     step = 0
     total_tokens = 0
 
-    logger.info(
-        f"Starting training: {max_steps} steps, {gradient_accumulation_steps} grad accumulation"
-    )
+    logger.info(f"Starting training: {max_steps} steps")
 
     try:
         dataloader_iter = iter(dataloader)
