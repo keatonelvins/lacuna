@@ -23,8 +23,6 @@ lacuna/
 ├── configs/
 │   ├── pretrain_qwen.toml  # Pretrain config
 │   └── sft_qwen.toml       # SFT config  
-├── scripts/
-│   └── launch.sh           # torchrun wrapper
 └── TODO.md                 # This file
 ```
 
@@ -33,10 +31,10 @@ lacuna/
 ### Phase 1: Minimal Working Trainer (Days 1-3)
 **Goal**: Train a small model end-to-end on single GPU
 
-- [ ] **Config System**
-  - [ ] Pydantic models for PretrainConfig and SFTConfig in `config.py`
-  - [ ] TOML loading with CLI overrides in `train.py`
-  - [ ] Opinionated defaults (AdamW, cosine, bf16)
+- [x] **Config System** ✅
+  - [x] Pydantic models for PretrainConfig and SFTConfig in `config.py`
+  - [x] TOML loading with CLI overrides in `train.py`
+  - [x] Opinionated defaults (AdamW, cosine, bf16)
 
 - [ ] **Model Loading**
   - [ ] Direct `AutoModelForCausalLM.from_pretrained()` in `trainer.py`
@@ -86,12 +84,12 @@ lacuna/
   - [ ] Handle node failures gracefully
   - [ ] Checkpoint to shared filesystem
 
-- [ ] **CLI Entrypoints** (Following PRIME-RL pattern)
-  - [ ] `uv run pretrain` - Pretraining entry point
-  - [ ] `uv run sft` - Supervised fine-tuning entry point  
+- [x] **CLI Entrypoints** ✅ (Simplified approach)
+  - [x] `uv run pt` - Pretraining entry point (renamed from pretrain)
+  - [x] `uv run sft` - Supervised fine-tuning entry point  
   - [ ] `uv run chat` - Terminal chat interface for testing models
-  - [ ] Support `@` config file syntax like `uv run sft @ configs/sft_qwen.toml`
-  - [ ] Support CLI overrides like `--model-name`, `--batch-size`
+  - [x] Support config file syntax like `uv run sft configs/sft_qwen.toml`
+  - [x] Support CLI overrides like `--model.name`, `--optimizer.lr`
 
 - [ ] **Terminal Chat Interface**
   - [ ] Simple terminal-based chat in `scripts/chat.py`
@@ -134,10 +132,10 @@ lacuna/
 ## First PR Checklist
 ```bash
 # Minimal trainer that can:
-uv run pretrain @ configs/pretrain_qwen.toml \
-  --model-name Qwen/Qwen2.5-0.5B \
-  --batch-size 4 \
-  --steps 100
+uv run pt configs/pretrain_qwen.toml \
+  --model.name Qwen/Qwen2.5-0.5B \
+  --data.batch-size 4 \
+  --max-steps 100
 
 # Should output:
 # - Loss decreasing

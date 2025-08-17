@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ModelConfig(BaseModel):
@@ -95,7 +95,11 @@ class PretrainConfig(BaseSettings):
     )
     gradient_clipping: float = Field(1.0, gt=0, description="Gradient clipping norm")
 
-    model_config = {"env_prefix": "LACUNA_"}
+    model_config = SettingsConfigDict(
+        cli_parse_args=True,
+        cli_kebab_case=True,
+        cli_implicit_flags=True,
+    )
 
 
 class SFTConfig(BaseSettings):
@@ -115,4 +119,8 @@ class SFTConfig(BaseSettings):
     )
     gradient_clipping: float = Field(1.0, gt=0, description="Gradient clipping norm")
 
-    model_config = {"env_prefix": "LACUNA_"}
+    model_config = SettingsConfigDict(
+        cli_parse_args=True,
+        cli_kebab_case=True,
+        cli_implicit_flags=True,
+    )
