@@ -20,6 +20,7 @@ sft = "lacuna.train:sft_main"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.3.0",
     "ruff>=0.12.9",
     "ty>=0.0.1a18",
 ]

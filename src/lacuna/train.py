@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Type, TypeVar
 
-import tomli
+import tomllib
 from pydantic_settings import BaseSettings
 
 from lacuna.config import PretrainConfig, SFTConfig
@@ -16,14 +16,14 @@ T = TypeVar("T", bound=BaseSettings)
 def parse_config_file(config_cls: Type[T], config_path: Path) -> T:
     """Parse TOML config file into pydantic settings."""
     with open(config_path, "rb") as f:
-        toml_data = tomli.load(f)
+        toml_data = tomllib.load(f)
     return config_cls(**toml_data)
 
 
 def parse_argv(config_cls: Type[T]) -> T:
     """Parse CLI args with @ syntax for TOML files."""
     args = sys.argv[1:]
-    
+
     if len(args) >= 2 and args[0] == "@":
         config_path = Path(args[1])
         cli_overrides = args[2:]
@@ -33,12 +33,12 @@ def parse_argv(config_cls: Type[T]) -> T:
     else:
         config_path = None
         cli_overrides = args
-    
+
     if config_path:
         config = parse_config_file(config_cls, config_path)
     else:
         config = config_cls()
-    
+
     # Apply CLI overrides
     if cli_overrides:
         override_dict = {}
@@ -47,7 +47,9 @@ def parse_argv(config_cls: Type[T]) -> T:
             arg = cli_overrides[i]
             if arg.startswith("--"):
                 key = arg[2:].replace("-", "_")
-                if i + 1 < len(cli_overrides) and not cli_overrides[i + 1].startswith("--"):
+                if i + 1 < len(cli_overrides) and not cli_overrides[i + 1].startswith(
+                    "--"
+                ):
                     value = cli_overrides[i + 1]
                     # Try to parse as int/float/bool
                     if value.lower() in ("true", "false"):
@@ -65,12 +67,12 @@ def parse_argv(config_cls: Type[T]) -> T:
                     i += 1
             else:
                 i += 1
-        
+
         # Create new instance with overrides
         config_dict = config.model_dump()
         config_dict.update(override_dict)
         config = config_cls(**config_dict)
-    
+
     return config
 
 
