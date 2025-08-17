@@ -16,12 +16,7 @@ from loguru import logger
 
 
 def setup_model(config: ModelConfig) -> PreTrainedModel:
-    """Load model with flash attention and liger kernels"""
-
-    # Make sure TF32 is enabled
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
-
+    """Load model with flash attention and liger kernels."""
     return AutoLigerKernelForCausalLM.from_pretrained(
         config.name,
         torch_dtype=torch.bfloat16,
@@ -31,7 +26,7 @@ def setup_model(config: ModelConfig) -> PreTrainedModel:
 
 
 def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
-    """Setup AdamW optimizer with opinionated defaults."""
+    """Setup AdamW optimizer."""
     return torch.optim.AdamW(
         model.parameters(),
         lr=config.optimizer.lr,
@@ -61,14 +56,12 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         f"GPU setup: {num_gpus} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
     )
 
-    # Setup model
     logger.info(f"Loading model: {config.model.name}")
     model = setup_model(config.model)
 
     model = model.cuda()
     model.train()
 
-    # Setup optimizer
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)
 
@@ -87,7 +80,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         num_training_steps=max_steps,
     )
 
-    # Training state
     step = 0
     total_tokens = 0
 
@@ -104,29 +96,25 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             try:
                 batch = next(dataloader_iter)
             except StopIteration:
-                # Reset dataloader if we run out of data
+                # TODO: should we just stop?
                 dataloader_iter = iter(dataloader)
                 batch = next(dataloader_iter)
 
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
-            # Forward pass
             with autocast("cuda", dtype=torch.bfloat16):
                 outputs = model(**model_inputs)
                 loss = outputs.loss
 
-            # Backward pass
             loss.backward()
             accumulated_loss += loss.item()
 
-            # Apply grad clip
             grad_norm = torch.nn.utils.clip_grad_norm_(
                 model.parameters(), config.optimizer.grad_clip
             )
             optimizer.step()
             scheduler.step()
 
-            # Metrics
             step_tokens = batch_size * config.data.seq_len
             total_tokens += step_tokens
 
@@ -144,7 +132,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
                 torch.cuda.reset_peak_memory_stats()
 
-            # Checkpoint saving
             if step > 0 and step % config.checkpoint.save_every == 0:
                 logger.info(f"Saving checkpoint at step {step}")
                 checkpoint_path = config.checkpoint.save_dir / f"step_{step}.pt"
@@ -156,7 +143,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     total_tokens=total_tokens,
                     path=checkpoint_path,
                 )
-                # Cleanup old checkpoints
                 cleanup_old_checkpoints(
                     config.checkpoint.save_dir, config.checkpoint.keep_latest
                 )

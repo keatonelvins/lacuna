@@ -52,26 +52,17 @@ class _SegmentTree:
         return self.tree[i]
 
 
-def _pad(
-    tensors: list[torch.Tensor], padding_value: int, padding_side: str = "right"
-) -> torch.Tensor:
+def _pad(tensors: list[torch.Tensor], padding_value: int) -> torch.Tensor:
     """Pad tensors to same length."""
     max_len = max(len(t) for t in tensors)
     padded = []
     for tensor in tensors:
         pad_len = max_len - len(tensor)
-        if padding_side == "right":
-            padded.append(
-                torch.cat(
-                    [tensor, torch.full((pad_len,), padding_value, dtype=tensor.dtype)]
-                )
+        padded.append(
+            torch.cat(
+                [tensor, torch.full((pad_len,), padding_value, dtype=tensor.dtype)]
             )
-        else:
-            padded.append(
-                torch.cat(
-                    [torch.full((pad_len,), padding_value, dtype=tensor.dtype), tensor]
-                )
-            )
+        )
     return torch.stack(padded)
 
 

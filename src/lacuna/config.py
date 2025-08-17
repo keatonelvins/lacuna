@@ -8,17 +8,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ModelConfig(BaseModel):
-    """Model loading config"""
+    """Model config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
 
 
 class OptimizerConfig(BaseModel):
-    """AdamW optimizer config"""
+    """Optimizer config"""
 
     type: Literal["adamw"] = "adamw"
     lr: float = Field(3e-4, gt=0, description="Learning rate")
-    weight_decay: float = Field(0.1, ge=0, description="Weight decay")
+    weight_decay: float = Field(0.01, ge=0, description="Weight decay")
     betas: tuple[float, float] = Field((0.9, 0.95), description="Adam betas")
     grad_clip: float = Field(1.0, gt=0, description="Gradient clipping norm")
 
@@ -27,9 +27,9 @@ class SchedulerConfig(BaseModel):
     """LR scheduler config"""
 
     type: Literal["cosine"] = "cosine"
-    warmup_steps: int = Field(100, ge=0, description="Warmup steps")
+    warmup_steps: int = Field(50, ge=0, description="Warmup steps")
     min_lr_ratio: float = Field(
-        0.1, ge=0, le=1, description="Minimum LR as ratio of max LR"
+        0, ge=0, le=1, description="Minimum LR as ratio of max LR"
     )
 
 
@@ -92,7 +92,7 @@ class SFTTrainerConfig(TrainerConfig):
 
 
 class PretrainConfig(BaseSettings):
-    """Pretraining config"""
+    """Pretraining config loader"""
 
     model: ModelConfig = ModelConfig()
     data: PretrainDataConfig = PretrainDataConfig()
@@ -110,7 +110,7 @@ class PretrainConfig(BaseSettings):
 
 
 class SFTConfig(BaseSettings):
-    """SFT config"""
+    """SFT config loader"""
 
     model: ModelConfig = ModelConfig()
     data: SFTDataConfig = SFTDataConfig()
