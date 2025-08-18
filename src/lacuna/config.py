@@ -55,6 +55,25 @@ class SFTDataConfig(DataConfig):
     packing: bool = Field(True, description="Pack multiple message lists per sample")
 
 
+class FSDPConfig(BaseModel):
+    """FSDP distributed training config"""
+
+    enabled: bool = Field(True, description="Enable FSDP (auto-detects multi-GPU)")
+    reshard_after_forward: bool = Field(
+        True, description="Reshard params after forward pass"
+    )
+    cpu_offload: bool = Field(False, description="Offload params to CPU")
+
+
+class TorchrunConfig(BaseModel):
+    """Torchrun distributed config"""
+
+    nproc_per_node: int = Field(8, ge=1, description="Number of processes per node")
+    nnodes: int = Field(1, ge=1, description="Number of nodes")
+    master_addr: str = Field("localhost", description="Master node address")
+    master_port: str = Field("29500", description="Master node port")
+
+
 class TrainerConfig(BaseModel):
     """Training loop config"""
 
@@ -101,6 +120,8 @@ class PretrainConfig(BaseSettings):
     scheduler: SchedulerConfig = SchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
+    fsdp: FSDPConfig = FSDPConfig()
+    torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
         cli_parse_args=True,
@@ -119,6 +140,8 @@ class SFTConfig(BaseSettings):
     scheduler: SchedulerConfig = SchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
+    fsdp: FSDPConfig = FSDPConfig()
+    torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
         cli_parse_args=True,

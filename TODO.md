@@ -6,20 +6,20 @@
 - **HF models directly** - no registry needed
 - **<100k tokens total** - every line counts
 
-## Architecture (10 files, ~5k lines total)
+## Architecture (9 files, ~1067 lines total)
 
 ```
 lacuna/
 ├── src/lacuna/
-│   ├── __init__.py         # Package init
-│   ├── config.py           # Pydantic configs (pretrain + sft)
-│   ├── cli.py              # Entry point, arg parsing
-│   ├── trainer.py          # Core training loop
-│   ├── data.py             # Dataloader, tokenization, packing
-│   ├── checkpoint.py       # Save/load with torch.save
-│   ├── metrics.py          # MFU, memory, throughput
-│   ├── distributed.py      # FSDP setup, world info
-│   └── utils.py            # Logging, misc helpers
+│   ├── __init__.py         # Package init - 3 lines
+│   ├── config.py           # Pydantic configs (pretrain + sft) - 150 lines
+│   ├── cli.py              # Entry point, arg parsing, torchrun - 82 lines
+│   ├── trainer.py          # Core training loop - 173 lines
+│   ├── data.py             # Dataloader, tokenization, packing - 472 lines
+│   ├── checkpoint.py       # Save/load with torch.save - 69 lines
+│   ├── metrics.py          # MFU, memory, throughput (TODO) - 11 lines
+│   ├── distributed.py      # FSDP setup, world info - 86 lines
+│   └── utils.py            # Logging, misc helpers - 21 lines
 ├── configs/
 │   ├── pt_qwen.toml        # Integration test config (TinierStories, 20 steps)
 │   └── sft_qwen.toml       # Integration test config (tiny dataset)  
@@ -59,10 +59,10 @@ lacuna/
   - [ ] Mixed precision with bf16
   - [ ] Gradient checkpointing for memory
 
-- [X] **SFT with Packing**
+- [X] **SFT with Packing** ✅ COMPLETED
   - [X] Parse OpenAI chat format in `data.py`
   - [X] Pack multiple conversations per batch (Best Fit Decreasing)
-  - [X] Mask non-assistant tokens in loss
+  - [X] Assistant-only loss masking with -100 labels
 
 - [ ] **Performance Monitoring**
   - [ ] Calculate MFU based on model size in `metrics.py`
@@ -83,12 +83,13 @@ lacuna/
   - [ ] Handle node failures gracefully
   - [ ] Checkpoint to shared filesystem
 
-- [x] **CLI Entrypoints** ✅ (Simplified approach)
+- [x] **CLI Entrypoints** ✅ COMPLETED
   - [x] `uv run pt` - Pretraining entry point (renamed from pretrain)
   - [x] `uv run sft` - Supervised fine-tuning entry point  
+  - [x] `--torchrun` flag for distributed training
   - [ ] `uv run chat` - Terminal chat interface for testing models
   - [x] Support config file syntax like `uv run sft configs/sft_qwen.toml`
-  - [x] Support CLI overrides like `--model.name`, `--optimizer.lr`
+  - [x] Support CLI overrides like `--model.name`, `--torchrun.nproc-per-node`
 
 - [ ] **Terminal Chat Interface**
   - [ ] Simple terminal-based chat in `scripts/chat.py`
@@ -112,11 +113,10 @@ lacuna/
 - **FSDP** - Simpler than DDP+ZeRO, built into PyTorch
 
 ## Code Style
-- Type hints everywhere (jaxtyping for tensors)
 - Validate configs with Pydantic
 - Clear variable names, no abbreviations
 - Docstrings for public functions only
-- No comments in code (self-documenting)
+- Minimal comments in code (self-documenting)
 
 ## Integration Test Validation ✅ WORKING
 ```bash
@@ -137,11 +137,12 @@ uv run pt configs/pt_qwen.toml \
 ```
 
 ## Success Metrics
-- ✅ Full pretrain in <1000 lines
-- ✅ Full SFT in <500 lines  
-- ✅ Configs in <200 lines
-- ✅ >50% MFU on H100
-- ✅ Seamless multi-node scaling
+- ✅ Full framework in ~1067 lines (target <2000)
+- ✅ Configs in 150 lines (target <200)  
+- ✅ Clean CLI with torchrun integration
+- ✅ SFT with assistant masking and packing
+- [ ] >50% MFU on H100 (need metrics.py implementation)
+- [ ] Seamless multi-node scaling (FSDP TODO)
 - ✅ Zero external dependencies beyond core libs
 
 This approach prioritizes **getting the fundamentals perfect** over flexibility. We make the right choices so users don't have to think about them.

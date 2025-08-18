@@ -11,6 +11,7 @@ from transformers import PreTrainedModel, get_cosine_schedule_with_warmup
 from .checkpoint import cleanup_old_checkpoints, save_checkpoint
 from .config import ModelConfig, PretrainConfig, SFTConfig
 from .data import setup_dataloader
+from .distributed import get_world_size, init_distributed, setup_fsdp
 from .utils import setup_logger
 from loguru import logger
 
@@ -39,20 +40,24 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
 
+    init_distributed()
+
     # Enable TF32, use "highest" for FP32
     torch.set_float32_matmul_precision("high")
 
-    # Detect number of GPUs and calculate batch sizes
-    num_gpus = torch.cuda.device_count() or 1
+    # Calculate world size and batch sizes
+    world_size = get_world_size()
     batch_size = config.trainer.batch_size
 
-    if not batch_size % num_gpus == 0:
-        raise ValueError(f"Batch size {batch_size} must be divisible by {num_gpus}")
+    if not batch_size % world_size == 0:
+        raise ValueError(
+            f"Batch size {batch_size} must be divisible by world_size {world_size}"
+        )
 
-    micro_batch_size = batch_size // num_gpus
+    micro_batch_size = batch_size // world_size
 
     logger.info(
-        f"GPU setup: {num_gpus} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
+        f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
     )
 
     logger.info(f"Loading model: {config.model.name}")
@@ -60,6 +65,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     model = model.cuda()
     model.train()
+
+    # Apply FSDP if enabled and multi-GPU
+    if config.fsdp.enabled and world_size > 1:
+        model = setup_fsdp(model, config.fsdp.reshard_after_forward)
 
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)

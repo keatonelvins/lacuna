@@ -9,11 +9,12 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from datasets import load_dataset
 from loguru import logger
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, DistributedSampler
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 from typing import Any
 
 from .config import PretrainConfig, SFTConfig
+from .distributed import get_world_size
 
 
 # From: https://github.com/huggingface/trl/blob/d15049bf71e6e33b2e6c10ff25a26d488bce8173/trl/data_utils.py#L450-L698
@@ -283,7 +284,7 @@ class SFTDataset(Dataset):
         # Load dataset
         dataset = load_dataset(dataset_name, split=split)
 
-        if dataset.column_names and "messages" not in dataset.column_names:
+        if "messages" not in dataset.column_names:
             logger.error(f"Expected 'messages' column, found: {dataset.column_names}")
             raise ValueError("SFTDataset requires a 'messages' column in OpenAI format")
 
@@ -447,10 +448,18 @@ def setup_dataloader(
 
     collator = DataCollator(pad_token_id=tokenizer.pad_token_id, packing=packing)
 
+    # Use distributed sampler for multi-GPU training
+    sampler = None
+    shuffle = True
+    if get_world_size() > 1:
+        sampler = DistributedSampler(dataset, shuffle=True)
+        shuffle = False  # Don't shuffle when using sampler
+
     dataloader = DataLoader(
         dataset,
         batch_size=micro_batch_size,
-        shuffle=True,
+        shuffle=shuffle,
+        sampler=sampler,
         num_workers=config.data.num_workers,
         pin_memory=True,
         collate_fn=collator,

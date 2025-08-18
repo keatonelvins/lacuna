@@ -6,6 +6,8 @@ from typing import Any
 import torch
 from loguru import logger
 
+from .distributed import get_rank
+
 
 def save_checkpoint(
     model: Any,
@@ -16,6 +18,9 @@ def save_checkpoint(
     path: Path,
 ) -> None:
     """Save checkpoint with model, optimizer, and training state."""
+    if get_rank() != 0:
+        return
+
     # Create parent directory if needed
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -44,6 +49,9 @@ def load_checkpoint(path: Path) -> dict[str, Any]:
 
 def cleanup_old_checkpoints(save_dir: Path, keep_latest: int) -> None:
     """Remove old checkpoints, keeping only the most recent ones."""
+    if get_rank() != 0:
+        return
+
     if not save_dir.exists():
         return
 

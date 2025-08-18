@@ -5,20 +5,23 @@ Tiny, memory-efficient trainer for continued pretraining and finetuning of popul
 ## Quick Start
 
 ```bash
-# Install
+# Single command install (w/ flash-attn)
 uv sync
 
-# Pretraining
-uv run pt configs/pt_qwen.toml
-uv run pt configs/pt_qwen.toml --model.name Qwen/Qwen2.5-1.5B --max-steps 5000
-
-# Fine-tuning  
-uv run sft configs/sft_qwen.toml
-uv run sft configs/sft_qwen.toml --optimizer.lr 1e-5 --epochs 3
-
-# See all options
+# See all config options
 uv run pt --help
 uv run sft --help
+
+# Pass args directly
+uv run pt --model.name Qwen/Qwen2.5-0.5B --max-steps 5000
+
+# Load args from a toml (w/ overrides)
+uv run sft configs/sft_qwen.toml
+uv run sft configs/sft_qwen.toml --optimizer.lr 1e-5
+
+# Multi-GPU w/ torchrun (multi-node otw)
+uv run pt --torchrun configs/pt_qwen.toml
+uv run sft --torchrun --torchrun.master-addr $HOST_NODE_ADDR configs/sft_qwen.toml
 
 # Log runs + access gated repos
 uv run wandb login
