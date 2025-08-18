@@ -5,9 +5,16 @@ from typing import Any
 
 import torch
 import torch.distributed as dist
-from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard
+from torch.distributed.fsdp import (
+    CPUOffloadPolicy,
+    MixedPrecisionPolicy,
+    ShardingStrategy,
+    fully_shard,
+)
 from transformers import PreTrainedModel
 from loguru import logger
+
+from .config import FSDPShardingStrategy
 
 
 def init_distributed() -> None:
@@ -49,9 +56,13 @@ def get_world_info() -> dict[str, Any]:
 
 
 def setup_fsdp(
-    model: PreTrainedModel, reshard_after_forward: bool = True
+    model: PreTrainedModel,
+    reshard_after_forward: bool = True,
+    cpu_offload: bool = False,
+    sharding_strategy: FSDPShardingStrategy = FSDPShardingStrategy.FULL_SHARD,
 ) -> PreTrainedModel:
-    """Setup FSDP wrapping following PRIME-RL pattern."""
+    """Setup FSDP wrapping."""
+
     if not dist.is_initialized():
         logger.info("FSDP disabled - single GPU training")
         return model
@@ -59,11 +70,19 @@ def setup_fsdp(
     logger.info("Setting up FSDP...")
 
     mp_policy = MixedPrecisionPolicy(
-        param_dtype=torch.bfloat16, reduce_dtype=torch.float32
+        param_dtype=torch.bfloat16,
+        reduce_dtype=torch.float32,
+        output_dtype=torch.bfloat16,
     )
 
-    # Wrap transformer layers
-    # TODO: look into best practices for FSDP
+    cpu_offload_policy = CPUOffloadPolicy(pin_memory=True) if cpu_offload else None
+
+    torch_strategy = getattr(ShardingStrategy, sharding_strategy.value)
+
+    logger.info(
+        f"FSDP Config: strategy={sharding_strategy.value}, cpu_offload={cpu_offload}"
+    )
+
     if hasattr(model, "model") and hasattr(model.model, "layers"):
         layers = model.model.layers
         num_layers = len(layers)
@@ -74,13 +93,23 @@ def setup_fsdp(
             fully_shard(
                 transformer_block,
                 mp_policy=mp_policy,
+                cpu_offload_policy=cpu_offload_policy,
                 reshard_after_forward=layer_reshard,
+                sharding_strategy=torch_strategy,
+                sync_module_states=True,  # Ensure consistent initialization
             )
 
         logger.info(f"Wrapped {num_layers} transformer layers with FSDP")
 
-    # Wrap entire model
-    fully_shard(model, mp_policy=mp_policy, reshard_after_forward=reshard_after_forward)
+    # Wrap entire model with FSDP
+    fully_shard(
+        model,
+        mp_policy=mp_policy,
+        cpu_offload_policy=cpu_offload_policy,
+        reshard_after_forward=reshard_after_forward,
+        sharding_strategy=torch_strategy,
+        sync_module_states=True,
+    )
 
     logger.info("FSDP setup complete")
     return model

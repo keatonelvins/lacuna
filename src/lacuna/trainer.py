@@ -8,7 +8,7 @@ from torch.amp import autocast
 from liger_kernel.transformers import AutoLigerKernelForCausalLM
 from transformers import PreTrainedModel, get_cosine_schedule_with_warmup
 
-from .checkpoint import cleanup_old_checkpoints, save_checkpoint
+from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoint
 from .config import ModelConfig, PretrainConfig, SFTConfig
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_fsdp
@@ -68,7 +68,12 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     # Apply FSDP if enabled and multi-GPU
     if config.fsdp.enabled and world_size > 1:
-        model = setup_fsdp(model, config.fsdp.reshard_after_forward)
+        model = setup_fsdp(
+            model,
+            reshard_after_forward=config.fsdp.reshard_after_forward,
+            cpu_offload=config.fsdp.cpu_offload,
+            sharding_strategy=config.fsdp.sharding_strategy,
+        )
 
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)
@@ -88,15 +93,28 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         num_training_steps=max_steps,
     )
 
-    step = 0
+    start_step = 0
     total_tokens = 0
 
-    logger.info(f"Starting training: {max_steps} steps")
+    # Resume from checkpoint if specified
+    if config.checkpoint.resume_path is not None:
+        logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_path}")
+        training_state = load_checkpoint(
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            path=config.checkpoint.resume_path,
+        )
+        start_step = training_state["step"]
+        total_tokens = training_state["total_tokens"]
+        logger.info(f"Resumed from step {start_step}, total tokens: {total_tokens:,}")
+
+    logger.info(f"Starting training: {max_steps} steps (current step: {start_step})")
 
     try:
         dataloader_iter = iter(dataloader)
 
-        for step in range(max_steps):
+        for step in range(start_step, max_steps):
             step_start_time = time.time()
             accumulated_loss = 0.0
             optimizer.zero_grad()
@@ -142,7 +160,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
             if step > 0 and step % config.checkpoint.save_every == 0:
                 logger.info(f"Saving checkpoint at step {step}")
-                checkpoint_path = config.checkpoint.save_dir / f"step_{step}.pt"
+                checkpoint_path = config.checkpoint.save_dir / f"step_{step}"
                 save_checkpoint(
                     model=model,
                     optimizer=optimizer,
@@ -160,7 +178,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     finally:
         logger.info("Saving final checkpoint")
-        final_path = config.checkpoint.save_dir / "final.pt"
+        final_path = config.checkpoint.save_dir / "final"
         save_checkpoint(
             model=model,
             optimizer=optimizer,

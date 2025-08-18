@@ -1,7 +1,8 @@
 """Pydantic configurations for pretraining and SFT."""
 
+from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -55,6 +56,16 @@ class SFTDataConfig(DataConfig):
     packing: bool = Field(True, description="Pack multiple message lists per sample")
 
 
+class FSDPShardingStrategy(str, Enum):
+    """FSDP sharding strategies."""
+
+    FULL_SHARD = "FULL_SHARD"
+    SHARD_GRAD_OP = "SHARD_GRAD_OP"
+    NO_SHARD = "NO_SHARD"
+    HYBRID_SHARD = "HYBRID_SHARD"
+    _HYBRID_SHARD_ZERO2 = "_HYBRID_SHARD_ZERO2"
+
+
 class FSDPConfig(BaseModel):
     """FSDP distributed training config"""
 
@@ -62,7 +73,10 @@ class FSDPConfig(BaseModel):
     reshard_after_forward: bool = Field(
         True, description="Reshard params after forward pass"
     )
-    cpu_offload: bool = Field(False, description="Offload params to CPU")
+    cpu_offload: bool = Field(False, description="Offload params to CPU for memory")
+    sharding_strategy: FSDPShardingStrategy = Field(
+        FSDPShardingStrategy.FULL_SHARD, description="FSDP sharding strategy"
+    )
 
 
 class TorchrunConfig(BaseModel):
@@ -94,6 +108,9 @@ class CheckpointConfig(BaseModel):
         3, gt=0, description="Number of recent checkpoints to keep"
     )
     save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
+    resume_path: Optional[Path] = Field(
+        None, description="Path to checkpoint to resume from"
+    )
 
 
 class PretrainTrainerConfig(TrainerConfig):
