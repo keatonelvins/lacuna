@@ -148,7 +148,6 @@ class DataCollator:
 
     pad_token_id: int
     packing: bool = True
-    return_position_ids: bool = True
 
     def __call__(self, examples: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
         input_ids = [torch.tensor(example["input_ids"]) for example in examples]
@@ -161,17 +160,16 @@ class DataCollator:
                 "labels": torch.cat(labels, dim=0).unsqueeze(0),
             }
 
-            if self.return_position_ids:
-                if "seq_lengths" in examples[0]:
-                    # Use packed sequence lengths for position IDs
-                    position_ids = self._get_position_ids_from_packed_seq_lengths(
-                        [example["seq_lengths"] for example in examples]
-                    )
-                    output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
-                else:
-                    # Generate position IDs for individual sequences
-                    position_ids = [torch.arange(len(ids)) for ids in input_ids]
-                    output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
+            if "seq_lengths" in examples[0]:
+                # Use packed sequence lengths for position IDs
+                position_ids = self._get_position_ids_from_packed_seq_lengths(
+                    [example["seq_lengths"] for example in examples]
+                )
+                output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
+            else:
+                # Generate position IDs for individual sequences
+                position_ids = [torch.arange(len(ids)) for ids in input_ids]
+                output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
         else:
             # Traditional padding
             output = {
@@ -180,9 +178,8 @@ class DataCollator:
                 "labels": _pad(labels, -100),
             }
 
-            if self.return_position_ids:
-                position_ids = [torch.arange(len(ids)) for ids in input_ids]
-                output["position_ids"] = _pad(position_ids, 0)
+            position_ids = [torch.arange(len(ids)) for ids in input_ids]
+            output["position_ids"] = _pad(position_ids, 0)
 
         return output
 
@@ -192,16 +189,16 @@ class DataCollator:
     ) -> list[torch.Tensor]:
         """Generate position IDs for packed sequences."""
         example_lengths = [sum(seq_lengths) for seq_lengths in batch_seq_lengths]
-        batch_seq_lengths = torch.tensor(
+        batch_seq_tensor = torch.tensor(
             [
                 seq_length
                 for seq_lengths in batch_seq_lengths
                 for seq_length in seq_lengths
             ]
         )
-        position_ids = torch.ones(sum(example_lengths), dtype=batch_seq_lengths.dtype)
+        position_ids = torch.ones(sum(example_lengths), dtype=batch_seq_tensor.dtype)
         position_ids[0] = 0
-        position_ids[batch_seq_lengths[:-1].cumsum(0)] = -(batch_seq_lengths[:-1] - 1)
+        position_ids[batch_seq_tensor[:-1].cumsum(0)] = -(batch_seq_tensor[:-1] - 1)
         position_ids = position_ids.cumsum(0)
         return list(position_ids.split(example_lengths))
 
@@ -286,7 +283,7 @@ class SFTDataset(Dataset):
         # Load dataset
         dataset = load_dataset(dataset_name, split=split)
 
-        if "messages" not in dataset.column_names:
+        if dataset.column_names and "messages" not in dataset.column_names:
             logger.error(f"Expected 'messages' column, found: {dataset.column_names}")
             raise ValueError("SFTDataset requires a 'messages' column in OpenAI format")
 
@@ -448,11 +445,7 @@ def setup_dataloader(
         )
         packing = config.data.packing
 
-    collator = DataCollator(
-        pad_token_id=tokenizer.pad_token_id,
-        packing=packing,
-        return_position_ids=True,
-    )
+    collator = DataCollator(pad_token_id=tokenizer.pad_token_id, packing=packing)
 
     dataloader = DataLoader(
         dataset,

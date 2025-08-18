@@ -10,7 +10,7 @@ num_workers = 0
 [trainer]
 steps = 20
 eval_every = 10
-batch_size = 4
+batch_size = 8
 
 [optimizer]
 type = "adamw"

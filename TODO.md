@@ -59,10 +59,10 @@ lacuna/
   - [ ] Mixed precision with bf16
   - [ ] Gradient checkpointing for memory
 
-- [ ] **SFT with Packing**
-  - [ ] Parse OpenAI chat format in `data.py`
-  - [ ] Pack multiple conversations per batch (First Fit Decreasing)
-  - [ ] Mask non-assistant tokens in loss
+- [X] **SFT with Packing**
+  - [X] Parse OpenAI chat format in `data.py`
+  - [X] Pack multiple conversations per batch (Best Fit Decreasing)
+  - [X] Mask non-assistant tokens in loss
 
 - [ ] **Performance Monitoring**
   - [ ] Calculate MFU based on model size in `metrics.py`
@@ -110,15 +110,6 @@ lacuna/
 - **Flash Attention 2** - When available (most GPUs now)
 - **Liger kernels** - Auto-detect and apply
 - **FSDP** - Simpler than DDP+ZeRO, built into PyTorch
-
-### Never Add (Keep It Simple):
-- ❌ Multiple optimizers - AdamW is enough
-- ❌ Complex schedulers - Cosine works great
-- ❌ Model registry - HF names in config
-- ❌ Factory patterns - Direct instantiation
-- ❌ FP8 - Not worth complexity yet
-- ❌ Pipeline/Tensor parallel - FSDP handles most cases
-- ❌ Custom kernels - Liger/Flash are sufficient
 
 ## Code Style
 - Type hints everywhere (jaxtyping for tensors)

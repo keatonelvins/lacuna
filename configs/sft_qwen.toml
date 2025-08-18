@@ -2,16 +2,16 @@
 name = "Qwen/Qwen2.5-0.5B"
 
 [data]
-dataset_name = "keatone/s1K"
+dataset_name = "trl-internal-testing/dolly-chatml-sft"
 split = "train"
-seq_len = 8192
+seq_len = 2048
 num_workers = 0
 packing = true
 
 [trainer]
 epochs = 1
 eval_every = 1
-batch_size = 2
+batch_size = 8
 
 [optimizer]
 type = "adamw"
@@ -26,8 +26,8 @@ warmup_steps = 100
 min_lr_ratio = 0.1
 
 [checkpoint]
-save_every = 50
-keep_latest = 3
+save_every = 10
+keep_latest = 2
 save_dir = "weights"
 
 [metrics]
