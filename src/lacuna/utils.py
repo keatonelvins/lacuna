@@ -11,7 +11,6 @@ def _rank_filter(record):
 
 
 def setup_logger() -> None:
-    """Configure loguru with colored output and timestamps."""
     logger.remove()  # Remove default handler
     logger.add(
         sink=lambda msg: print(msg, end=""),

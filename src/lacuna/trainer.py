@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 import torch
+from rich.pretty import pprint
 from torch.amp import autocast
 from liger_kernel.transformers import AutoLigerKernelForCausalLM
 from transformers import PreTrainedModel, get_cosine_schedule_with_warmup
@@ -40,12 +41,15 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
 
+    logger.info("Starting training with config:")
+    # TODO: merge into logger
+    pprint(config, expand_all=True)  # omg Will you've outdone yourself
+
     init_distributed()
 
-    # Enable TF32, use "highest" for FP32
+    # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
 
-    # Calculate world size and batch sizes
     world_size = get_world_size()
     batch_size = config.trainer.batch_size
 
@@ -122,7 +126,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             try:
                 batch = next(dataloader_iter)
             except StopIteration:
-                # TODO: should we just stop?
+                # TODO: should we flag for pt?
                 dataloader_iter = iter(dataloader)
                 batch = next(dataloader_iter)
 
@@ -174,7 +178,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 )
 
     except KeyboardInterrupt:
-        logger.info("Training interrupted, ending loop")
+        logger.info("Training interrupted!!!")
 
     finally:
         logger.info("Saving final checkpoint")
@@ -188,4 +192,4 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             path=final_path,
         )
 
-        logger.info(f"All done! Final step: {step}, Total tokens: {total_tokens:,}")
+        logger.info(f"All done! Total steps: {step}, Total tokens: {total_tokens:,}")

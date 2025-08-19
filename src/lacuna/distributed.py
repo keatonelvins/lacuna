@@ -87,8 +87,8 @@ def setup_fsdp(
         layers = model.model.layers
         num_layers = len(layers)
 
+        # TODO: read up more on torchtitan/nemo practices
         for layer_id, transformer_block in enumerate(layers):
-            # Reshard all but last layer to save memory
             layer_reshard = reshard_after_forward and (layer_id < num_layers - 1)
             fully_shard(
                 transformer_block,
@@ -96,12 +96,11 @@ def setup_fsdp(
                 cpu_offload_policy=cpu_offload_policy,
                 reshard_after_forward=layer_reshard,
                 sharding_strategy=torch_strategy,
-                sync_module_states=True,  # Ensure consistent initialization
+                sync_module_states=True,
             )
 
         logger.info(f"Wrapped {num_layers} transformer layers with FSDP")
 
-    # Wrap entire model with FSDP
     fully_shard(
         model,
         mp_policy=mp_policy,

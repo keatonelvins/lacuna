@@ -17,6 +17,7 @@ from .config import PretrainConfig, SFTConfig
 from .distributed import get_world_size
 
 
+# Fast Best Fit Decreasing sample packing strategy
 # From: https://github.com/huggingface/trl/blob/d15049bf71e6e33b2e6c10ff25a26d488bce8173/trl/data_utils.py#L450-L698
 class _SegmentTree:
     def __init__(self, maxval: int):
@@ -145,7 +146,7 @@ def _pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
 
 @dataclass
 class DataCollator:
-    """Data collator (packing depends on Flash Attention)"""
+    """Data collator w/ multipacking (lean on FA for attention mask)"""
 
     pad_token_id: int
     packing: bool = True
@@ -172,7 +173,7 @@ class DataCollator:
                 position_ids = [torch.arange(len(ids)) for ids in input_ids]
                 output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
         else:
-            # Traditional padding
+            # Standard right padding
             output = {
                 "input_ids": _pad(input_ids, self.pad_token_id),
                 "attention_mask": _pad([torch.ones_like(ids) for ids in input_ids], 0),
@@ -251,7 +252,7 @@ class PretrainDataset(Dataset):
                 i + 1 : i + seq_len + 1
             ]  # Labels are input shifted by 1
 
-            if len(input_chunk) == seq_len and len(label_chunk) == seq_len:
+            if len(input_chunk) == seq_len == len(label_chunk):
                 self.chunks.append(
                     {
                         "input_ids": input_chunk,
@@ -281,7 +282,6 @@ class SFTDataset(Dataset):
     ):
         logger.info(f"Loading SFT dataset: {dataset_name}")
 
-        # Load dataset
         dataset = load_dataset(dataset_name, split=split)
 
         if "messages" not in dataset.column_names:
@@ -460,7 +460,6 @@ def setup_dataloader(
         batch_size=micro_batch_size,
         shuffle=shuffle,
         sampler=sampler,
-        num_workers=config.data.num_workers,
         pin_memory=True,
         collate_fn=collator,
     )

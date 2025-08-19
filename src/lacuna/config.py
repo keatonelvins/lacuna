@@ -28,7 +28,7 @@ class SchedulerConfig(BaseModel):
     """LR scheduler config"""
 
     type: Literal["cosine"] = "cosine"
-    warmup_steps: int = Field(50, ge=0, description="Warmup steps")
+    warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio")
     min_lr_ratio: float = Field(
         0, ge=0, le=1, description="Minimum LR as ratio of max LR"
     )
@@ -37,10 +37,9 @@ class SchedulerConfig(BaseModel):
 class DataConfig(BaseModel):
     """Base config for data loading"""
 
-    dataset_name: str = Field(description="HuggingFace dataset name")
+    dataset_name: str = Field(description="HF dataset name")
     split: str = Field("train", description="Dataset split")
     seq_len: int = Field(2048, ge=1, description="Sequence length")
-    num_workers: int = Field(0, ge=0, description="Number of data loading workers")
 
 
 class PretrainDataConfig(DataConfig):
@@ -123,7 +122,7 @@ class PretrainTrainerConfig(TrainerConfig):
 class SFTTrainerConfig(TrainerConfig):
     """SFT trainer config"""
 
-    epochs: int = Field(1, gt=0, description="Number of epochs")
+    epochs: int = Field(3, gt=0, description="Number of epochs")
     eval_every: int = Field(1, gt=0, description="Epochs between evaluations")
 
 

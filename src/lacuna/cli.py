@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Type, TypeVar
 
+
 import tomllib
 from pydantic_settings import BaseSettings
 
@@ -31,10 +32,12 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     ]
 
     # Add original CLI args (without --torchrun flag)
-    original_args = [arg for arg in sys.argv[1:] if arg != "--torchrun"]
-    cmd.extend(original_args)
+    lacuna_args = [arg for arg in sys.argv[1:] if arg != "--torchrun"]
+    cmd.extend(lacuna_args)
 
     print(f"Launching: {' '.join(cmd)}")
+
+    # Use os.execvp due to better ctrl+c handling
     os.execvp("torchrun", cmd)
 
 
@@ -71,12 +74,10 @@ def parse_argv(config_cls: Type[T], args: list[str] | None = None) -> T:
 def pretrain_main():
     """Entry point for pretraining."""
     config = parse_argv(PretrainConfig)
-    print(f"Starting pretraining with model: {config.model.name}")
     train(config)
 
 
 def sft_main():
     """Entry point for SFT."""
     config = parse_argv(SFTConfig)
-    print(f"Starting SFT with model: {config.model.name}")
     train(config)
