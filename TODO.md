@@ -20,9 +20,6 @@ lacuna/
 │   ├── metrics.py          # MFU, memory, throughput (TODO) - 11 lines
 │   ├── distributed.py      # FSDP setup, world info - 86 lines
 │   └── utils.py            # Logging, misc helpers - 21 lines
-├── configs/
-│   ├── pt_qwen.toml        # Integration test config (TinierStories, 20 steps)
-│   └── sft_qwen.toml       # Integration test config (tiny dataset)  
 └── TODO.md                 # This file
 ```
 
@@ -120,14 +117,8 @@ lacuna/
 
 ## Integration Test Validation ✅ WORKING
 ```bash
-# Integration test (validates setup, not for real experiments):
-uv run pt configs/pt_qwen.toml
-
-# For real pretraining experiments, use larger datasets:
-uv run pt configs/pt_qwen.toml \
-  --data.dataset-name roneneldan/TinyStories \
-  --trainer.steps 10000 \
-  --trainer.batch-size 32
+# Integration test:
+uv run pt
 
 # Results: ✅ Loss decreasing (10.97 → 2.84)
 # Results: ✅ ~12k tokens/sec throughput  
