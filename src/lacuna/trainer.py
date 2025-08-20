@@ -75,7 +75,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     )
 
     logger.info(f"Loading model: {config.model.name}")
-    model = setup_model(config.model)
+    try:
+        model = setup_model(config.model)
+    except Exception as e:
+        logger.error(f"Error loading model: {e}")
+        raise e
 
     model = model.cuda()
     model.train()
