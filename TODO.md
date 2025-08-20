@@ -118,7 +118,7 @@ lacuna/
 ## Integration Test Validation ✅ WORKING
 ```bash
 # Integration test:
-uv run pt
+uv run pt --trainer.steps 3
 
 # Results: ✅ Loss decreasing (10.97 → 2.84)
 # Results: ✅ ~12k tokens/sec throughput  

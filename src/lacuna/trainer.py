@@ -7,10 +7,20 @@ import torch
 from rich.pretty import pprint
 from torch.amp import autocast
 from liger_kernel.transformers import AutoLigerKernelForCausalLM
-from transformers import PreTrainedModel, get_cosine_schedule_with_warmup
+from transformers import PreTrainedModel
+from transformers.optimization import (
+    get_cosine_with_min_lr_schedule_with_warmup,
+    get_wsd_schedule,
+)
 
 from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoint
-from .config import ModelConfig, PretrainConfig, SFTConfig
+from .config import (
+    CosineSchedulerConfig,
+    WSDSchedulerConfig,
+    ModelConfig,
+    PretrainConfig,
+    SFTConfig,
+)
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_fsdp
 from .utils import setup_logger
@@ -90,12 +100,24 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:  # SFTConfig
         max_steps = len(dataloader) * config.trainer.epochs
 
-    # TODO: support linear, wsd, etc.
-    scheduler = get_cosine_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=config.scheduler.warmup_steps,
-        num_training_steps=max_steps,
-    )
+    if isinstance(config.scheduler, CosineSchedulerConfig):
+        scheduler = get_cosine_with_min_lr_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=config.scheduler.warmup_ratio * max_steps,
+            num_training_steps=max_steps,
+            min_lr_ratio=config.scheduler.min_lr_ratio,
+        )
+    elif isinstance(config.scheduler, WSDSchedulerConfig):
+        scheduler = get_wsd_schedule(
+            optimizer,
+            num_warmup_steps=config.scheduler.warmup_steps,
+            num_decay_steps=config.scheduler.decay_steps,
+            num_training_steps=max_steps,
+            min_lr_ratio=config.scheduler.min_lr_ratio,
+            decay_type=config.scheduler.decay_type,
+        )
+    else:
+        raise ValueError(f"Unsupported scheduler type: {config.scheduler.type}")
 
     start_step = 0
     total_tokens = 0

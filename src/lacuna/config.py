@@ -24,14 +24,26 @@ class OptimizerConfig(BaseModel):
     grad_clip: float = Field(1.0, gt=0, description="Gradient clipping norm")
 
 
-class SchedulerConfig(BaseModel):
-    """LR scheduler config"""
+class CosineSchedulerConfig(BaseModel):
+    """Cosine scheduler config"""
 
     type: Literal["cosine"] = "cosine"
     warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio")
     min_lr_ratio: float = Field(
         0, ge=0, le=1, description="Minimum LR as ratio of max LR"
     )
+
+
+class WSDSchedulerConfig(BaseModel):
+    """WSD scheduler config"""
+
+    type: Literal["wsd"] = "wsd"
+    warmup_steps: int = Field(100, ge=0, description="Warmup steps")
+    decay_steps: int = Field(100, ge=0, description="Decay steps")
+    min_lr_ratio: float = Field(
+        0, ge=0, le=1, description="Minimum LR as ratio of max LR"
+    )
+    decay_type: Literal["linear", "cosine"] = "linear"
 
 
 class DataConfig(BaseModel):
@@ -90,7 +102,7 @@ class TorchrunConfig(BaseModel):
 class TrainerConfig(BaseModel):
     """Training loop config"""
 
-    batch_size: int = Field(32, ge=1, description="Global training batch size")
+    batch_size: int = Field(8, ge=1, description="Global training batch size")
 
 
 class MetricsConfig(BaseModel):
@@ -133,7 +145,7 @@ class PretrainConfig(BaseSettings):
     data: PretrainDataConfig = PretrainDataConfig()
     trainer: PretrainTrainerConfig = PretrainTrainerConfig()
     optimizer: OptimizerConfig = OptimizerConfig()
-    scheduler: SchedulerConfig = SchedulerConfig()
+    scheduler: WSDSchedulerConfig = WSDSchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
     fsdp: FSDPConfig = FSDPConfig()
@@ -153,7 +165,7 @@ class SFTConfig(BaseSettings):
     data: SFTDataConfig = SFTDataConfig()
     trainer: SFTTrainerConfig = SFTTrainerConfig()
     optimizer: OptimizerConfig = OptimizerConfig()
-    scheduler: SchedulerConfig = SchedulerConfig()
+    scheduler: CosineSchedulerConfig = CosineSchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
     fsdp: FSDPConfig = FSDPConfig()
