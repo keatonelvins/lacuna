@@ -157,6 +157,7 @@ __marimo__/
 .claude
 REFS/*
 CLAUDE.md
+TODO.md
 
 # Artifacts
 weights/**
