@@ -16,6 +16,7 @@ dependencies = [
     "loguru>=0.7.3",
     "pyarrow>=21.0.0",
     "rich>=14.1.0",
+    "cut-cross-entropy[transformers]",
 ]
 
 [project.scripts]
@@ -51,3 +52,6 @@ addopts = [
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]
 prerelease = "allow"
+
+[tool.uv.sources]
+cut-cross-entropy = { git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git", rev = "0ee9ee8" }

@@ -146,6 +146,12 @@ class CompileConfig(BaseModel):
     ] = Field("default", description="Compile mode")
 
 
+class CutCrossEntropyConfig(BaseModel):
+    """Cut Cross Entropy configuration for memory-efficient loss computation"""
+
+    enabled: bool = Field(False, description="Enable Cut Cross Entropy patch")
+
+
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
@@ -184,9 +190,10 @@ class PretrainConfig(BaseSettings):
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
-    fsdp: FSDPConfig = FSDPConfig()
+    ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
-    activation_checkpoint: ActivationCheckpointConfig = ActivationCheckpointConfig()
+    cut_cross_entropy: CutCrossEntropyConfig = CutCrossEntropyConfig()
+    fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
@@ -209,6 +216,7 @@ class SFTConfig(BaseSettings):
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
+    cut_cross_entropy: CutCrossEntropyConfig = CutCrossEntropyConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 

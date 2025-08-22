@@ -3,6 +3,7 @@
 import os
 import time
 import math
+import inspect
 from typing import Any
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -13,8 +14,11 @@ from torch.amp import autocast
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
-from liger_kernel.transformers import AutoLigerKernelForCausalLM
-from transformers import PreTrainedModel
+from cut_cross_entropy.transformers import cce_patch
+from liger_kernel.transformers.monkey_patch import (
+    MODEL_TYPE_TO_APPLY_LIGER_FN as liger_map,
+)
+from transformers import PreTrainedModel, AutoModelForCausalLM
 from transformers.optimization import (
     get_cosine_with_min_lr_schedule_with_warmup,
     get_wsd_schedule,
@@ -24,6 +28,7 @@ from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoin
 from .config import (
     ActivationCheckpointConfig,
     CompileConfig,
+    CutCrossEntropyConfig,
     CosineSchedulerConfig,
     WSDSchedulerConfig,
     ModelConfig,
@@ -39,19 +44,39 @@ from loguru import logger
 
 
 def setup_model(config: ModelConfig) -> PreTrainedModel:
-    """Load model with flash attention and liger kernels."""
+    """Load model with flash attention."""
     logger.info(f"Loading model: {config.name}")
+    model = AutoModelForCausalLM.from_pretrained(
+        config.name,
+        torch_dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
+        use_cache=False,
+    )
+    return model
+
+
+def apply_liger_patches(
+    model: PreTrainedModel, cce_enabled: bool = False
+) -> PreTrainedModel:
+    """Apply Liger kernel patches (skip FLCE if CCE is enabled)"""
+    apply_liger_fn = liger_map[model.config.model_type]
+
+    liger_params = inspect.signature(apply_liger_fn).parameters
+    liger_kwargs = {k: v.default for k, v in liger_params.items()}
+    liger_kwargs[
+        "fused_linear_cross_entropy"
+    ] = not cce_enabled  # avoid double patching
+    liger_kwargs["model"] = model
+
     with (
         open(os.devnull, "w") as devnull,
         redirect_stdout(devnull),
         redirect_stderr(devnull),
     ):  # silence unaesthetic liger print (lol liger print)
-        model = AutoLigerKernelForCausalLM.from_pretrained(
-            config.name,
-            torch_dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2",
-            use_cache=False,
-        )
+        apply_liger_fn(
+            **liger_kwargs
+        )  # TODO: debug 10% MFU regression compared to AutoLigerKernelForCausalLM
+
     return model
 
 
@@ -63,6 +88,19 @@ def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
         weight_decay=config.optimizer.weight_decay,
         betas=config.optimizer.betas,
     )
+
+
+def apply_cut_cross_entropy(
+    model: PreTrainedModel, cce_config: CutCrossEntropyConfig
+) -> PreTrainedModel:
+    """Apply Cut Cross Entropy optimization to model."""
+    if not cce_config.enabled:
+        return model
+
+    logger.info("Applying Cut Cross Entropy")
+    model = cce_patch(model)
+
+    return model
 
 
 def apply_activation_checkpointing(
@@ -157,8 +195,12 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     model = model.cuda()
     model.train()
 
-    # AC -> Compile -> FSDP
-    model = apply_activation_checkpointing(model, config.activation_checkpoint)
+    # Liger -> CCE -> AC -> Compile -> FSDP
+    model = apply_liger_patches(model, config.cut_cross_entropy.enabled)
+
+    model = apply_cut_cross_entropy(model, config.cut_cross_entropy)
+
+    model = apply_activation_checkpointing(model, config.ac)
 
     model = apply_torch_compile(model, config.compile)
 
