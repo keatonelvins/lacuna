@@ -111,6 +111,16 @@ class MetricsConfig(BaseModel):
     log_every: int = Field(10, gt=0, description="Steps between log outputs")
 
 
+class WandbConfig(BaseModel):
+    """Weights and Biases logging config"""
+
+    enabled: bool = Field(False, description="Enable wandb logging")
+    project: str = Field("lacuna", description="Wandb project name")
+    name: str = Field(None, description="Run name")
+    entity: str = Field(None, description="Wandb entity (team/user)")
+    offline: bool = Field(False, description="Run wandb in offline mode")
+
+
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
@@ -148,6 +158,7 @@ class PretrainConfig(BaseSettings):
     scheduler: WSDSchedulerConfig = WSDSchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
+    wandb: WandbConfig = WandbConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
@@ -168,6 +179,7 @@ class SFTConfig(BaseSettings):
     scheduler: CosineSchedulerConfig = CosineSchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
+    wandb: WandbConfig = WandbConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 

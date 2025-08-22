@@ -160,4 +160,5 @@ CLAUDE.md
 TODO.md
 
 # Artifacts
-weights/**
+weights/
+wandb/

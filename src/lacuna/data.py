@@ -465,7 +465,7 @@ def setup_dataloader(
     )
 
     logger.info(
-        f"Dataloader created with {len(dataset)} samples, micro_batch_size={micro_batch_size}, packing={packing}"
+        f"Dataloader created with {len(dataset)} samples, batch_size={micro_batch_size}"
     )
 
     return dataloader

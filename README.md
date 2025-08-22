@@ -13,7 +13,7 @@ uv run pt --help
 uv run sft --help
 
 # Pass args directly
-uv run pt --model.name Qwen/Qwen2.5-0.5B --max-steps 5000
+uv run pt --model.name Qwen/Qwen2.5-0.5B --trainer.steps 5000
 
 # Load args from a toml (w/ overrides)
 uv run sft path/to/config.toml

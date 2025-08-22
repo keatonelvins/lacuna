@@ -3,6 +3,9 @@
 import time
 from typing import Any
 
+import os
+from contextlib import redirect_stdout, redirect_stderr
+
 import torch
 from rich.pretty import pprint
 from torch.amp import autocast
@@ -25,17 +28,25 @@ from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_fsdp
 from .metrics import MFUTracker, MemoryTracker
 from .utils import setup_logger
+from .wandb import init_wandb, log_metrics, finish
 from loguru import logger
 
 
 def setup_model(config: ModelConfig) -> PreTrainedModel:
     """Load model with flash attention and liger kernels."""
-    return AutoLigerKernelForCausalLM.from_pretrained(
-        config.name,
-        torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
-        use_cache=False,
-    )
+    logger.info(f"Loading model: {config.name}")
+    with (
+        open(os.devnull, "w") as devnull,
+        redirect_stdout(devnull),
+        redirect_stderr(devnull),
+    ):
+        model = AutoLigerKernelForCausalLM.from_pretrained(
+            config.name,
+            torch_dtype=torch.bfloat16,
+            attn_implementation="flash_attention_2",
+            use_cache=False,
+        )
+    return model
 
 
 def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
@@ -61,6 +72,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
 
+    wandb_run = init_wandb(config)
+
     world_size = get_world_size()
     batch_size = config.trainer.batch_size
 
@@ -75,7 +88,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
     )
 
-    logger.info(f"Loading model: {config.model.name}")
     try:
         model = setup_model(config.model)
     except Exception as e:
@@ -211,8 +223,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 else:
                     data_pct = 0
 
-                peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
-                peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
+                if "mfu_pct" in mfu_metrics:
+                    peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
+                    peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
 
                 # Build log message with colors
                 log_parts = [
@@ -222,9 +235,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     f"\033[94mLR: {current_lr:.2e}\033[0m",  # Blue
                 ]
 
-                if "tokens_per_second" in mfu_metrics:
+                if "tps" in mfu_metrics:
                     log_parts.append(
-                        f"\033[96mTPS: {mfu_metrics['tokens_per_second']:,.0f}\033[0m"
+                        f"\033[96mTPS: {mfu_metrics['tps']:,.0f}\033[0m"
                     )  # Cyan
                     log_parts.append(
                         f"\033[95mTFLOPS: {mfu_metrics['tflops']:.1f}\033[0m"
@@ -242,6 +255,30 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     log_parts.append(f"\033[33mData: {data_pct:.1f}%\033[0m")  # Yellow
 
                 logger.info(" | ".join(log_parts))
+
+                if wandb_run:
+                    wandb_metrics = {
+                        "train/loss": accumulated_loss,
+                        "train/grad_norm": grad_norm,
+                        "train/lr": current_lr,
+                        "train/total_tokens": total_tokens,
+                        "perf/data_loading_pct": data_pct,
+                        "memory/max_reserved_gb": memory_stats["max_reserved_gb"],
+                        "memory/max_reserved_pct": memory_stats["max_reserved_pct"],
+                    }
+
+                    if "tps" in mfu_metrics:
+                        wandb_metrics.update(
+                            {
+                                "perf/tps": mfu_metrics["tps"],
+                                "perf/tflops": mfu_metrics["tflops"],
+                                "perf/mfu_pct": mfu_metrics["mfu_pct"],
+                                "perf/peak_mfu_pct": peak_mfu,
+                                "perf/peak_tflops": peak_tflops,
+                            }
+                        )
+
+                    log_metrics(wandb_metrics, step, wandb_run)
 
                 memory_tracker.reset_peak_stats()
                 data_loading_times.clear()
@@ -281,6 +318,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             peak_mfu=peak_mfu,
             peak_tflops=peak_tflops,
         )
+
+        finish(wandb_run)
 
         logger.info(
             f"All done! Total steps: {step}, Total tokens: {total_tokens:,}, "

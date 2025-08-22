@@ -62,13 +62,6 @@ class MFUTracker:
 
         self.num_params, self.flops_per_token = calculate_model_flops(model, seq_len)
 
-        logger.info(
-            f"MFU Tracker initialized: {self.device_name} "
-            f"({self.gpu_peak_flops / 1e12:.1f} TFLOPS peak), "
-            f"{self.num_params / 1e9:.2f}B params, "
-            f"{self.flops_per_token / 1e9:.2f} GFLOPs/token"
-        )
-
     def update(self, tokens: int) -> None:
         """Update tracker with new token count."""
         self.tokens.append(tokens)
@@ -115,7 +108,7 @@ class MFUTracker:
 
         tps = self.get_tokens_per_second()
         if tps is not None:
-            metrics["tokens_per_second"] = tps
+            metrics["tps"] = tps
             metrics["tflops"] = self.get_tflops()
             metrics["mfu_pct"] = self.get_mfu()
 
