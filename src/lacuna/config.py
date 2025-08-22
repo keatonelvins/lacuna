@@ -15,6 +15,9 @@ class ModelConfig(BaseModel):
     attention: Literal["FA2", "FA3", "SDPA"] = Field(
         "FA2", description="Attention implementation (for FA3 run scripts/fa3.sh)"
     )
+    accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
+    enable_liger: bool = Field(True, description="Enable Liger kernels")
+    enable_cce: bool = Field(False, description="Enable Cut Cross Entropy patch")
 
 
 class OptimizerConfig(BaseModel):
@@ -77,7 +80,6 @@ class FSDPShardingStrategy(str, Enum):
     SHARD_GRAD_OP = "SHARD_GRAD_OP"
     NO_SHARD = "NO_SHARD"
     HYBRID_SHARD = "HYBRID_SHARD"
-    _HYBRID_SHARD_ZERO2 = "_HYBRID_SHARD_ZERO2"
 
 
 class FSDPConfig(BaseModel):
@@ -149,20 +151,6 @@ class CompileConfig(BaseModel):
     ] = Field("default", description="Compile mode")
 
 
-class CutCrossEntropyConfig(BaseModel):
-    """Cut Cross Entropy configuration for memory-efficient loss computation"""
-
-    enabled: bool = Field(False, description="Enable Cut Cross Entropy patch")
-    accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
-
-
-class LigerConfig(BaseModel):
-    """Liger Kernel configuration"""
-
-    enabled: bool = Field(True, description="Enable Liger kernel optimizations")
-    accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
-
-
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
@@ -203,8 +191,6 @@ class PretrainConfig(BaseSettings):
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
-    cut_cross_entropy: CutCrossEntropyConfig = CutCrossEntropyConfig()
-    liger: LigerConfig = LigerConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
@@ -228,8 +214,6 @@ class SFTConfig(BaseSettings):
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
-    cut_cross_entropy: CutCrossEntropyConfig = CutCrossEntropyConfig()
-    liger: LigerConfig = LigerConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 

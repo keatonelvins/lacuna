@@ -28,8 +28,6 @@ from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoin
 from .config import (
     ActivationCheckpointConfig,
     CompileConfig,
-    CutCrossEntropyConfig,
-    LigerConfig,
     CosineSchedulerConfig,
     WSDSchedulerConfig,
     ModelConfig,
@@ -46,7 +44,7 @@ from loguru import logger
 
 def setup_model(config: ModelConfig) -> PreTrainedModel:
     """Load model with specified attention implementation."""
-    logger.info(f"Loading model: {config.name} with {config.attn_implementation}")
+    logger.info(f"Loading model: {config.name} with {config.attention}")
 
     attn_impl_map = {
         "FA2": "flash_attention_2",
@@ -64,11 +62,9 @@ def setup_model(config: ModelConfig) -> PreTrainedModel:
     return model
 
 
-def apply_liger_patches(
-    model: PreTrainedModel, liger_config: LigerConfig, cce_enabled: bool = False
-) -> PreTrainedModel:
+def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Apply Liger kernel patches if enabled"""
-    if not liger_config.enabled:
+    if not config.enable_liger:
         return model
 
     if model.config.model_type not in liger_map:
@@ -81,7 +77,7 @@ def apply_liger_patches(
     liger_kwargs = {k: v.default for k, v in liger_params.items()}
     liger_kwargs[
         "fused_linear_cross_entropy"
-    ] = not cce_enabled  # avoid double patching
+    ] = not config.enable_cce  # avoid double patching
     liger_kwargs["model"] = model
 
     with (
@@ -105,17 +101,17 @@ def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
 
 
 def apply_cut_cross_entropy(
-    model: PreTrainedModel, cce_config: CutCrossEntropyConfig
+    model: PreTrainedModel, config: ModelConfig
 ) -> PreTrainedModel:
     """Apply Cut Cross Entropy optimization to model."""
-    if not cce_config.enabled:
+    if not config.enable_cce:
         return model
 
     logger.info("Applying Cut Cross Entropy")
     model = cce_patch(
         model,
-        accum_e_fp32=cce_config.accum_fp32,
-        accum_c_fp32=cce_config.accum_fp32,
+        accum_e_fp32=config.accum_fp32,
+        accum_c_fp32=config.accum_fp32,
     )
 
     return model
@@ -214,9 +210,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     model.train()
 
     # Liger -> CCE -> AC -> Compile -> FSDP
-    model = apply_liger_patches(model, config.liger, config.cut_cross_entropy.enabled)
+    model = apply_liger_patches(model, config.model)
 
-    model = apply_cut_cross_entropy(model, config.cut_cross_entropy)
+    model = apply_cut_cross_entropy(model, config.model)
 
     model = apply_activation_checkpointing(model, config.ac)
 
@@ -319,7 +315,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
             with autocast("cuda", dtype=torch.bfloat16):
-                if config.liger.enabled and not config.cut_cross_entropy.enabled:
+                if config.model.enable_liger and not config.model.enable_cce:
                     outputs = model(
                         **model_inputs, accum_dtype=torch.float32
                     )  # pass through accum_dtype for Liger

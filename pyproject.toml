@@ -7,7 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "datasets>=4.0.0",
     "liger-kernel>=0.6.2",
-    "pydantic-settings>=2.10.1",
     "torch>=2.8.0",
     "torchvision>=0.23.0",
     "transformers>=4.55.4",
@@ -17,6 +16,7 @@ dependencies = [
     "pyarrow>=21.0.0",
     "rich>=14.1.0",
     "cut-cross-entropy[transformers]",
+    "pydantic-settings>=2.10.1",
 ]
 
 [project.scripts]
@@ -51,7 +51,6 @@ addopts = [
 
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]
-prerelease = "allow"
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128" }]

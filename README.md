@@ -32,9 +32,6 @@ uv run hf auth login
 ```bash
 uv sync --dev
 uv run pre-commit install
-
-# Bump dependencies
-uv lock --upgrade && uv sync
 ```
 
 ## Acknowledgemnt
