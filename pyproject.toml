@@ -6,11 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "datasets>=4.0.0",
-    "liger-kernel>=0.6.1",
+    "liger-kernel>=0.6.2",
     "pydantic-settings>=2.10.1",
     "torch>=2.8.0",
     "torchvision>=0.23.0",
-    "transformers>=4.55.2",
+    "transformers>=4.55.4",
     "wandb>=0.21.1",
     "flash-attn>=2.8.3",
     "loguru>=0.7.3",
@@ -28,8 +28,8 @@ dev = [
     "pre-commit>=4.3.0",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
-    "ruff>=0.12.9",
-    "ty>=0.0.1a18",
+    "ruff>=0.12.10",
+    "ty>=0.0.1a19",
 ]
 
 [build-system]

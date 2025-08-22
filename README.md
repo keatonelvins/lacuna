@@ -45,3 +45,8 @@ There are a ton of great training repos out there already! Some I have used/enjo
 - [ArticTraining](https://github.com/snowflakedb/ArcticTraining)
 - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
 - [trl](https://github.com/huggingface/trl/)
+
+## Notes
+
+- **Liger Kernel**: We use fp32 gradient accumulation (`accum_dtype=torch.float32`) with Liger's fused cross-entropy for numerical stability.
+- Related issue: https://github.com/linkedin/Liger-Kernel/pull/830

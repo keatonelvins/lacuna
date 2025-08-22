@@ -152,6 +152,12 @@ class CutCrossEntropyConfig(BaseModel):
     enabled: bool = Field(False, description="Enable Cut Cross Entropy patch")
 
 
+class LigerConfig(BaseModel):
+    """Liger Kernel configuration"""
+
+    enabled: bool = Field(True, description="Enable Liger kernel optimizations")
+
+
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
@@ -193,6 +199,7 @@ class PretrainConfig(BaseSettings):
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
     cut_cross_entropy: CutCrossEntropyConfig = CutCrossEntropyConfig()
+    liger: LigerConfig = LigerConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
@@ -217,6 +224,7 @@ class SFTConfig(BaseSettings):
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
     cut_cross_entropy: CutCrossEntropyConfig = CutCrossEntropyConfig()
+    liger: LigerConfig = LigerConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 

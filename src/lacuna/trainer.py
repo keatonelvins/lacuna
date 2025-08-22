@@ -29,6 +29,7 @@ from .config import (
     ActivationCheckpointConfig,
     CompileConfig,
     CutCrossEntropyConfig,
+    LigerConfig,
     CosineSchedulerConfig,
     WSDSchedulerConfig,
     ModelConfig,
@@ -56,9 +57,16 @@ def setup_model(config: ModelConfig) -> PreTrainedModel:
 
 
 def apply_liger_patches(
-    model: PreTrainedModel, cce_enabled: bool = False
+    model: PreTrainedModel, liger_config: LigerConfig, cce_enabled: bool = False
 ) -> PreTrainedModel:
-    """Apply Liger kernel patches (skip FLCE if CCE is enabled)"""
+    """Apply Liger kernel patches if enabled"""
+    if not liger_config.enabled:
+        return model
+
+    if model.config.model_type not in liger_map:
+        logger.warning(f"Liger kernel not supported for {model.config.model_type}")
+        return model
+
     apply_liger_fn = liger_map[model.config.model_type]
 
     liger_params = inspect.signature(apply_liger_fn).parameters
@@ -73,9 +81,7 @@ def apply_liger_patches(
         redirect_stdout(devnull),
         redirect_stderr(devnull),
     ):  # silence unaesthetic liger print (lol liger print)
-        apply_liger_fn(
-            **liger_kwargs
-        )  # TODO: debug 10% MFU regression compared to AutoLigerKernelForCausalLM
+        apply_liger_fn(**liger_kwargs)
 
     return model
 
@@ -196,7 +202,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     model.train()
 
     # Liger -> CCE -> AC -> Compile -> FSDP
-    model = apply_liger_patches(model, config.cut_cross_entropy.enabled)
+    model = apply_liger_patches(model, config.liger, config.cut_cross_entropy.enabled)
 
     model = apply_cut_cross_entropy(model, config.cut_cross_entropy)
 
@@ -301,7 +307,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
             with autocast("cuda", dtype=torch.bfloat16):
-                outputs = model(**model_inputs)
+                if config.liger.enabled and not config.cut_cross_entropy.enabled:
+                    outputs = model(**model_inputs, accum_dtype=torch.float32)
+                else:
+                    outputs = model(**model_inputs)
                 loss = outputs.loss
 
             loss.backward()
