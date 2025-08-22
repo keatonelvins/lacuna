@@ -106,8 +106,8 @@ def apply_cut_cross_entropy(
     logger.info("Applying Cut Cross Entropy")
     model = cce_patch(
         model,
-        accum_e_fp32=cce_config.accum_e_fp32,
-        accum_c_fp32=cce_config.accum_c_fp32,
+        accum_e_fp32=cce_config.accum_fp32,
+        accum_c_fp32=cce_config.accum_fp32,
     )
 
     return model
@@ -312,7 +312,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
             with autocast("cuda", dtype=torch.bfloat16):
                 if config.liger.enabled and not config.cut_cross_entropy.enabled:
-                    outputs = model(**model_inputs, accum_dtype=torch.float32)
+                    outputs = model(
+                        **model_inputs, accum_dtype=torch.float32
+                    )  # pass through accum_dtype for Liger
                 else:
                     outputs = model(**model_inputs)
                 loss = outputs.loss

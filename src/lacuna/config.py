@@ -150,18 +150,14 @@ class CutCrossEntropyConfig(BaseModel):
     """Cut Cross Entropy configuration for memory-efficient loss computation"""
 
     enabled: bool = Field(False, description="Enable Cut Cross Entropy patch")
-    accum_e_fp32: bool = Field(
-        True, description="Use fp32 accumulation for embedding gradients"
-    )
-    accum_c_fp32: bool = Field(
-        True, description="Use fp32 accumulation for classifier gradients"
-    )
+    accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
 
 
 class LigerConfig(BaseModel):
     """Liger Kernel configuration"""
 
     enabled: bool = Field(True, description="Enable Liger kernel optimizations")
+    accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
 
 
 class CheckpointConfig(BaseModel):
