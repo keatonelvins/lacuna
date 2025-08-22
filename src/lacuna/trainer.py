@@ -1,15 +1,18 @@
 """Core training loop for pretraining and SFT."""
 
-import time
-from typing import Any
-
 import os
+import time
+import math
+from typing import Any
 from contextlib import redirect_stdout, redirect_stderr
 
 import torch
 from rich.pretty import Pretty
 from rich.console import Console
 from torch.amp import autocast
+from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+    checkpoint_wrapper,
+)
 from liger_kernel.transformers import AutoLigerKernelForCausalLM
 from transformers import PreTrainedModel
 from transformers.optimization import (
@@ -19,6 +22,7 @@ from transformers.optimization import (
 
 from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoint
 from .config import (
+    ActivationCheckpointConfig,
     CompileConfig,
     CosineSchedulerConfig,
     WSDSchedulerConfig,
@@ -59,6 +63,32 @@ def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
         weight_decay=config.optimizer.weight_decay,
         betas=config.optimizer.betas,
     )
+
+
+def apply_activation_checkpointing(
+    model: PreTrainedModel, ac_config: ActivationCheckpointConfig
+) -> PreTrainedModel:
+    """Apply activation checkpointing to transformer blocks."""
+    if ac_config.mode == "none":
+        return model
+
+    layers = model.model.layers
+    num_layers = len(layers)
+
+    if ac_config.mode == "full":
+        checkpoint_freq = 1
+    elif ac_config.mode == "partial":
+        if ac_config.stride is None:
+            checkpoint_freq = max(1, int(math.sqrt(num_layers)))
+        else:
+            checkpoint_freq = ac_config.stride
+
+    for idx, layer in enumerate(layers):
+        if idx % checkpoint_freq == 0:
+            layers[idx] = checkpoint_wrapper(layer, preserve_rng_state=False)
+
+    logger.info(f"Applied {ac_config.mode} activation checkpointing")
+    return model
 
 
 def apply_torch_compile(
@@ -127,6 +157,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     model = model.cuda()
     model.train()
 
+    # AC -> Compile -> FSDP
+    model = apply_activation_checkpointing(model, config.activation_checkpoint)
+
+    model = apply_torch_compile(model, config.compile)
+
     # Apply FSDP if enabled and multi-GPU
     if config.fsdp.enabled and world_size > 1:
         model = setup_fsdp(
@@ -135,8 +170,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             cpu_offload=config.fsdp.cpu_offload,
             sharding_strategy=config.fsdp.sharding_strategy,
         )
-
-    model = apply_torch_compile(model, config.compile)
 
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)

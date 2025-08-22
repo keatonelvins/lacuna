@@ -121,6 +121,18 @@ class WandbConfig(BaseModel):
     offline: bool = Field(False, description="Run wandb in offline mode")
 
 
+class ActivationCheckpointConfig(BaseModel):
+    """Activation checkpointing configuration"""
+
+    mode: Literal["none", "full", "partial"] = Field(
+        "none", description="Activation checkpointing mode"
+    )
+    stride: Optional[int] = Field(
+        None,
+        description="If partial, checkpoint every nth layer (or sqrt(num_layers) if unspecified)",
+    )
+
+
 class CompileConfig(BaseModel):
     """Torch compile configuration"""
 
@@ -174,6 +186,7 @@ class PretrainConfig(BaseSettings):
     wandb: WandbConfig = WandbConfig()
     fsdp: FSDPConfig = FSDPConfig()
     compile: CompileConfig = CompileConfig()
+    activation_checkpoint: ActivationCheckpointConfig = ActivationCheckpointConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
@@ -194,8 +207,9 @@ class SFTConfig(BaseSettings):
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
-    fsdp: FSDPConfig = FSDPConfig()
+    ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     compile: CompileConfig = CompileConfig()
+    fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
