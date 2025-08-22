@@ -7,7 +7,8 @@ import os
 from contextlib import redirect_stdout, redirect_stderr
 
 import torch
-from rich.pretty import pprint
+from rich.pretty import Pretty
+from rich.console import Console
 from torch.amp import autocast
 from liger_kernel.transformers import AutoLigerKernelForCausalLM
 from transformers import PreTrainedModel
@@ -18,6 +19,7 @@ from transformers.optimization import (
 
 from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoint
 from .config import (
+    CompileConfig,
     CosineSchedulerConfig,
     WSDSchedulerConfig,
     ModelConfig,
@@ -39,7 +41,7 @@ def setup_model(config: ModelConfig) -> PreTrainedModel:
         open(os.devnull, "w") as devnull,
         redirect_stdout(devnull),
         redirect_stderr(devnull),
-    ):
+    ):  # silence unaesthetic liger print (lol liger print)
         model = AutoLigerKernelForCausalLM.from_pretrained(
             config.name,
             torch_dtype=torch.bfloat16,
@@ -59,13 +61,41 @@ def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
     )
 
 
+def apply_torch_compile(
+    model: PreTrainedModel, compile_config: CompileConfig
+) -> PreTrainedModel:
+    """Apply torch.compile to each individual transformer block."""
+    if not compile_config.enabled:
+        return model
+
+    # Set dynamo configs for stability
+    if hasattr(torch, "_dynamo"):
+        torch._dynamo.config.cache_size_limit = 256
+        torch._dynamo.config.suppress_errors = True
+
+    layers = model.model.layers
+    for idx, layer in enumerate(layers):
+        compiled_layer = torch.compile(
+            layer,
+            fullgraph=compile_config.fullgraph,
+            mode=compile_config.mode,
+        )
+        layers[idx] = compiled_layer
+    logger.info(f"Applied torch.compile (mode={compile_config.mode})")
+
+    return model
+
+
 def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
 
-    logger.info("Starting training with config:")
-    # TODO: merge into logger
-    pprint(config, expand_all=True)  # omg Will you've outdone yourself
+    console = Console()
+    with console.capture() as capture:
+        console.print(
+            Pretty(config, expand_all=True)
+        )  # omg Will you've outdone yourself
+    logger.info("Starting training with config:\n" + capture.get().strip())
 
     init_distributed()
 
@@ -105,6 +135,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             cpu_offload=config.fsdp.cpu_offload,
             sharding_strategy=config.fsdp.sharding_strategy,
         )
+
+    model = apply_torch_compile(model, config.compile)
 
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)

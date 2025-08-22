@@ -121,6 +121,19 @@ class WandbConfig(BaseModel):
     offline: bool = Field(False, description="Run wandb in offline mode")
 
 
+class CompileConfig(BaseModel):
+    """Torch compile configuration"""
+
+    enabled: bool = Field(False, description="Enable torch.compile")
+    fullgraph: bool = Field(True, description="Compile with fullgraph mode")
+    mode: Literal[
+        "default",
+        "reduce-overhead",
+        "max-autotune",
+        "max-autotune-no-cudagraphs",
+    ] = Field("default", description="Compile mode")
+
+
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
@@ -160,6 +173,7 @@ class PretrainConfig(BaseSettings):
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     fsdp: FSDPConfig = FSDPConfig()
+    compile: CompileConfig = CompileConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
@@ -181,6 +195,7 @@ class SFTConfig(BaseSettings):
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     fsdp: FSDPConfig = FSDPConfig()
+    compile: CompileConfig = CompileConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
