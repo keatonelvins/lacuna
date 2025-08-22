@@ -45,14 +45,22 @@ from loguru import logger
 
 
 def setup_model(config: ModelConfig) -> PreTrainedModel:
-    """Load model with flash attention."""
-    logger.info(f"Loading model: {config.name}")
+    """Load model with specified attention implementation."""
+    logger.info(f"Loading model: {config.name} with {config.attn_implementation}")
+
+    attn_impl_map = {
+        "FA2": "flash_attention_2",
+        "FA3": "flash_attention_3",
+        "SDPA": "sdpa",
+    }
+
     model = AutoModelForCausalLM.from_pretrained(
         config.name,
         torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
+        attn_implementation=attn_impl_map[config.attention],
         use_cache=False,
     )
+
     return model
 
 

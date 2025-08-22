@@ -5,7 +5,7 @@ Tiny, memory-efficient trainer for continued pretraining and finetuning of popul
 ## Quick Start
 
 ```bash
-# Single command install (w/ flash-attn)
+# Single command install (w/ FA2)
 uv sync
 
 # See all config options

@@ -12,6 +12,9 @@ class ModelConfig(BaseModel):
     """Model config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
+    attention: Literal["FA2", "FA3", "SDPA"] = Field(
+        "FA2", description="Attention implementation"
+    )
 
 
 class OptimizerConfig(BaseModel):
