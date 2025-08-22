@@ -104,7 +104,11 @@ def apply_cut_cross_entropy(
         return model
 
     logger.info("Applying Cut Cross Entropy")
-    model = cce_patch(model)
+    model = cce_patch(
+        model,
+        accum_e_fp32=cce_config.accum_e_fp32,
+        accum_c_fp32=cce_config.accum_c_fp32,
+    )
 
     return model
 
