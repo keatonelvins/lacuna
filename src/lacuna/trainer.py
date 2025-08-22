@@ -23,6 +23,7 @@ from .config import (
 )
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_fsdp
+from .metrics import MFUTracker, MemoryTracker
 from .utils import setup_logger
 from loguru import logger
 
@@ -104,6 +105,15 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:  # SFTConfig
         max_steps = len(dataloader) * config.trainer.epochs
 
+    # Setup MFU and memory tracking
+    mfu_tracker = MFUTracker(
+        model=model,
+        seq_len=config.data.seq_len,
+        window_size=10,
+        world_size=world_size,
+    )
+    memory_tracker = MemoryTracker()
+
     if isinstance(config.scheduler, CosineSchedulerConfig):
         scheduler = get_cosine_with_min_lr_schedule_with_warmup(
             optimizer,
@@ -125,6 +135,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     start_step = 0
     total_tokens = 0
+    peak_mfu = 0.0
+    peak_tflops = 0.0
 
     # Resume from checkpoint if specified
     if config.checkpoint.resume_path is not None:
@@ -137,24 +149,35 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         )
         start_step = training_state["step"]
         total_tokens = training_state["total_tokens"]
-        logger.info(f"Resumed from step {start_step}, total tokens: {total_tokens:,}")
+        peak_mfu = training_state.get("peak_mfu", 0.0)
+        peak_tflops = training_state.get("peak_tflops", 0.0)
+        logger.info(
+            f"Resumed from step {start_step}, total tokens: {total_tokens:,}, "
+            f"peak MFU: {peak_mfu:.1f}%, peak TFLOPS: {peak_tflops:.1f}"
+        )
 
     logger.info(f"Starting training: {max_steps} steps (current step: {start_step})")
+
+    # Track data loading times and start time
+    data_loading_times = []
+    start_time = time.perf_counter()
 
     try:
         dataloader_iter = iter(dataloader)
 
         for step in range(start_step, max_steps):
-            step_start_time = time.time()
             accumulated_loss = 0.0
             optimizer.zero_grad()
 
+            # Track data loading time
+            data_load_start = time.perf_counter()
             try:
                 batch = next(dataloader_iter)
             except StopIteration:
                 # TODO: should we flag for pt?
                 dataloader_iter = iter(dataloader)
                 batch = next(dataloader_iter)
+            data_loading_times.append(time.perf_counter() - data_load_start)
 
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
@@ -174,22 +197,59 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             step_tokens = batch_size * config.data.seq_len
             total_tokens += step_tokens
 
+            mfu_tracker.update(step_tokens)
+
             if step % config.metrics.log_every == 0:
-                step_time = time.time() - step_start_time
-                tokens_per_sec = step_tokens / step_time if step_time > 0 else 0
                 current_lr = scheduler.get_last_lr()[0]
-                memory_gb = torch.cuda.max_memory_allocated() / 1024**3
 
-                logger.info(
-                    f"Step {step:>6} | Loss: {accumulated_loss:.4f} | "
-                    f"Grad Norm: {grad_norm:.4f} | LR: {current_lr:.2e} | "
-                    f"Tokens/s: {tokens_per_sec:>6.0f} | Memory: {memory_gb:.1f}GB"
-                )
+                mfu_metrics = mfu_tracker.get_metrics()
+                memory_stats = memory_tracker.get_memory_stats()
 
-                torch.cuda.reset_peak_memory_stats()
+                if data_loading_times:
+                    total_time = time.perf_counter() - start_time
+                    data_pct = 100 * sum(data_loading_times) / max(total_time, 0.001)
+                else:
+                    data_pct = 0
+
+                peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
+                peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
+
+                # Build log message with colors
+                log_parts = [
+                    f"\033[91mStep {step:>6}\033[0m",  # Red
+                    f"\033[92mLoss: {accumulated_loss:.4f}\033[0m",  # Green
+                    f"\033[93mGrad: {grad_norm:.4f}\033[0m",  # Yellow
+                    f"\033[94mLR: {current_lr:.2e}\033[0m",  # Blue
+                ]
+
+                if "tokens_per_second" in mfu_metrics:
+                    log_parts.append(
+                        f"\033[96mTPS: {mfu_metrics['tokens_per_second']:,.0f}\033[0m"
+                    )  # Cyan
+                    log_parts.append(
+                        f"\033[95mTFLOPS: {mfu_metrics['tflops']:.1f}\033[0m"
+                    )  # Magenta
+                    log_parts.append(
+                        f"\033[92mMFU: {mfu_metrics['mfu_pct']:.1f}%\033[0m"
+                    )  # Green
+
+                log_parts.append(
+                    f"\033[36mMem: {memory_stats['max_reserved_gb']:.1f}GB ({memory_stats['max_reserved_pct']:.0f}%)\033[0m"
+                )  # Cyan
+
+                # Add data loading time if significant
+                if data_pct > 5:  # Only show if > 5% of time
+                    log_parts.append(f"\033[33mData: {data_pct:.1f}%\033[0m")  # Yellow
+
+                logger.info(" | ".join(log_parts))
+
+                memory_tracker.reset_peak_stats()
+                data_loading_times.clear()
 
             if step > 0 and step % config.checkpoint.save_every == 0:
-                logger.info(f"Saving checkpoint at step {step}")
+                logger.info(
+                    f"Saving checkpoint at step {step} (peak MFU: {peak_mfu:.1f}%)"
+                )
                 checkpoint_path = config.checkpoint.save_dir / f"step_{step}"
                 save_checkpoint(
                     model=model,
@@ -198,6 +258,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     step=step,
                     total_tokens=total_tokens,
                     path=checkpoint_path,
+                    peak_mfu=peak_mfu,
+                    peak_tflops=peak_tflops,
                 )
                 cleanup_old_checkpoints(
                     config.checkpoint.save_dir, config.checkpoint.keep_latest
@@ -216,6 +278,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             step=step,
             total_tokens=total_tokens,
             path=final_path,
+            peak_mfu=peak_mfu,
+            peak_tflops=peak_tflops,
         )
 
-        logger.info(f"All done! Total steps: {step}, Total tokens: {total_tokens:,}")
+        logger.info(
+            f"All done! Total steps: {step}, Total tokens: {total_tokens:,}, "
+            f"Peak MFU: {peak_mfu:.1f}%, Peak TFLOPS: {peak_tflops:.1f}"
+        )

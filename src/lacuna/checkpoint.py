@@ -77,23 +77,35 @@ class OptimizerState(Stateful):
 
 
 class TrainingState(Stateful):
-    """Stateful protocol for training metadata (step, tokens)."""
+    """Stateful protocol for training metadata (step, tokens, MFU)."""
 
-    def __init__(self, step: int = 0, total_tokens: int = 0):
+    def __init__(
+        self,
+        step: int = 0,
+        total_tokens: int = 0,
+        peak_mfu: float = 0.0,
+        peak_tflops: float = 0.0,
+    ):
         self.step = step
         self.total_tokens = total_tokens
+        self.peak_mfu = peak_mfu
+        self.peak_tflops = peak_tflops
 
     def state_dict(self) -> dict[str, Any]:
         """Get the training state dictionary."""
         return {
             "step": self.step,
             "total_tokens": self.total_tokens,
+            "peak_mfu": self.peak_mfu,
+            "peak_tflops": self.peak_tflops,
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         """Load the training state."""
         self.step = state_dict["step"]
         self.total_tokens = state_dict["total_tokens"]
+        self.peak_mfu = state_dict.get("peak_mfu", 0.0)
+        self.peak_tflops = state_dict.get("peak_tflops", 0.0)
 
 
 def save_checkpoint(
@@ -103,6 +115,8 @@ def save_checkpoint(
     step: int,
     total_tokens: int,
     path: Path,
+    peak_mfu: float = 0.0,
+    peak_tflops: float = 0.0,
 ) -> None:
     """Save distributed checkpoint."""
     # Create parent directory if needed (only on rank 0)
@@ -112,7 +126,7 @@ def save_checkpoint(
     state_dict = {
         "model": ModelState(model),
         "optimizer": OptimizerState(model, optimizer, scheduler),
-        "training": TrainingState(step, total_tokens),
+        "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops),
     }
 
     # Save using DCP (all ranks participate)
