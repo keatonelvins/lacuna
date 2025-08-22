@@ -259,32 +259,21 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
                     peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
 
-                # Build log message with colors
                 log_parts = [
-                    f"\033[91mStep {step:>6}\033[0m",  # Red
-                    f"\033[92mLoss: {accumulated_loss:.4f}\033[0m",  # Green
-                    f"\033[93mGrad: {grad_norm:.4f}\033[0m",  # Yellow
-                    f"\033[94mLR: {current_lr:.2e}\033[0m",  # Blue
+                    f"\033[91mStep {step:>6}\033[0m",
+                    f"\033[92mLoss: {accumulated_loss:7.4f}\033[0m",
+                    f"\033[93mGrad: {grad_norm:8.4f}\033[0m",
+                    f"\033[94mLR: {current_lr:9.2e}\033[0m",
+                    f"\033[36mMem: {memory_stats['max_reserved_gb']:5.1f}GB ({memory_stats['max_reserved_pct']:3.0f}%)\033[0m",
                 ]
 
-                if "tps" in mfu_metrics:
+                if "mfu_pct" in mfu_metrics:
                     log_parts.append(
-                        f"\033[96mTPS: {mfu_metrics['tps']:,.0f}\033[0m"
-                    )  # Cyan
-                    log_parts.append(
-                        f"\033[95mTFLOPS: {mfu_metrics['tflops']:.1f}\033[0m"
-                    )  # Magenta
-                    log_parts.append(
-                        f"\033[92mMFU: {mfu_metrics['mfu_pct']:.1f}%\033[0m"
-                    )  # Green
+                        f"\033[92mMFU: {mfu_metrics['mfu_pct']:5.1f}%\033[0m"
+                    )
 
-                log_parts.append(
-                    f"\033[36mMem: {memory_stats['max_reserved_gb']:.1f}GB ({memory_stats['max_reserved_pct']:.0f}%)\033[0m"
-                )  # Cyan
-
-                # Add data loading time if significant
-                if data_pct > 5:  # Only show if > 5% of time
-                    log_parts.append(f"\033[33mData: {data_pct:.1f}%\033[0m")  # Yellow
+                if data_pct > 5:  # Only show if > 5% of wall-clock time
+                    log_parts.append(f"\033[33mData: {data_pct:5.1f}%\033[0m")
 
                 logger.info(" | ".join(log_parts))
 
