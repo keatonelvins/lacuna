@@ -48,5 +48,6 @@ There are a ton of great training repos out there already! Some I have used/enjo
 
 ## Notes
 
-- **Liger Kernel**: We use fp32 gradient accumulation (`accum_dtype=torch.float32`) with Liger's fused cross-entropy for numerical stability.
-- Related issue: https://github.com/linkedin/Liger-Kernel/pull/830
+- We default to fp32 for gradient accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed):
+    - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
+    - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
