@@ -5,8 +5,8 @@ Tiny, memory-efficient trainer for continued pretraining and finetuning of popul
 ## Quick Start
 
 ```bash
-# Single command install (w/ FA2)
-uv sync
+# Single command install (or clone + `uv sync`)
+curl -sSL https://raw.githubusercontent.com/keatonelvins/lacuna/main/scripts/install.sh | bash
 
 # See all config options
 uv run pt --help
