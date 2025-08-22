@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import torch.distributed as dist
 import torch.distributed.checkpoint as dcp
 from torch.distributed.checkpoint.state_dict import (
     get_model_state_dict,
@@ -129,8 +130,16 @@ def save_checkpoint(
         "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops),
     }
 
-    # Save using DCP (all ranks participate)
-    dcp.save(state_dict, checkpoint_id=str(path))
+    if dist.is_initialized():
+        # Save using DCP (all ranks participate)
+        storage_writer = dcp.FileSystemWriter(str(path), overwrite=True)
+        dcp.save(state_dict, storage_writer=storage_writer)
+    else:
+        # Standard torch.save for single GPU
+        save_dict = {}
+        for key, stateful in state_dict.items():
+            save_dict[key] = stateful.state_dict()
+        torch.save(save_dict, path / "checkpoint.pt")
 
     logger.info(f"Saved checkpoint to {path}")
 
@@ -143,18 +152,35 @@ def load_checkpoint(
 ) -> dict[str, Any]:
     """Load distributed checkpoint."""
 
-    if get_rank() == 0 and not path.exists():
-        raise FileNotFoundError(f"Checkpoint not found at {path}")
+    if dist.is_initialized():
+        if get_rank() == 0 and not path.exists():
+            raise FileNotFoundError(f"Checkpoint not found at {path}")
 
-    state_dict = {
-        "model": ModelState(model),
-        "optimizer": OptimizerState(model, optimizer, scheduler),
-        "training": TrainingState(),
-    }
+        state_dict = {
+            "model": ModelState(model),
+            "optimizer": OptimizerState(model, optimizer, scheduler),
+            "training": TrainingState(),
+        }
 
-    dcp.load(state_dict, checkpoint_id=str(path))
+        dcp.load(state_dict, checkpoint_id=str(path))
+    else:
+        checkpoint_path = path / "checkpoint.pt"
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
 
-    logger.info(f"Loaded distributed checkpoint from {path}")
+        loaded_dict = torch.load(checkpoint_path, map_location="cpu")
+
+        state_dict = {
+            "model": ModelState(model),
+            "optimizer": OptimizerState(model, optimizer, scheduler),
+            "training": TrainingState(),
+        }
+
+        for key, stateful in state_dict.items():
+            if key in loaded_dict:
+                stateful.load_state_dict(loaded_dict[key])
+
+    logger.info(f"Loaded checkpoint from {path}")
 
     return state_dict["training"].state_dict()
 
