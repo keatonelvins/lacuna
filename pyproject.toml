@@ -22,6 +22,7 @@ dependencies = [
 [project.scripts]
 pt = "lacuna.cli:pretrain_main"
 sft = "lacuna.cli:sft_main"
+dcp_to_hf = "lacuna.cli:dcp_to_hf_main"
 
 [dependency-groups]
 dev = [

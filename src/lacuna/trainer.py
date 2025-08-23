@@ -419,6 +419,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     total_tokens=total_tokens,
                     path=checkpoint_path,
                     tokenizer=tokenizer,
+                    config=config,
                     peak_mfu=peak_mfu,
                     peak_tflops=peak_tflops,
                     final=False,
@@ -441,6 +442,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             total_tokens=total_tokens,
             path=final_path,
             tokenizer=tokenizer,
+            config=config,
             peak_mfu=peak_mfu,
             peak_tflops=peak_tflops,
             final=True,  # Final checkpoint in HF format

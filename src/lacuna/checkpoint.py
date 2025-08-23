@@ -19,6 +19,7 @@ from transformers import PreTrainedTokenizerBase
 from loguru import logger
 
 from .distributed import get_rank
+from .config import PretrainConfig, SFTConfig
 
 
 class ModelState(Stateful):
@@ -118,6 +119,7 @@ def save_checkpoint(
     total_tokens: int,
     path: Path,
     tokenizer: PreTrainedTokenizerBase,
+    config: PretrainConfig | SFTConfig,
     peak_mfu: float = 0.0,
     peak_tflops: float = 0.0,
     final: bool = False,
@@ -150,6 +152,7 @@ def save_checkpoint(
             "model": ModelState(model),
             "optimizer": OptimizerState(model, optimizer, scheduler),
             "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops),
+            "config": config.model_dump(),
         }
 
         storage_writer = dcp.FileSystemWriter(str(path), overwrite=True)
@@ -196,6 +199,7 @@ def load_checkpoint(
             "model": ModelState(model),
             "optimizer": OptimizerState(model, optimizer, scheduler),
             "training": TrainingState(),
+            "config": {},
         }
 
         dcp.load(state_dict, checkpoint_id=str(path))

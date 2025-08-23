@@ -2,12 +2,17 @@
 
 import os
 import sys
+import argparse
 from pathlib import Path
 from typing import Type, TypeVar
 
-
+import torch
 import tomllib
+import torch.distributed.checkpoint as dcp
+
 from pydantic_settings import BaseSettings
+from transformers import AutoTokenizer, AutoConfig
+from torch.distributed.checkpoint.format_utils import dcp_to_torch_save
 
 from lacuna.config import PretrainConfig, SFTConfig
 from lacuna.trainer import train
@@ -81,3 +86,40 @@ def sft_main():
     """Entry point for SFT."""
     config = parse_argv(SFTConfig)
     train(config)
+
+
+def dcp_to_hf_main():
+    """Convert DCP checkpoint to HF format."""
+    parser = argparse.ArgumentParser(
+        description="Convert DCP checkpoint to HuggingFace format"
+    )
+    parser.add_argument("checkpoint_path", type=Path, help="Path to DCP checkpoint")
+    parser.add_argument(
+        "--output-dir", type=Path, help="Output directory (default: {checkpoint}_hf)"
+    )
+    args = parser.parse_args()
+
+    dcp_path = args.checkpoint_path
+    if not dcp_path.exists() or not (dcp_path / ".metadata").exists():
+        print(f"Error: {dcp_path} is not a valid DCP checkpoint")
+        sys.exit(1)
+
+    hf_path = (
+        args.output_dir if args.output_dir else dcp_path.parent / f"{dcp_path.name}_hf"
+    )
+    hf_path.mkdir(parents=True, exist_ok=True)
+
+    state_dict = {"config": {}}
+    dcp.load(state_dict, checkpoint_id=str(dcp_path))
+    model_name = state_dict["config"]["model"]["name"]
+
+    weights_path = hf_path / "pytorch_model.bin"
+    dcp_to_torch_save(str(dcp_path), str(weights_path))
+
+    state_dict = torch.load(weights_path, map_location="cpu")
+    torch.save(state_dict["model"], weights_path)
+
+    config = AutoConfig.from_pretrained(model_name)
+    config.save_pretrained(hf_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.save_pretrained(hf_path)

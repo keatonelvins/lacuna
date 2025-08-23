@@ -22,6 +22,9 @@ uv run sft path/to/config.toml --optimizer.lr 1e-5
 # Multi-GPU w/ torchrun (multi-node otw)
 uv run pt --torchrun path/to/config.toml
 
+# Convert an early checkpoint to hf safetensors
+uv run dcp_to_hf --help
+
 # Log runs + access gated repos
 uv run wandb login
 uv run hf auth login
