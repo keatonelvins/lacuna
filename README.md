@@ -1,6 +1,8 @@
 # lacuna
 
-Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models
+Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
+
+Seeing how far we can push `AutoModel.from_pretrained()`.
 
 ## Quick Start
 
@@ -42,7 +44,7 @@ uv run pre-commit install
 There are a ton of great training repos out there already! Some that influenced my implementation:
 - [prime-rl](https://github.com/PrimeIntellect-ai/prime-rl)
 - [torchtitan](https://github.com/pytorch/torchtitan)
-- [RL](https://github.com/NVIDIA-NeMo/RL)
+- [AutoModel](https://github.com/NVIDIA-NeMo/Automodel)
 - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
 
 
