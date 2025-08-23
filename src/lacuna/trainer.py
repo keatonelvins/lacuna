@@ -3,7 +3,6 @@
 import os
 import time
 import math
-import inspect
 from pathlib import Path
 from typing import Any
 from contextlib import redirect_stdout, redirect_stderr
@@ -16,9 +15,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
 from cut_cross_entropy.transformers import cce_patch
-from liger_kernel.transformers.monkey_patch import (
-    MODEL_TYPE_TO_APPLY_LIGER_FN as liger_map,
-)
+from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from transformers.optimization import (
     get_cosine_with_min_lr_schedule_with_warmup,
@@ -75,25 +72,15 @@ def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrain
     if not config.enable_liger:
         return model
 
-    if model.config.model_type not in liger_map:
-        logger.warning(f"Liger kernel not supported for {model.config.model_type}")
-        return model
-
-    apply_liger_fn = liger_map[model.config.model_type]
-
-    liger_params = inspect.signature(apply_liger_fn).parameters
-    liger_kwargs = {k: v.default for k, v in liger_params.items()}
-    liger_kwargs[
-        "fused_linear_cross_entropy"
-    ] = not config.enable_cce  # avoid double patching
-    liger_kwargs["model"] = model
-
     with (
         open(os.devnull, "w") as devnull,
         redirect_stdout(devnull),
         redirect_stderr(devnull),
     ):  # silence unaesthetic liger print (lol liger print)
-        apply_liger_fn(**liger_kwargs)
+        _apply_liger_kernel_to_instance(
+            model,
+            fused_linear_cross_entropy=not config.enable_cce,  # avoid double patching
+        )
 
     return model
 
