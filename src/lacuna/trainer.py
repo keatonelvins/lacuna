@@ -1,22 +1,12 @@
 """Core training loop for pretraining and SFT."""
 
-import os
 import time
-import math
-from pathlib import Path
-from typing import Any
-from contextlib import redirect_stdout, redirect_stderr
 
 import torch
 from rich.pretty import Pretty
 from rich.console import Console
 from torch.amp import autocast
-from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
-    checkpoint_wrapper,
-)
-from cut_cross_entropy.transformers import cce_patch
-from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
-from transformers import PreTrainedModel, AutoModelForCausalLM
+from transformers import PreTrainedModel
 from transformers.optimization import (
     get_cosine_with_min_lr_schedule_with_warmup,
     get_wsd_schedule,
@@ -24,68 +14,23 @@ from transformers.optimization import (
 
 from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoint
 from .config import (
-    ActivationCheckpointConfig,
-    CompileConfig,
     CosineSchedulerConfig,
     WSDSchedulerConfig,
-    ModelConfig,
     PretrainConfig,
     SFTConfig,
 )
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_fsdp
 from .metrics import MFUTracker, MemoryTracker
+from .model import setup_model
 from .utils import setup_logger
 from .wandb import init_wandb, log_metrics, finish
 from loguru import logger
 
 
-def setup_model(
-    config: ModelConfig, resume_path: Path | None = None
-) -> PreTrainedModel:
-    """Load model with specified attention backend."""
-    attn_impl_map = {
-        "FA2": "flash_attention_2",
-        "FA3": "flash_attention_3",
-        "SDPA": "sdpa",
-    }
-
-    model_path = config.name
-
-    if resume_path and (resume_path / "config.json").exists():
-        model_path = resume_path
-
-    logger.info(f"Loading model: {model_path} with {config.attention}")
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.bfloat16,
-        attn_implementation=attn_impl_map[config.attention],
-        use_cache=False,
-    )
-
-    return model
-
-
-def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Apply Liger kernel patches if enabled"""
-    if not config.enable_liger:
-        return model
-
-    with (
-        open(os.devnull, "w") as devnull,
-        redirect_stdout(devnull),
-        redirect_stderr(devnull),
-    ):  # silence unaesthetic liger print (lol liger print)
-        _apply_liger_kernel_to_instance(
-            model,
-            fused_linear_cross_entropy=not config.enable_cce,  # avoid double patching
-        )
-
-    return model
-
-
-def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
+def setup_optimizer(
+    model: PreTrainedModel, config: PretrainConfig | SFTConfig
+) -> torch.optim.AdamW:
     """Setup AdamW optimizer."""
     return torch.optim.AdamW(
         model.parameters(),
@@ -93,74 +38,6 @@ def setup_optimizer(model: PreTrainedModel, config: Any) -> torch.optim.AdamW:
         weight_decay=config.optimizer.weight_decay,
         betas=config.optimizer.betas,
     )
-
-
-def apply_cut_cross_entropy(
-    model: PreTrainedModel, config: ModelConfig
-) -> PreTrainedModel:
-    """Apply Cut Cross Entropy optimization to model."""
-    if not config.enable_cce:
-        return model
-
-    logger.info("Applying Cut Cross Entropy")
-    model = cce_patch(
-        model,
-        accum_e_fp32=config.accum_fp32,
-        accum_c_fp32=config.accum_fp32,
-    )
-
-    return model
-
-
-def apply_activation_checkpointing(
-    model: PreTrainedModel, ac_config: ActivationCheckpointConfig
-) -> PreTrainedModel:
-    """Apply activation checkpointing to transformer blocks."""
-    if ac_config.mode == "none":
-        return model
-
-    layers = model.model.layers
-    num_layers = len(layers)
-
-    if ac_config.mode == "full":
-        checkpoint_freq = 1
-    elif ac_config.mode == "partial":
-        if ac_config.stride is None:
-            checkpoint_freq = max(1, int(math.sqrt(num_layers)))
-        else:
-            checkpoint_freq = ac_config.stride
-
-    for idx, layer in enumerate(layers):
-        if idx % checkpoint_freq == 0:
-            layers[idx] = checkpoint_wrapper(layer, preserve_rng_state=False)
-
-    logger.info(f"Applied {ac_config.mode} activation checkpointing")
-    return model
-
-
-def apply_torch_compile(
-    model: PreTrainedModel, compile_config: CompileConfig
-) -> PreTrainedModel:
-    """Apply torch.compile to each individual transformer block."""
-    if not compile_config.enabled:
-        return model
-
-    # Set dynamo configs for stability
-    if hasattr(torch, "_dynamo"):
-        torch._dynamo.config.cache_size_limit = 256
-        torch._dynamo.config.suppress_errors = True
-
-    layers = model.model.layers
-    for idx, layer in enumerate(layers):
-        compiled_layer = torch.compile(
-            layer,
-            fullgraph=compile_config.fullgraph,
-            mode=compile_config.mode,
-        )
-        layers[idx] = compiled_layer
-    logger.info(f"Applied torch.compile (mode={compile_config.mode})")
-
-    return model
 
 
 def train(config: PretrainConfig | SFTConfig) -> None:
@@ -195,23 +72,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
     )
 
-    try:
-        model = setup_model(config.model, config.checkpoint.resume_path)
-    except Exception as e:
-        logger.error(f"Error loading model: {e}")
-        raise e
-
-    model = model.cuda()
-    model.train()
-
-    # Liger -> CCE -> AC -> Compile -> FSDP
-    model = apply_liger_patches(model, config.model)
-
-    model = apply_cut_cross_entropy(model, config.model)
-
-    model = apply_activation_checkpointing(model, config.ac)
-
-    model = apply_torch_compile(model, config.compile)
+    model = setup_model(config)
 
     # Apply FSDP if enabled and multi-GPU
     if config.fsdp.enabled and world_size > 1:
