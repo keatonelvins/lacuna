@@ -15,6 +15,7 @@ from torch.distributed.checkpoint.state_dict import (
     StateDictOptions,
 )
 from torch.distributed.checkpoint.stateful import Stateful
+from transformers import PreTrainedTokenizerBase
 from loguru import logger
 
 from .distributed import get_rank
@@ -116,32 +117,44 @@ def save_checkpoint(
     step: int,
     total_tokens: int,
     path: Path,
+    tokenizer: PreTrainedTokenizerBase,
     peak_mfu: float = 0.0,
     peak_tflops: float = 0.0,
+    final: bool = False,
 ) -> None:
-    """Save distributed checkpoint."""
-    # Create parent directory if needed (only on rank 0)
+    """Save checkpoint in DCP format (intermediate) or HF format (final/single-GPU)."""
     if get_rank() == 0:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
 
-    state_dict = {
-        "model": ModelState(model),
-        "optimizer": OptimizerState(model, optimizer, scheduler),
-        "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops),
-    }
+    # Get the actual model (unwrap from FSDP if needed)
+    unwrapped_model = model.module if hasattr(model, "module") else model
 
-    if dist.is_initialized():
-        # Save using DCP (all ranks participate)
+    if not dist.is_initialized() or (final and get_rank() == 0):
+        unwrapped_model.save_pretrained(path)
+        tokenizer.save_pretrained(path)
+        logger.info(f"Saved HF model + tokenizer to {path}")
+
+        training_state = {
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "step": step,
+            "total_tokens": total_tokens,
+            "peak_mfu": peak_mfu,
+            "peak_tflops": peak_tflops,
+        }
+        torch.save(training_state, path / "training_state.pt")
+        logger.info(f"Saved training state to {path}/training_state.pt")
+
+    else:
+        state_dict = {
+            "model": ModelState(model),
+            "optimizer": OptimizerState(model, optimizer, scheduler),
+            "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops),
+        }
+
         storage_writer = dcp.FileSystemWriter(str(path), overwrite=True)
         dcp.save(state_dict, storage_writer=storage_writer)
-    else:
-        # Standard torch.save for single GPU
-        save_dict = {}
-        for key, stateful in state_dict.items():
-            save_dict[key] = stateful.state_dict()
-        torch.save(save_dict, path / "checkpoint.pt")
-
-    logger.info(f"Saved checkpoint to {path}")
+        logger.info(f"Saved DCP checkpoint to {path}")
 
 
 def load_checkpoint(
@@ -150,12 +163,35 @@ def load_checkpoint(
     scheduler: Any,
     path: Path,
 ) -> dict[str, Any]:
-    """Load distributed checkpoint."""
+    """Load checkpoint from either HF or DCP format."""
+    is_hf_format = (path / "config.json").exists()
+    is_dcp_format = (path / ".metadata").exists()
 
-    if dist.is_initialized():
-        if get_rank() == 0 and not path.exists():
-            raise FileNotFoundError(f"Checkpoint not found at {path}")
+    if not path.exists():
+        raise FileNotFoundError(f"Checkpoint not found at {path}")
 
+    if not (is_hf_format or is_dcp_format):
+        raise ValueError(f"Unknown checkpoint format at {path}")
+
+    if is_hf_format:  # just load training state, model loaded from trainer
+        training_state_path = path / "training_state.pt"
+        training_state = torch.load(training_state_path, map_location="cpu")
+
+        if "optimizer" in training_state:
+            optimizer.load_state_dict(training_state["optimizer"])
+        if scheduler and training_state.get("scheduler"):
+            scheduler.load_state_dict(training_state["scheduler"])
+
+        logger.info(f"Loaded training state from {training_state_path}")
+
+        return {
+            "step": training_state.get("step", 0),
+            "total_tokens": training_state.get("total_tokens", 0),
+            "peak_mfu": training_state.get("peak_mfu", 0.0),
+            "peak_tflops": training_state.get("peak_tflops", 0.0),
+        }
+
+    else:
         state_dict = {
             "model": ModelState(model),
             "optimizer": OptimizerState(model, optimizer, scheduler),
@@ -163,26 +199,9 @@ def load_checkpoint(
         }
 
         dcp.load(state_dict, checkpoint_id=str(path))
-    else:
-        checkpoint_path = path / "checkpoint.pt"
-        if not checkpoint_path.exists():
-            raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
+        logger.info(f"Loaded DCP checkpoint from {path}")
 
-        loaded_dict = torch.load(checkpoint_path, map_location="cpu")
-
-        state_dict = {
-            "model": ModelState(model),
-            "optimizer": OptimizerState(model, optimizer, scheduler),
-            "training": TrainingState(),
-        }
-
-        for key, stateful in state_dict.items():
-            if key in loaded_dict:
-                stateful.load_state_dict(loaded_dict[key])
-
-    logger.info(f"Loaded checkpoint from {path}")
-
-    return state_dict["training"].state_dict()
+        return state_dict["training"].state_dict()
 
 
 def cleanup_old_checkpoints(save_dir: Path, keep_latest: int) -> None:

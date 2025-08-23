@@ -428,7 +428,7 @@ class SFTDataset(Dataset):
 
 def setup_dataloader(
     config: PretrainConfig | SFTConfig, micro_batch_size: int
-) -> DataLoader:
+) -> tuple[DataLoader, PreTrainedTokenizerBase]:
     tokenizer = setup_tokenizer(config.model.name)
 
     if isinstance(config, PretrainConfig):
@@ -468,4 +468,4 @@ def setup_dataloader(
         f"Dataloader created with {len(dataset)} samples, batch_size={micro_batch_size}"
     )
 
-    return dataloader
+    return dataloader, tokenizer

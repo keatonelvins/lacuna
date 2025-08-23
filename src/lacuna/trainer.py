@@ -4,6 +4,7 @@ import os
 import time
 import math
 import inspect
+from pathlib import Path
 from typing import Any
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -42,18 +43,25 @@ from .wandb import init_wandb, log_metrics, finish
 from loguru import logger
 
 
-def setup_model(config: ModelConfig) -> PreTrainedModel:
-    """Load model with specified attention implementation."""
-    logger.info(f"Loading model: {config.name} with {config.attention}")
-
+def setup_model(
+    config: ModelConfig, resume_path: Path | None = None
+) -> PreTrainedModel:
+    """Load model with specified attention backend."""
     attn_impl_map = {
         "FA2": "flash_attention_2",
         "FA3": "flash_attention_3",
         "SDPA": "sdpa",
     }
 
+    model_path = config.name
+
+    if resume_path and (resume_path / "config.json").exists():
+        model_path = resume_path
+
+    logger.info(f"Loading model: {model_path} with {config.attention}")
+
     model = AutoModelForCausalLM.from_pretrained(
-        config.name,
+        model_path,
         torch_dtype=torch.bfloat16,
         attn_implementation=attn_impl_map[config.attention],
         use_cache=False,
@@ -201,7 +209,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     )
 
     try:
-        model = setup_model(config.model)
+        model = setup_model(config.model, config.checkpoint.resume_path)
     except Exception as e:
         logger.error(f"Error loading model: {e}")
         raise e
@@ -231,7 +239,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     optimizer = setup_optimizer(model, config)
 
     logger.info("Setting up dataloader")
-    dataloader = setup_dataloader(config, micro_batch_size)
+    dataloader, tokenizer = setup_dataloader(config, micro_batch_size)
 
     if isinstance(config, PretrainConfig):
         max_steps = config.trainer.steps
@@ -410,8 +418,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     step=step,
                     total_tokens=total_tokens,
                     path=checkpoint_path,
+                    tokenizer=tokenizer,
                     peak_mfu=peak_mfu,
                     peak_tflops=peak_tflops,
+                    final=False,
                 )
                 cleanup_old_checkpoints(
                     config.checkpoint.save_dir, config.checkpoint.keep_latest
@@ -430,8 +440,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             step=step,
             total_tokens=total_tokens,
             path=final_path,
+            tokenizer=tokenizer,
             peak_mfu=peak_mfu,
             peak_tflops=peak_tflops,
+            final=True,  # Final checkpoint in HF format
         )
 
         finish(wandb_run)

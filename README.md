@@ -36,12 +36,12 @@ uv run pre-commit install
 
 ## Acknowledgemnt
 
-There are a ton of great training repos out there already! Some I have used/enjoyed:
+There are a ton of great training repos out there already! Some that influenced my implementation:
 - [prime-rl](https://github.com/PrimeIntellect-ai/prime-rl)
 - [torchtitan](https://github.com/pytorch/torchtitan)
-- [ArticTraining](https://github.com/snowflakedb/ArcticTraining)
+- [RL](https://github.com/NVIDIA-NeMo/RL)
 - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
-- [trl](https://github.com/huggingface/trl/)
+
 
 ## Notes
 
