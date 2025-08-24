@@ -12,6 +12,7 @@ from torch.nn.attention import sdpa_kernel, SDPBackend
 from cut_cross_entropy.transformers import cce_patch
 from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from transformers import PreTrainedModel, AutoModelForCausalLM
+from kernels import kernelize
 from loguru import logger
 
 from .config import (
@@ -49,6 +50,7 @@ def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
 
     model = apply_liger_patches(model, config.model)
     model = apply_cut_cross_entropy(model, config.model)
+    model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config.model)
 
@@ -141,12 +143,22 @@ def apply_torch_compile(
         compiled_layer = torch.compile(
             layer,
             fullgraph=fullgraph,
-            mode=compile_config.mode,
+            mode=compile_config.compile_mode,
         )
         layers[idx] = compiled_layer
     logger.info(
-        f"Applied torch.compile (fullgraph={fullgraph}, mode={compile_config.mode})"
+        f"Applied torch.compile (fullgraph={fullgraph}, mode={compile_config.compile_mode})"
     )
+
+    return model
+
+
+def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
+    """Optionally apply Hugging Face kernels.kernelize to the model."""
+    if not config.enable_kernelize:
+        return model
+
+    model = kernelize(model)
 
     return model
 

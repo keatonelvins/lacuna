@@ -18,6 +18,9 @@ class ModelConfig(BaseModel):
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
     enable_liger: bool = Field(True, description="Enable Liger kernels")
     enable_cce: bool = Field(False, description="Enable Cut Cross Entropy patch")
+    enable_kernelize: bool = Field(
+        False, description="Enable Hugging Face kernels.kernelize(model)"
+    )
     compile_mode: Optional[
         Literal[
             "default",
