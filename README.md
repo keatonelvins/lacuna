@@ -58,3 +58,11 @@ There are a ton of great training repos out there already! Some that influenced 
 - Using `torch.compile`:
     - SDPA: `fullgraph=True` works for causal-only attention (no masks)
     - FA2/FA3: Require `fullgraph=False` due to data-dependent branching
+
+## Benchmarks
+
+0. Vanilla HF Native
+1. HF Native w/ tuning (kernelize + compile + better attn)
+2. Replace limited kernelize w/ full Liger Kernel
+3. Try #2 but with compile
+4. Fight OOM's with CCE

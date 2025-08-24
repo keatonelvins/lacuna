@@ -3,6 +3,10 @@
 import os
 import sys
 import argparse
+import json
+import subprocess
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Type, TypeVar
 
@@ -127,4 +131,129 @@ def dcp_to_hf_main():
 
 def benchmark_main():
     """Entry point for benchmark."""
-    pass
+    benchmarks_dir = Path("configs/benchmarks")
+    benchmark_configs = sorted(benchmarks_dir.glob("*.toml"))
+    results_dir = Path("benchmark_results")
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n{'=' * 60}")
+    print(f"Running {len(benchmark_configs)} benchmarks")
+    print(f"{'=' * 60}\n")
+
+    results = []
+    start_time = time.perf_counter()
+
+    for i, config_path in enumerate(benchmark_configs, 1):
+        config_name = config_path.stem
+        print(f"[{i}/{len(benchmark_configs)}] Running {config_name}...")
+
+        # Get save_dir from config
+        with open(config_path, "rb") as f:
+            config_data = tomllib.load(f)
+        save_dir = Path(
+            config_data.get("checkpoint", {}).get(
+                "save_dir", f"benchmark_results/{config_name}"
+            )
+        )
+
+        # Run benchmark
+        run_start = time.perf_counter()
+        try:
+            process = subprocess.run(
+                ["uv", "run", "pt", str(config_path)],
+                capture_output=True,
+                text=True,
+                timeout=1800,
+            )
+            runtime = time.perf_counter() - run_start
+
+            # Always check for checkpoint, regardless of exit code
+            training_state_path = save_dir / "final" / "training_state.pt"
+            if training_state_path.exists():
+                try:
+                    state = torch.load(training_state_path, map_location="cpu")
+                    error = (
+                        "CUDA OOM" if "CUDA out of memory" in process.stderr else None
+                    )
+                    results.append(
+                        {
+                            "config": config_name,
+                            "success": error is None,
+                            "error": error,
+                            "runtime_seconds": runtime,
+                            "peak_mfu": state.get("peak_mfu", 0.0),
+                            "peak_tflops": state.get("peak_tflops", 0.0),
+                            "total_tokens": state.get("total_tokens", 0),
+                            "final_step": state.get("step", 0),
+                        }
+                    )
+                except Exception as e:
+                    results.append(
+                        {
+                            "config": config_name,
+                            "success": False,
+                            "error": f"Failed to load metrics: {e}",
+                            "runtime_seconds": runtime,
+                        }
+                    )
+            else:
+                error = (
+                    "CUDA OOM"
+                    if "CUDA out of memory" in process.stderr
+                    else f"Exit code {process.returncode}"
+                )
+                results.append(
+                    {
+                        "config": config_name,
+                        "success": False,
+                        "error": error,
+                        "runtime_seconds": runtime,
+                    }
+                )
+
+        except subprocess.TimeoutExpired:
+            results.append(
+                {
+                    "config": config_name,
+                    "success": False,
+                    "error": "Timeout",
+                    "runtime_seconds": 1800,
+                }
+            )
+        except Exception as e:
+            results.append(
+                {
+                    "config": config_name,
+                    "success": False,
+                    "error": str(e),
+                    "runtime_seconds": time.perf_counter() - run_start,
+                }
+            )
+
+    # Save and display results
+    results_file = (
+        results_dir
+        / f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    with open(results_file, "w") as f:
+        json.dump(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "runtime": time.perf_counter() - start_time,
+                "results": results,
+            },
+            f,
+            indent=2,
+        )
+
+    print(f"\n{'=' * 60}\nBenchmark Summary\n{'=' * 60}")
+    print(f"{'Config':<30} {'Status':<20} {'MFU %':<10} {'TFLOPS':<10}")
+    print("-" * 60)
+    for r in results:
+        status = "✓ Success" if r["success"] else f"✗ {r['error']}"
+        mfu = f"{r.get('peak_mfu', 0):.1f}" if r["success"] else "-"
+        tflops = f"{r.get('peak_tflops', 0):.1f}" if r["success"] else "-"
+        print(f"{r['config']:<30} {status:<20} {mfu:<10} {tflops:<10}")
+    print(
+        f"{'=' * 60}\nResults saved to: {results_file}\nTotal runtime: {time.perf_counter() - start_time:.1f}s\n{'=' * 60}\n"
+    )

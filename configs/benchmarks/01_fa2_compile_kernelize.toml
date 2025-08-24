@@ -1,0 +1,20 @@
+# SDPA + compile + kernelize
+
+[model]
+name = "Qwen/Qwen2.5-0.5B"
+attention = "FA2"
+enable_liger = false
+enable_cce = false
+enable_kernelize = true
+compile_mode = "default"
+
+[trainer]
+steps = 50
+
+[scheduler]
+type = "wsd"
+warmup_steps = 10
+decay_steps = 40
+
+[checkpoint]
+save_dir = "benchmark_results/sdpa_compile_kernelize"

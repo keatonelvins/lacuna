@@ -24,6 +24,7 @@ from .config import (
 )
 
 ATTN_IMPL_MAP = {
+    "eager": "eager",
     "FA2": "flash_attention_2",
     "FA3": "flash_attention_3",
     "SDPA": "sdpa",
@@ -154,7 +155,7 @@ def apply_torch_compile(
         # Need to use capture_scalar_outputs for FA2/FA3 compatibility
         torch._dynamo.config.capture_scalar_outputs = "FA" in compile_config.attention
 
-    # Use fullgraph=True for SDPA, fullgraph=False for FA2/FA3
+    # Use fullgraph=True for SDPA, fullgraph=False for FA2/FA3/eager
     fullgraph = compile_config.attention == "SDPA"
 
     layers = model.model.layers

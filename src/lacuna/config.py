@@ -12,8 +12,9 @@ class ModelConfig(BaseModel):
     """Model config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
-    attention: Literal["FA2", "FA3", "SDPA"] = Field(
-        "FA2", description="Attention implementation (for FA3 run scripts/fa3.sh)"
+    attention: Literal["FA2", "FA3", "SDPA", "eager"] = Field(
+        "FA2",
+        description="Attention implementation (use FA2/FA3/SDPA, eager is just for baseline)",
     )
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
     enable_liger: bool = Field(True, description="Enable Liger kernels")
