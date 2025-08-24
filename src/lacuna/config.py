@@ -142,7 +142,6 @@ class CompileConfig(BaseModel):
     """Torch compile configuration"""
 
     enabled: bool = Field(False, description="Enable torch.compile")
-    fullgraph: bool = Field(True, description="Compile with fullgraph mode")
     mode: Literal[
         "default",
         "reduce-overhead",

@@ -53,3 +53,5 @@ There are a ton of great training repos out there already! Some that influenced 
 - We default to fp32 for gradient accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
     - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
+- In order for `torch.compile` to play nice with flash attention, you must enable [capturing scalar outputs](https://github.com/huggingface/transformers/blob/4f9b4e62bc52a52b19a6a4a1a6bfc61a3f5b65b1/src/transformers/modeling_flash_attention_utils.py#L370-L374)
+    - `fullgraph=True` is not supported afaict but may be in the future

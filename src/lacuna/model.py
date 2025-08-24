@@ -126,19 +126,26 @@ def apply_torch_compile(
     if not compile_config.enabled:
         return model
 
-    # Set dynamo configs for stability
     if hasattr(torch, "_dynamo"):
         torch._dynamo.config.cache_size_limit = 256
         torch._dynamo.config.suppress_errors = True
+        torch._dynamo.config.capture_scalar_outputs = True  # For FA2 compatibility
+
+    # Determine fullgraph based on attention implementation
+    # FA2/FA3 require fullgraph=False due to data-dependent branching
+    attn_impl = model.config._attn_implementation
+    fullgraph = attn_impl not in ["flash_attention_2", "flash_attention_3"]
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
         compiled_layer = torch.compile(
             layer,
-            fullgraph=compile_config.fullgraph,
+            fullgraph=fullgraph,
             mode=compile_config.mode,
         )
         layers[idx] = compiled_layer
-    logger.info(f"Applied torch.compile (mode={compile_config.mode})")
+    logger.info(
+        f"Applied torch.compile (fullgraph={fullgraph}, mode={compile_config.mode})"
+    )
 
     return model

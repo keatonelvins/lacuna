@@ -158,6 +158,7 @@ __marimo__/
 REFS/*
 CLAUDE.md
 TODO.md
+NOTES.md
 
 # Artifacts
 weights/
