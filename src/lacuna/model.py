@@ -2,12 +2,13 @@
 
 import os
 import math
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stdout, redirect_stderr, nullcontext
 
 import torch
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
+from torch.nn.attention import sdpa_kernel, SDPBackend
 from cut_cross_entropy.transformers import cce_patch
 from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from transformers import PreTrainedModel, AutoModelForCausalLM
@@ -15,7 +16,6 @@ from loguru import logger
 
 from .config import (
     ActivationCheckpointConfig,
-    CompileConfig,
     ModelConfig,
     PretrainConfig,
     SFTConfig,
@@ -50,7 +50,7 @@ def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
     model = apply_liger_patches(model, config.model)
     model = apply_cut_cross_entropy(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
-    model = apply_torch_compile(model, config.compile)
+    model = apply_torch_compile(model, config.model)
 
     model = model.cuda()
     model.train()
@@ -120,21 +120,21 @@ def apply_activation_checkpointing(
 
 
 def apply_torch_compile(
-    model: PreTrainedModel, compile_config: CompileConfig
+    model: PreTrainedModel, compile_config: ModelConfig
 ) -> PreTrainedModel:
     """Apply torch.compile to each individual transformer block."""
-    if not compile_config.enabled:
+    if not compile_config.compile_mode:
         return model
 
     if hasattr(torch, "_dynamo"):
         torch._dynamo.config.cache_size_limit = 256
         torch._dynamo.config.suppress_errors = True
-        torch._dynamo.config.capture_scalar_outputs = True  # For FA2 compatibility
 
-    # Determine fullgraph based on attention implementation
-    # FA2/FA3 require fullgraph=False due to data-dependent branching
-    attn_impl = model.config._attn_implementation
-    fullgraph = attn_impl not in ["flash_attention_2", "flash_attention_3"]
+        # Need to use capture_scalar_outputs for FA2/FA3 compatibility
+        torch._dynamo.config.capture_scalar_outputs = "FA" in compile_config.attention
+
+    # Use fullgraph=True for SDPA, fullgraph=False for FA2/FA3
+    fullgraph = compile_config.attention == "SDPA"
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
@@ -149,3 +149,24 @@ def apply_torch_compile(
     )
 
     return model
+
+
+def fast_forward(
+    model: PreTrainedModel, model_inputs: dict, config: ModelConfig
+) -> torch.Tensor:
+    """Fast forward pass with Liger kernels, CCE/FLCE, and SDPA Flash backend (if using SDPA)."""
+    forward_kwargs = dict(model_inputs)
+    if config.enable_liger and not config.enable_cce:
+        # pass through accum_dtype if using Liger FLCE
+        accum_dtype = torch.float32 if config.accum_fp32 else torch.bfloat16
+        forward_kwargs["accum_dtype"] = accum_dtype
+
+    if config.attention == "SDPA":
+        ctx = sdpa_kernel(SDPBackend.FLASH_ATTENTION)
+    else:
+        ctx = nullcontext()
+
+    with ctx:
+        outputs = model(**forward_kwargs)
+
+    return outputs

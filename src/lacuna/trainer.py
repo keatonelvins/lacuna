@@ -22,7 +22,7 @@ from .config import (
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_fsdp
 from .metrics import MFUTracker, MemoryTracker
-from .model import setup_model
+from .model import setup_model, fast_forward
 from .utils import setup_logger
 from .wandb import init_wandb, log_metrics, finish
 from loguru import logger
@@ -171,12 +171,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
             with autocast("cuda", dtype=torch.bfloat16):
-                if config.model.enable_liger and not config.model.enable_cce:
-                    outputs = model(
-                        **model_inputs, accum_dtype=torch.float32
-                    )  # pass through accum_dtype for Liger
-                else:
-                    outputs = model(**model_inputs)
+                outputs = fast_forward(model, model_inputs, config.model)
                 loss = outputs.loss
 
             loss.backward()

@@ -18,6 +18,16 @@ class ModelConfig(BaseModel):
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
     enable_liger: bool = Field(True, description="Enable Liger kernels")
     enable_cce: bool = Field(False, description="Enable Cut Cross Entropy patch")
+    compile_mode: Optional[
+        Literal[
+            "default",
+            "reduce-overhead",
+            "max-autotune",
+            "max-autotune-no-cudagraphs",
+        ]
+    ] = Field(
+        None, description="Compile mode (if omitted, torch.compile will not be applied)"
+    )
 
 
 class OptimizerConfig(BaseModel):
@@ -138,18 +148,6 @@ class ActivationCheckpointConfig(BaseModel):
     )
 
 
-class CompileConfig(BaseModel):
-    """Torch compile configuration"""
-
-    enabled: bool = Field(False, description="Enable torch.compile")
-    mode: Literal[
-        "default",
-        "reduce-overhead",
-        "max-autotune",
-        "max-autotune-no-cudagraphs",
-    ] = Field("default", description="Compile mode")
-
-
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
@@ -189,7 +187,6 @@ class PretrainConfig(BaseSettings):
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
-    compile: CompileConfig = CompileConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
@@ -212,7 +209,6 @@ class SFTConfig(BaseSettings):
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
-    compile: CompileConfig = CompileConfig()
     fsdp: FSDPConfig = FSDPConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
