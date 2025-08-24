@@ -24,6 +24,7 @@ dependencies = [
 pt = "lacuna.cli:pretrain_main"
 sft = "lacuna.cli:sft_main"
 dcp_to_hf = "lacuna.cli:dcp_to_hf_main"
+benchmark = "lacuna.cli:benchmark_main"
 
 [dependency-groups]
 dev = [
@@ -32,6 +33,7 @@ dev = [
     "pytest-cov>=6.2.1",
     "ruff>=0.12.10",
     "ty>=0.0.1a19",
+    "toml>=0.10.2",
 ]
 
 [build-system]

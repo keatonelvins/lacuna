@@ -1,0 +1,35 @@
+# Scenario 8: Liger + CCE + FA2 + compile
+
+[model]
+name = "Qwen/Qwen2.5-0.5B"
+attention = "FA2"
+enable_liger = true
+enable_cce = true
+enable_kernelize = false
+compile_mode = "default"
+
+[data]
+dataset_name = "keatone/TinierStories"
+seq_len = 2048
+
+[trainer]
+batch_size = 8
+steps = 50
+
+[optimizer]
+lr = 3e-4
+
+[scheduler]
+type = "wsd"
+warmup_steps = 10
+decay_steps = 40
+
+[checkpoint]
+save_every = 1000
+save_dir = "benchmarks/results/liger_cce_fa2_compile"
+
+[metrics]
+log_every = 10
+
+[wandb]
+enabled = false

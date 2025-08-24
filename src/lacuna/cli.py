@@ -123,3 +123,8 @@ def dcp_to_hf_main():
     config.save_pretrained(hf_path)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.save_pretrained(hf_path)
+
+
+def benchmark_main():
+    """Entry point for benchmark."""
+    pass
