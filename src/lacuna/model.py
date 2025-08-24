@@ -2,7 +2,8 @@
 
 import os
 import math
-from contextlib import redirect_stdout, redirect_stderr, nullcontext
+import functools
+from contextlib import redirect_stdout, redirect_stderr
 
 import torch
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
@@ -125,6 +126,24 @@ def apply_torch_compile(
     model: PreTrainedModel, compile_config: ModelConfig
 ) -> PreTrainedModel:
     """Apply torch.compile to each individual transformer block."""
+    # Patch model.forward with SDPA kernel if using SDPA
+    if compile_config.attention == "SDPA":
+        backends = [SDPBackend.FLASH_ATTENTION]
+        capability = torch.cuda.get_device_capability()
+        if capability[0] >= 9:  # H100 is 9.0, H200/B200 are 9.0+
+            backends.insert(0, SDPBackend.CUDNN_ATTENTION)
+
+        original_forward = model.forward
+
+        @functools.wraps(original_forward)
+        def sdpa_forward(*args, **kwargs):
+            with sdpa_kernel(backends, set_priority=True):
+                return original_forward(*args, **kwargs)
+
+        model.forward = sdpa_forward
+        backend_names = [b.name for b in backends]
+        logger.info(f"Patched model.forward with SDPA backends: {backend_names}")
+
     if not compile_config.compile_mode:
         return model
 
@@ -161,24 +180,3 @@ def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedMo
     model = kernelize(model)
 
     return model
-
-
-def fast_forward(
-    model: PreTrainedModel, model_inputs: dict, config: ModelConfig
-) -> torch.Tensor:
-    """Fast forward pass with Liger kernels, CCE/FLCE, and SDPA Flash backend (if using SDPA)."""
-    forward_kwargs = dict(model_inputs)
-    if config.enable_liger and not config.enable_cce:
-        # pass through accum_dtype if using Liger FLCE
-        accum_dtype = torch.float32 if config.accum_fp32 else torch.bfloat16
-        forward_kwargs["accum_dtype"] = accum_dtype
-
-    if config.attention == "SDPA":
-        ctx = sdpa_kernel(SDPBackend.FLASH_ATTENTION)
-    else:
-        ctx = nullcontext()
-
-    with ctx:
-        outputs = model(**forward_kwargs)
-
-    return outputs
