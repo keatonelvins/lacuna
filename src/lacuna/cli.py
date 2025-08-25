@@ -6,6 +6,7 @@ import argparse
 import json
 import subprocess
 import time
+import gc
 from datetime import datetime
 from pathlib import Path
 from typing import Type, TypeVar
@@ -242,6 +243,11 @@ def benchmark_main():
                     "runtime_seconds": time.perf_counter() - run_start,
                 }
             )
+
+        # Clean up memory between runs
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
     # Save and display results
     results_file = (

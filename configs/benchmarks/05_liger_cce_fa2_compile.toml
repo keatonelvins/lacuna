@@ -2,7 +2,7 @@
 
 [model]
 name = "Qwen/Qwen3-8B"
-attention = "FA3"
+attention = "FA2"
 liger = true
 cce = true
 compile_mode = "max-autotune"
@@ -16,4 +16,4 @@ warmup_steps = 10
 decay_steps = 10
 
 [checkpoint]
-save_dir = "benchmark_results/liger_cce_fa3_compile"
+save_dir = "benchmark_results/liger_cce_fa2_compile"

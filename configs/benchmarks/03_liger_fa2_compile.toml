@@ -1,9 +1,9 @@
-# FA2 + compile + kernelize
+# Liger + FA2 + compile
 
 [model]
 name = "Qwen/Qwen3-8B"
-attention = "FA3"
-kernelize = true
+attention = "FA2"
+liger = true
 compile_mode = "max-autotune"
 
 [trainer]
@@ -16,4 +16,4 @@ warmup_steps = 10
 decay_steps = 10
 
 [checkpoint]
-save_dir = "benchmark_results/fa3_compile_kernelize"
+save_dir = "benchmark_results/liger_fa2_compile"

@@ -1,4 +1,4 @@
-# Baseline HF w/ FA2
+# Baseline HF w/ FA3
 
 [model]
 name = "Qwen/Qwen3-8B"
