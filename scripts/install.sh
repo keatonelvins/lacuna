@@ -34,6 +34,8 @@ main() {
     log_info "Installing uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
+    # TODO: enforce uv version
+
     log_info "Setting up uv environment..."
     if ! command -v uv &> /dev/null; then
         source $HOME/.local/bin/env
