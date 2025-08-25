@@ -8,6 +8,7 @@ compile_mode = "max-autotune"
 
 [trainer]
 steps = 50
+batch_size = 1
 
 [scheduler]
 type = "wsd"
