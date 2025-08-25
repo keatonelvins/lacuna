@@ -155,20 +155,15 @@ def apply_torch_compile(
         # Need to use capture_scalar_outputs for FA2/FA3 compatibility
         torch._dynamo.config.capture_scalar_outputs = "FA" in compile_config.attention
 
-    # Use fullgraph=True for SDPA, fullgraph=False for FA2/FA3/eager
-    fullgraph = compile_config.attention == "SDPA"
-
     layers = model.model.layers
     for idx, layer in enumerate(layers):
         compiled_layer = torch.compile(
             layer,
-            fullgraph=fullgraph,
+            fullgraph=True,
             mode=compile_config.compile_mode,
         )
         layers[idx] = compiled_layer
-    logger.info(
-        f"Applied torch.compile (fullgraph={fullgraph}, mode={compile_config.compile_mode})"
-    )
+    logger.info(f"Applied torch.compile (mode={compile_config.compile_mode})")
 
     return model
 

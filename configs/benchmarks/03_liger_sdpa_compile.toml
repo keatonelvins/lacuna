@@ -6,7 +6,7 @@ attention = "SDPA"
 enable_liger = true
 enable_cce = false
 enable_kernelize = false
-compile_mode = "default"
+compile_mode = "max-autotune"
 
 [trainer]
 steps = 50

@@ -50,10 +50,9 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     os.execvp("torchrun", cmd)
 
 
-def parse_argv(config_cls: Type[T], args: list[str] | None = None) -> T:
+def parse_argv(config_cls: Type[T]) -> T:
     """Parse TOML config file and CLI overrides into pydantic settings"""
-    if args is None:
-        args = sys.argv[1:]
+    args = sys.argv[1:]
 
     # First arg is TOML file path if it exists and doesn't start with --
     if args and not args[0].startswith("--"):
@@ -131,8 +130,22 @@ def dcp_to_hf_main():
 
 def benchmark_main():
     """Entry point for benchmark."""
+    parser = argparse.ArgumentParser(description="Run benchmarks")
+    parser.add_argument(
+        "--subset",
+        type=str,
+        default="all",
+        help="Subset of benchmarks to run (default: 'all')",
+    )
+    args = parser.parse_args()
+
     benchmarks_dir = Path("configs/benchmarks")
     benchmark_configs = sorted(benchmarks_dir.glob("*.toml"))
+    if args.subset != "all":
+        benchmark_configs = [
+            config for config in benchmark_configs if args.subset in config.stem
+        ]
+
     results_dir = Path("benchmark_results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -250,7 +263,7 @@ def benchmark_main():
     print(f"{'Config':<30} {'Status':<20} {'MFU %':<10} {'TFLOPS':<10}")
     print("-" * 60)
     for r in results:
-        status = "✓ Success" if r["success"] else f"✗ {r['error']}"
+        status = "Success!" if r["success"] else f"{r['error']}"
         mfu = f"{r.get('peak_mfu', 0):.1f}" if r["success"] else "-"
         tflops = f"{r.get('peak_tflops', 0):.1f}" if r["success"] else "-"
         print(f"{r['config']:<30} {status:<20} {mfu:<10} {tflops:<10}")

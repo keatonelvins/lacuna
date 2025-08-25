@@ -55,9 +55,6 @@ There are a ton of great training repos out there already! Some that influenced 
 - We default to fp32 for gradient accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
     - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
-- Using `torch.compile`:
-    - SDPA: `fullgraph=True` works for causal-only attention (no masks)
-    - FA2/FA3: Require `fullgraph=False` due to data-dependent branching
 
 ## Benchmarks
 
@@ -66,3 +63,4 @@ There are a ton of great training repos out there already! Some that influenced 
 2. Replace limited kernelize w/ full Liger Kernel
 3. Try #2 but with compile
 4. Fight OOM's with CCE
+5. Kitchen sink strategy (liger + cce + compile)

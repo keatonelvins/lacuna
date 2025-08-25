@@ -6,7 +6,7 @@ attention = "FA2"
 enable_liger = false
 enable_cce = false
 enable_kernelize = true
-compile_mode = "default"
+compile_mode = "max-autotune"
 
 [trainer]
 steps = 50

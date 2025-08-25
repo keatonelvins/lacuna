@@ -1,10 +1,10 @@
-# Liger + SDPA + compile
+# Liger + CCE + SDPA + compile
 
 [model]
 name = "Qwen/Qwen2.5-0.5B"
 attention = "SDPA"
 enable_liger = true
-enable_cce = false
+enable_cce = true
 enable_kernelize = false
 compile_mode = "max-autotune"
 
@@ -17,4 +17,4 @@ warmup_steps = 10
 decay_steps = 40
 
 [checkpoint]
-save_dir = "benchmark_results/liger_sdpa_compile"
+save_dir = "benchmark_results/liger_cce_sdpa_compile"
