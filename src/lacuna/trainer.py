@@ -169,6 +169,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 batch = next(dataloader_iter)
             data_loading_times.append(time.perf_counter() - data_load_start)
 
+            if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
+                torch.compiler.cudagraph_mark_step_begin()
+
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
             with autocast("cuda", dtype=torch.bfloat16):
