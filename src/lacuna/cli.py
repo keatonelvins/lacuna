@@ -262,11 +262,16 @@ def benchmark_main():
     print(f"\n{'=' * 60}\nBenchmark Summary\n{'=' * 60}")
     print(f"{'Config':<30} {'Status':<20} {'MFU %':<10} {'TFLOPS':<10}")
     print("-" * 60)
+    print(
+        f"{'Config':<30} {'Status':<20} {'MFU %':<10} {'TFLOPS':<10} {'Runtime(s)':<12}"
+    )
+    print("-" * 60)
     for r in results:
         status = "Success!" if r["success"] else f"{r['error']}"
         mfu = f"{r.get('peak_mfu', 0):.1f}" if r["success"] else "-"
         tflops = f"{r.get('peak_tflops', 0):.1f}" if r["success"] else "-"
-        print(f"{r['config']:<30} {status:<20} {mfu:<10} {tflops:<10}")
+        runtime = f"{r.get('runtime_seconds', 0):.1f}"
+        print(f"{r['config']:<30} {status:<20} {mfu:<10} {tflops:<10} {runtime:<12}")
     print(
         f"{'=' * 60}\nResults saved to: {results_file}\nTotal runtime: {time.perf_counter() - start_time:.1f}s\n{'=' * 60}\n"
     )

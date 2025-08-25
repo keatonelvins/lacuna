@@ -1,8 +1,8 @@
-# Baseline HF
+# Baseline HF w/ SDPA
 
 [model]
-name = "Qwen/Qwen3-8B-Base"
-attention = "eager"
+name = "Qwen/Qwen3-8B"
+attention = "SDPA" 
 
 [trainer]
 steps = 50
@@ -13,4 +13,4 @@ warmup_steps = 10
 decay_steps = 10
 
 [checkpoint]
-save_dir = "benchmark_results/baseline"
+save_dir = "benchmark_results/sdpa"

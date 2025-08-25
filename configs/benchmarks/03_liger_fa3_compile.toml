@@ -1,10 +1,9 @@
-# Liger + CCE + SDPA + compile
+# Liger + FA2 + compile
 
 [model]
 name = "Qwen/Qwen3-8B"
-attention = "SDPA"
+attention = "FA3"
 enable_liger = true
-enable_cce = true
 compile_mode = "max-autotune"
 
 [trainer]
@@ -16,4 +15,4 @@ warmup_steps = 10
 decay_steps = 10
 
 [checkpoint]
-save_dir = "benchmark_results/liger_cce_sdpa_compile"
+save_dir = "benchmark_results/liger_fa3_compile"

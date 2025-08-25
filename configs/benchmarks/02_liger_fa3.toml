@@ -1,10 +1,9 @@
-# Liger + SDPA + compile
+# Liger + FA2 (no compile)
 
 [model]
 name = "Qwen/Qwen3-8B"
-attention = "SDPA"
+attention = "FA3"
 enable_liger = true
-compile_mode = "max-autotune"
 
 [trainer]
 steps = 50
@@ -15,4 +14,4 @@ warmup_steps = 10
 decay_steps = 10
 
 [checkpoint]
-save_dir = "benchmark_results/liger_sdpa_compile"
+save_dir = "benchmark_results/liger_fa3"

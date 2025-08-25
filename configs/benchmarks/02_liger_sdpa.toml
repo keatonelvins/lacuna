@@ -1,11 +1,9 @@
 # Liger + SDPA (no compile)
 
 [model]
-name = "Qwen/Qwen2.5-0.5B"
+name = "Qwen/Qwen3-8B"
 attention = "SDPA"
 enable_liger = true
-enable_cce = false
-enable_kernelize = false
 
 [trainer]
 steps = 50
@@ -13,7 +11,7 @@ steps = 50
 [scheduler]
 type = "wsd"
 warmup_steps = 10
-decay_steps = 40
+decay_steps = 10
 
 [checkpoint]
 save_dir = "benchmark_results/liger_sdpa"

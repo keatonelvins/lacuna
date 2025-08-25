@@ -37,6 +37,7 @@ def setup_optimizer(
         lr=config.optimizer.lr,
         weight_decay=config.optimizer.weight_decay,
         betas=config.optimizer.betas,
+        fused=True,
     )
 
 

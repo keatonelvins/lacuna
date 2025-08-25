@@ -1,11 +1,10 @@
 # Liger + CCE + FA2 (no compile)
 
 [model]
-name = "Qwen/Qwen2.5-0.5B"
-attention = "FA2"
+name = "Qwen/Qwen3-8B"
+attention = "FA3"
 enable_liger = true
 enable_cce = true
-enable_kernelize = false
 
 [trainer]
 steps = 50
@@ -13,7 +12,7 @@ steps = 50
 [scheduler]
 type = "wsd"
 warmup_steps = 10
-decay_steps = 40
+decay_steps = 10
 
 [checkpoint]
-save_dir = "benchmark_results/liger_cce_fa2"
+save_dir = "benchmark_results/liger_cce_fa3"
