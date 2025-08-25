@@ -1,6 +1,5 @@
 """Pydantic configurations for pretraining and SFT."""
 
-from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -72,13 +71,13 @@ class DataConfig(BaseModel):
     dataset_name: str = Field(description="HF dataset name")
     split: str = Field("train", description="Dataset split")
     seq_len: int = Field(2048, ge=1, description="Sequence length")
+    use_random_data: bool = Field(False, description="Use random data for testing")
 
 
 class PretrainDataConfig(DataConfig):
     """Pretraining data config"""
 
     dataset_name: str = Field("keatone/TinierStories", description="HF dataset name")
-    use_random_data: bool = Field(False, description="Use random data for testing")
 
 
 class SFTDataConfig(DataConfig):
@@ -86,28 +85,17 @@ class SFTDataConfig(DataConfig):
 
     dataset_name: str = Field("keatone/s1K", description="HF dataset name")
     packing: bool = Field(True, description="Pack multiple message lists per sample")
-    use_random_data: bool = Field(False, description="Use random data for testing")
 
 
-class FSDPShardingStrategy(str, Enum):
-    """FSDP sharding strategies."""
+class DistributedConfig(BaseModel):
+    """Distributed training configuration"""
 
-    FULL_SHARD = "FULL_SHARD"
-    SHARD_GRAD_OP = "SHARD_GRAD_OP"
-    NO_SHARD = "NO_SHARD"
-    HYBRID_SHARD = "HYBRID_SHARD"
-
-
-class FSDPConfig(BaseModel):
-    """FSDP distributed training config"""
-
-    enabled: bool = Field(True, description="Enable FSDP (auto-detects multi-GPU)")
-    reshard_after_forward: bool = Field(
-        True, description="Reshard params after forward pass"
+    backend: Literal["fsdp", "ddp", "none"] = Field(
+        "none",
+        description="FSDP for large models, DDP for small models, none to disable",
     )
-    cpu_offload: bool = Field(False, description="Offload params to CPU for memory")
-    sharding_strategy: FSDPShardingStrategy = Field(
-        FSDPShardingStrategy.FULL_SHARD, description="FSDP sharding strategy"
+    cpu_offload: bool = Field(
+        False, description="Offload params to CPU (enable if OOM, FSDP only)"
     )
 
 
@@ -118,6 +106,9 @@ class TorchrunConfig(BaseModel):
     nnodes: int = Field(1, ge=1, description="Number of nodes")
     master_addr: str = Field("localhost", description="Master node address")
     master_port: str = Field("29500", description="Master node port")
+    node_rank: int | None = Field(
+        None, ge=0, description="Node rank for multi-node training"
+    )
 
 
 class TrainerConfig(BaseModel):
@@ -193,7 +184,7 @@ class PretrainConfig(BaseSettings):
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
-    fsdp: FSDPConfig = FSDPConfig()
+    dist: DistributedConfig = DistributedConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
@@ -215,7 +206,7 @@ class SFTConfig(BaseSettings):
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
-    fsdp: FSDPConfig = FSDPConfig()
+    dist: DistributedConfig = DistributedConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(

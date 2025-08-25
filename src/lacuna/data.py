@@ -450,7 +450,7 @@ class SFTDataset(Dataset):
 
 def setup_dataloader(
     config: PretrainConfig | SFTConfig, micro_batch_size: int
-) -> tuple[DataLoader, PreTrainedTokenizerBase]:
+) -> tuple[DataLoader, PreTrainedTokenizerBase, DistributedSampler | None]:
     tokenizer = setup_tokenizer(config.model.name)
 
     # Check if we should use random data
@@ -499,4 +499,4 @@ def setup_dataloader(
         f"Dataloader created with {len(dataset)} samples, batch_size={micro_batch_size}"
     )
 
-    return dataloader, tokenizer
+    return dataloader, tokenizer, sampler

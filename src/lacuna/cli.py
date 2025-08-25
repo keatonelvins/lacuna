@@ -36,10 +36,20 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
         f"--nnodes={torchrun.nnodes}",
         f"--master_addr={torchrun.master_addr}",
         f"--master_port={torchrun.master_port}",
-        "-m",
-        "lacuna.cli",
-        entry_point,
     ]
+
+    if hasattr(torchrun, "node_rank") and torchrun.node_rank is not None:
+        cmd.append(f"--node_rank={torchrun.node_rank}")
+    elif torchrun.nnodes > 1:
+        print(
+            f"Error: For multi-node training (nnodes={torchrun.nnodes}), node_rank must be specified in config or via --torchrun.node_rank"
+        )
+        print(
+            "Example: uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 0"
+        )
+        sys.exit(1)
+
+    cmd.extend(["-m", "lacuna.cli", entry_point])
 
     # Add original CLI args (without --torchrun flag)
     lacuna_args = [arg for arg in sys.argv[1:] if arg != "--torchrun"]
@@ -277,7 +287,9 @@ def benchmark_main():
         tflops = f"{r.get('peak_tflops', 0):.1f}" if r["success"] else "-"
         memory = f"{r.get('peak_memory_gb', 0):.1f}" if r["success"] else "-"
         runtime = f"{r.get('runtime_seconds', 0):.1f}"
-        print(f"{r['config']:<30} {status:<15} {mfu:<8} {tflops:<10} {memory:<10} {runtime:<12}")
+        print(
+            f"{r['config']:<30} {status:<15} {mfu:<8} {tflops:<10} {memory:<10} {runtime:<12}"
+        )
     print(
         f"{'=' * 80}\nResults saved to: {results_file}\nTotal runtime: {time.perf_counter() - start_time:.1f}s\n{'=' * 80}\n"
     )

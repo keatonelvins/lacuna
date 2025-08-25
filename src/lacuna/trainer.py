@@ -20,7 +20,7 @@ from .config import (
     SFTConfig,
 )
 from .data import setup_dataloader
-from .distributed import get_world_size, init_distributed, setup_fsdp
+from .distributed import get_world_size, init_distributed, setup_distributed
 from .metrics import MFUTracker, MemoryTracker
 from .model import setup_model
 from .utils import setup_logger
@@ -75,20 +75,14 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     model = setup_model(config)
 
-    # Apply FSDP if enabled and multi-GPU
-    if config.fsdp.enabled and world_size > 1:
-        model = setup_fsdp(
-            model,
-            reshard_after_forward=config.fsdp.reshard_after_forward,
-            cpu_offload=config.fsdp.cpu_offload,
-            sharding_strategy=config.fsdp.sharding_strategy,
-        )
+    # Apply distributed training (FSDP2 or DDP)
+    model = setup_distributed(model, config)
 
     logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)
 
     logger.info("Setting up dataloader")
-    dataloader, tokenizer = setup_dataloader(config, micro_batch_size)
+    dataloader, tokenizer, sampler = setup_dataloader(config, micro_batch_size)
 
     if isinstance(config, PretrainConfig):
         max_steps = config.trainer.steps
@@ -157,6 +151,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     try:
         dataloader_iter = iter(dataloader)
+        current_epoch = 0
 
         for step in range(start_step, max_steps):
             accumulated_loss = 0.0
@@ -167,7 +162,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             try:
                 batch = next(dataloader_iter)
             except StopIteration:
-                # TODO: should we flag for pt?
+                # For SFT with epochs, need to update sampler so shuffling works
+                if isinstance(config, SFTConfig) and sampler is not None:
+                    current_epoch += 1
+                    sampler.set_epoch(current_epoch)
                 dataloader_iter = iter(dataloader)
                 batch = next(dataloader_iter)
             data_loading_times.append(time.perf_counter() - data_load_start)
@@ -217,7 +215,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 if "mfu_pct" in mfu_metrics:
                     peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
                     peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
-                
+
                 # Track peak memory usage
                 peak_memory_gb = max(peak_memory_gb, memory_stats["max_reserved_gb"])
 

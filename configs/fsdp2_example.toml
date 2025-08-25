@@ -1,0 +1,22 @@
+# FSDP2 Multi-GPU Training Example
+# Run with: uv run pt --torchrun configs/fsdp2_example.toml
+
+[model]
+name = "Qwen/Qwen2.5-0.5B"
+attention = "FA3" 
+liger = true
+
+[dist]
+backend = "fsdp"
+cpu_offload = false  # Enable if OOM
+
+[trainer]
+batch_size = 32  # Global batch size across all GPUs
+steps = 1000
+
+[checkpoint]
+save_every = 500
+save_dir = "weights/fsdp2_model"
+
+[torchrun]
+nproc_per_node = 4  # Number of GPUs per node
