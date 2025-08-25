@@ -31,15 +31,13 @@ main() {
     git clone https://github.com/keatonelvins/lacuna.git
     cd lacuna
 
-    log_info "Installing uv..."
+    log_info "Installing/updating uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
-    # TODO: enforce uv version
+    echo "uv >=0.8.11 required to build, current: $(uv --version)"
 
-    log_info "Setting up uv environment..."
-    if ! command -v uv &> /dev/null; then
-        source $HOME/.local/bin/env
-    fi
+    # Source uv environment
+    [ -f "$HOME/.local/bin/env" ] && source $HOME/.local/bin/env
 
     log_info "Installing Python dependencies..."
     uv sync --dev
