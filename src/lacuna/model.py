@@ -123,12 +123,10 @@ def apply_activation_checkpointing(
     return model
 
 
-def apply_torch_compile(
-    model: PreTrainedModel, compile_config: ModelConfig
-) -> PreTrainedModel:
+def apply_torch_compile(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Apply torch.compile to each individual transformer block."""
     # Patch model.forward with SDPA kernel if using SDPA
-    if compile_config.attention == "SDPA":
+    if config.attention == "SDPA":
         backends = [SDPBackend.FLASH_ATTENTION]
         capability = torch.cuda.get_device_capability()
         if capability[0] >= 9:  # H100 is 9.0, H200/B200 are 9.0+
@@ -145,25 +143,27 @@ def apply_torch_compile(
         backend_names = [b.name for b in backends]
         logger.info(f"Patched model.forward with SDPA backends: {backend_names}")
 
-    if not compile_config.compile_mode:
+    if not config.compile_mode:
         return model
+
+    using_fa = "FA" in config.attention
 
     if hasattr(torch, "_dynamo"):
         torch._dynamo.config.cache_size_limit = 256
         torch._dynamo.config.suppress_errors = True
 
         # Need to use capture_scalar_outputs for FA2/FA3 compatibility
-        torch._dynamo.config.capture_scalar_outputs = "FA" in compile_config.attention
+        torch._dynamo.config.capture_scalar_outputs = using_fa
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
         compiled_layer = torch.compile(
             layer,
-            fullgraph=True,
-            mode=compile_config.compile_mode,
+            fullgraph=not using_fa,  # FA2 can be compiled but not with fullgraph=True when batch_size = 1
+            mode=config.compile_mode,
         )
         layers[idx] = compiled_layer
-    logger.info(f"Applied torch.compile (mode={compile_config.compile_mode})")
+    logger.info(f"Applied torch.compile (mode={config.compile_mode})")
 
     return model
 

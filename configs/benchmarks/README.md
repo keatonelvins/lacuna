@@ -36,22 +36,3 @@ Config                         Status          MFU %    TFLOPS     Mem(GB)    Ru
 Results saved to: benchmark_results/benchmark_results_20250825_055428.json
 Total runtime: 1495.8s
 ========================================================================================
-
-* FA2 + compile should be possible in fullgraph=True but got data-dependent branching issue (transformers 4.55.4):
-```bash
-from user code:                                    
-   File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/transformers/modeling_layers.py", line 93, in __call__                                                                           
-    return super().__call__(*args, **kwargs)                                                          
-  File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl                                                                     
-    return self._call_impl(*args, **kwargs)                                                           
-  File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl                                                                             
-    return forward_call(*args, **kwargs)           
-  File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 257, in forward                                                                
-    hidden_states, _ = self.self_attn(             
-  File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 214, in forward                                                                
-    attn_output, attn_weights = attention_interface(                                                  
-  File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/transformers/integrations/flash_attention.py", line 64, in flash_attention_forward                                                
-    attn_output = _flash_attention_forward(                                                           
-  File "/home/keaton_camfer_dev/lacuna/.venv/lib/python3.12/site-packages/transformers/modeling_flash_attention_utils.py", line 668, in _flash_attention_forward                                            
-    elif is_fa_with_varlen_kwargs or is_fa_with_position_ids:   
-```

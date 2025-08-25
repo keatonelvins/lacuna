@@ -1,0 +1,20 @@
+# Liger + CCE + SDPA + compile
+
+[model]
+name = "Qwen/Qwen3-8B"
+attention = "SDPA"
+kernelize = true
+cce = true
+compile_mode = "max-autotune"
+
+[trainer]
+steps = 100
+batch_size = 1
+
+[scheduler]
+type = "wsd"
+warmup_steps = 10
+decay_steps = 10
+
+[checkpoint]
+save_dir = "benchmark_results/kernelize_cce_sdpa_compile"
