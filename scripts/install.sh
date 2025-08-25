@@ -44,13 +44,6 @@ main() {
     log_info "Installing Python dependencies..."
     uv sync --dev
 
-    read -p "Do you want to install Flash Attention 3? [y/N] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Installing Flash Attention 3..."
-        ./scripts/fa3.sh
-    fi
-
     log_info "Installation complete!"
     log_info "See options with uv run pt --help or uv run sft --help"
 }

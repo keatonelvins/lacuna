@@ -26,7 +26,7 @@ from .config import (
 ATTN_IMPL_MAP = {
     "eager": "eager",
     "FA2": "flash_attention_2",
-    "FA3": "flash_attention_3",
+    "FA3": "kernels-community/flash-attn3",
     "SDPA": "sdpa",
 }
 
