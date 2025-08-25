@@ -3,7 +3,7 @@
 [model]
 name = "Qwen/Qwen3-8B"
 attention = "FA3"
-enable_liger = true
+liger = true
 
 [trainer]
 steps = 50

@@ -56,5 +56,3 @@ There are a ton of great training repos out there already! Some that influenced 
 - We default to fp32 for gradient accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
     - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
-- Current best performance seems to be Liger Kernels + CCE loss + FA2 + `torch.compile(mode='max-autotune')`
-    - FA3 benchmarks soon!

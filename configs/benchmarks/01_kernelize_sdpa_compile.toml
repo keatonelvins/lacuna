@@ -3,7 +3,7 @@
 [model]
 name = "Qwen/Qwen3-8B"
 attention = "SDPA"
-enable_kernelize = true
+kernelize = true
 compile_mode = "max-autotune"
 
 [trainer]

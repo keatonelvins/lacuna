@@ -64,7 +64,7 @@ def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
 
 def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Apply Liger kernel patches if enabled"""
-    if not config.enable_liger:
+    if not config.liger:
         return model
 
     with (
@@ -74,7 +74,7 @@ def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrain
     ):  # silence unaesthetic liger print (lol liger print)
         _apply_liger_kernel_to_instance(
             model,
-            fused_linear_cross_entropy=not config.enable_cce,  # avoid double patching
+            fused_linear_cross_entropy=not config.cce,  # avoid double patching
         )
 
     return model
@@ -84,7 +84,7 @@ def apply_cut_cross_entropy(
     model: PreTrainedModel, config: ModelConfig
 ) -> PreTrainedModel:
     """Apply Cut Cross Entropy optimization to model."""
-    if not config.enable_cce:
+    if not config.cce:
         return model
 
     logger.info("Applying Cut Cross Entropy")
@@ -170,7 +170,7 @@ def apply_torch_compile(
 
 def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Optionally apply Hugging Face kernels.kernelize to the model."""
-    if not config.enable_kernelize:
+    if not config.kernelize:
         return model
 
     model = kernelize(model)

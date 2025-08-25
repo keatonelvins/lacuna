@@ -175,7 +175,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             model_inputs = {k: v.cuda() for k, v in batch.items()}
 
             with autocast("cuda", dtype=torch.bfloat16):
-                if config.model.enable_liger and not config.model.enable_cce:
+                if config.model.liger and not config.model.cce:
                     # pass through accum_dtype if using Liger FLCE
                     accum_dtype = (
                         torch.float32 if config.model.accum_fp32 else torch.bfloat16

@@ -3,8 +3,8 @@
 [model]
 name = "Qwen/Qwen3-8B"
 attention = "FA3"
-enable_liger = true
-enable_cce = true
+liger = true
+cce = true
 compile_mode = "max-autotune"
 
 [trainer]
