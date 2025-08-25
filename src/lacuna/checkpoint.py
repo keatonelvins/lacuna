@@ -88,11 +88,13 @@ class TrainingState(Stateful):
         total_tokens: int = 0,
         peak_mfu: float = 0.0,
         peak_tflops: float = 0.0,
+        peak_memory_gb: float = 0.0,
     ):
         self.step = step
         self.total_tokens = total_tokens
         self.peak_mfu = peak_mfu
         self.peak_tflops = peak_tflops
+        self.peak_memory_gb = peak_memory_gb
 
     def state_dict(self) -> dict[str, Any]:
         """Get the training state dictionary."""
@@ -101,6 +103,7 @@ class TrainingState(Stateful):
             "total_tokens": self.total_tokens,
             "peak_mfu": self.peak_mfu,
             "peak_tflops": self.peak_tflops,
+            "peak_memory_gb": self.peak_memory_gb,
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
@@ -109,6 +112,7 @@ class TrainingState(Stateful):
         self.total_tokens = state_dict["total_tokens"]
         self.peak_mfu = state_dict.get("peak_mfu", 0.0)
         self.peak_tflops = state_dict.get("peak_tflops", 0.0)
+        self.peak_memory_gb = state_dict.get("peak_memory_gb", 0.0)
 
 
 def save_checkpoint(
@@ -122,6 +126,7 @@ def save_checkpoint(
     config: PretrainConfig | SFTConfig,
     peak_mfu: float = 0.0,
     peak_tflops: float = 0.0,
+    peak_memory_gb: float = 0.0,
     final: bool = False,
 ) -> None:
     """Save checkpoint in DCP format (intermediate) or HF format (final/single-GPU)."""
@@ -143,6 +148,7 @@ def save_checkpoint(
             "total_tokens": total_tokens,
             "peak_mfu": peak_mfu,
             "peak_tflops": peak_tflops,
+            "peak_memory_gb": peak_memory_gb,
         }
         torch.save(training_state, path / "training_state.pt")
         logger.info(f"Saved training state to {path}/training_state.pt")
@@ -151,7 +157,7 @@ def save_checkpoint(
         state_dict = {
             "model": ModelState(model),
             "optimizer": OptimizerState(model, optimizer, scheduler),
-            "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops),
+            "training": TrainingState(step, total_tokens, peak_mfu, peak_tflops, peak_memory_gb),
             "config": config.model_dump(),
         }
 
@@ -192,6 +198,7 @@ def load_checkpoint(
             "total_tokens": training_state.get("total_tokens", 0),
             "peak_mfu": training_state.get("peak_mfu", 0.0),
             "peak_tflops": training_state.get("peak_tflops", 0.0),
+            "peak_memory_gb": training_state.get("peak_memory_gb", 0.0),
         }
 
     else:

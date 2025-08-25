@@ -127,6 +127,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     total_tokens = 0
     peak_mfu = 0.0
     peak_tflops = 0.0
+    peak_memory_gb = 0.0
 
     # Resume from checkpoint if specified
     if config.checkpoint.resume_path is not None:
@@ -141,9 +142,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         total_tokens = training_state["total_tokens"]
         peak_mfu = training_state.get("peak_mfu", 0.0)
         peak_tflops = training_state.get("peak_tflops", 0.0)
+        peak_memory_gb = training_state.get("peak_memory_gb", 0.0)
         logger.info(
             f"Resumed from step {start_step}, total tokens: {total_tokens:,}, "
-            f"peak MFU: {peak_mfu:.1f}%, peak TFLOPS: {peak_tflops:.1f}"
+            f"peak MFU: {peak_mfu:.1f}%, peak TFLOPS: {peak_tflops:.1f}, "
+            f"peak memory: {peak_memory_gb:.1f}GB"
         )
 
     logger.info(f"Starting training: {max_steps} steps (current step: {start_step})")
@@ -214,6 +217,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 if "mfu_pct" in mfu_metrics:
                     peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
                     peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
+                
+                # Track peak memory usage
+                peak_memory_gb = max(peak_memory_gb, memory_stats["max_reserved_gb"])
 
                 log_parts = [
                     f"\033[91mStep {step:>6}\033[0m",
@@ -262,7 +268,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
             if step > 0 and step % config.checkpoint.save_every == 0:
                 logger.info(
-                    f"Saving checkpoint at step {step} (peak MFU: {peak_mfu:.1f}%)"
+                    f"Saving checkpoint at step {step} (peak MFU: {peak_mfu:.1f}%, peak memory: {peak_memory_gb:.1f}GB)"
                 )
                 checkpoint_path = config.checkpoint.save_dir / f"step_{step}"
                 save_checkpoint(
@@ -276,6 +282,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     config=config,
                     peak_mfu=peak_mfu,
                     peak_tflops=peak_tflops,
+                    peak_memory_gb=peak_memory_gb,
                     final=False,
                 )
                 cleanup_old_checkpoints(
@@ -299,6 +306,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             config=config,
             peak_mfu=peak_mfu,
             peak_tflops=peak_tflops,
+            peak_memory_gb=peak_memory_gb,
             final=True,  # Final checkpoint in HF format
         )
 
@@ -306,5 +314,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
         logger.info(
             f"All done! Total steps: {step}, Total tokens: {total_tokens:,}, "
-            f"Peak MFU: {peak_mfu:.1f}%, Peak TFLOPS: {peak_tflops:.1f}"
+            f"Peak MFU: {peak_mfu:.1f}%, Peak TFLOPS: {peak_tflops:.1f}, "
+            f"Peak Memory: {peak_memory_gb:.1f}GB"
         )
