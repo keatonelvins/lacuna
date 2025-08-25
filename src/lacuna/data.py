@@ -17,6 +17,28 @@ from .config import PretrainConfig, SFTConfig
 from .distributed import get_world_size
 
 
+class RandomDataset(Dataset):
+    """Dataset that generates random tokens for testing and benchmarking."""
+
+    def __init__(self, vocab_size: int, seq_len: int, num_samples: int = 10000):
+        self.vocab_size = vocab_size
+        self.seq_len = seq_len
+        self.num_samples = num_samples
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __getitem__(self, idx: int) -> dict[str, list]:
+        torch.manual_seed(idx)  # for reproducibility
+
+        tokens = torch.randint(0, self.vocab_size, (self.seq_len + 1,)).tolist()
+
+        return {
+            "input_ids": tokens[:-1],
+            "labels": tokens[1:],
+        }
+
+
 # Fast Best Fit Decreasing sample packing strategy
 # From: https://github.com/huggingface/trl/blob/d15049bf71e6e33b2e6c10ff25a26d488bce8173/trl/data_utils.py#L450-L698
 class _SegmentTree:
@@ -431,7 +453,16 @@ def setup_dataloader(
 ) -> tuple[DataLoader, PreTrainedTokenizerBase]:
     tokenizer = setup_tokenizer(config.model.name)
 
-    if isinstance(config, PretrainConfig):
+    # Check if we should use random data
+    if config.data.use_random_data:
+        logger.info("Using random data for testing/benchmarking")
+        dataset = RandomDataset(
+            vocab_size=tokenizer.vocab_size,
+            seq_len=config.data.seq_len,
+            num_samples=10000,
+        )
+        packing = False
+    elif isinstance(config, PretrainConfig):
         dataset = PretrainDataset(
             config.data.dataset_name, config.data.split, tokenizer, config.data.seq_len
         )

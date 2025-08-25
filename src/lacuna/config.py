@@ -78,6 +78,7 @@ class PretrainDataConfig(DataConfig):
     """Pretraining data config"""
 
     dataset_name: str = Field("keatone/TinierStories", description="HF dataset name")
+    use_random_data: bool = Field(False, description="Use random data for testing")
 
 
 class SFTDataConfig(DataConfig):
@@ -85,6 +86,7 @@ class SFTDataConfig(DataConfig):
 
     dataset_name: str = Field("keatone/s1K", description="HF dataset name")
     packing: bool = Field(True, description="Pack multiple message lists per sample")
+    use_random_data: bool = Field(False, description="Use random data for testing")
 
 
 class FSDPShardingStrategy(str, Enum):
