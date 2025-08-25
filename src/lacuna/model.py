@@ -54,7 +54,7 @@ def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
     model = apply_cut_cross_entropy(model, config.model)
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
-    model = apply_torch_compile(model, config.model)
+    model = apply_torch_compile(model, config.model, config)
 
     model = model.cuda()
     model.train()
@@ -123,10 +123,12 @@ def apply_activation_checkpointing(
     return model
 
 
-def apply_torch_compile(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
+def apply_torch_compile(
+    model: PreTrainedModel, config: PretrainConfig | SFTConfig
+) -> PreTrainedModel:
     """Apply torch.compile to each individual transformer block."""
     # Patch model.forward with SDPA kernel if using SDPA
-    if config.attention == "SDPA":
+    if config.model.attention == "SDPA":
         backends = [SDPBackend.FLASH_ATTENTION]
         capability = torch.cuda.get_device_capability()
         if capability[0] >= 9:  # H100 is 9.0, H200/B200 are 9.0+
@@ -143,27 +145,37 @@ def apply_torch_compile(model: PreTrainedModel, config: ModelConfig) -> PreTrain
         backend_names = [b.name for b in backends]
         logger.info(f"Patched model.forward with SDPA backends: {backend_names}")
 
-    if not config.compile_mode:
+    if not config.model.compile_mode:
         return model
 
-    using_fa = "FA" in config.attention
+    # Determine if we can use fullgraph compilation
+    # - SDPA: always can use fullgraph (no position_ids for PT, error for SFT+packing)
+    # - FA2: can use fullgraph for PT (no position_ids), not for SFT with packing
+    # - FA3: currently can't use fullgraph due to kernelhub limitations
+    is_sft_with_packing = isinstance(config, SFTConfig) and config.data.packing
+    can_use_fullgraph = config.model.attention == "SDPA" or (
+        config.model.attention == "FA2" and not is_sft_with_packing
+    )
 
     if hasattr(torch, "_dynamo"):
         torch._dynamo.config.cache_size_limit = 256
         torch._dynamo.config.suppress_errors = True
 
         # Need to use capture_scalar_outputs for FA2/FA3 compatibility
-        torch._dynamo.config.capture_scalar_outputs = using_fa
+        if "FA" in config.model.attention:
+            torch._dynamo.config.capture_scalar_outputs = True
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
         compiled_layer = torch.compile(
             layer,
-            fullgraph=not using_fa,  # FA2 can be compiled but not with fullgraph=True when batch_size = 1
-            mode=config.compile_mode,
+            fullgraph=can_use_fullgraph,
+            mode=config.model.compile_mode,
         )
         layers[idx] = compiled_layer
-    logger.info(f"Applied torch.compile (mode={config.compile_mode})")
+    logger.info(
+        f"Applied torch.compile (mode={config.model.compile_mode}, fullgraph={can_use_fullgraph})"
+    )
 
     return model
 

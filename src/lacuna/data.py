@@ -195,15 +195,12 @@ class DataCollator:
                 position_ids = [torch.arange(len(ids)) for ids in input_ids]
                 output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
         else:
-            # Standard right padding
+            # Standard right padding (no position_ids needed for non-packed)
             output = {
                 "input_ids": _pad(input_ids, self.pad_token_id),
                 "attention_mask": _pad([torch.ones_like(ids) for ids in input_ids], 0),
                 "labels": _pad(labels, -100),
             }
-
-            position_ids = [torch.arange(len(ids)) for ids in input_ids]
-            output["position_ids"] = _pad(position_ids, 0)
 
         return output
 
