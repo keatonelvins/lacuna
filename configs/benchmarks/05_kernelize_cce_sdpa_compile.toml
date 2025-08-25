@@ -1,4 +1,4 @@
-# Liger + CCE + SDPA + compile
+# Kernelize + CCE + SDPA + compile
 
 [model]
 name = "Qwen/Qwen3-8B"

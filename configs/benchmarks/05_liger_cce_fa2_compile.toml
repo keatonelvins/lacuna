@@ -1,4 +1,4 @@
-# Liger + CCE + FA2 (no compile)
+# Liger + CCE + FA2 + compile
 
 [model]
 name = "Qwen/Qwen3-8B"
