@@ -2,7 +2,7 @@
 
 Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
 
-Seeing how far we can push `AutoModel.from_pretrained()`.
+Seeing how far we can push HF modeling code!
 
 ## Quick Start
 
@@ -27,6 +27,7 @@ uv run pt --torchrun path/to/config.toml
 # Convert an early checkpoint to hf safetensors
 uv run dcp_to_hf --help
 
+# Run benchmarks for different speedups
 uv run benchmark
 
 # Log runs + access gated repos
@@ -55,12 +56,5 @@ There are a ton of great training repos out there already! Some that influenced 
 - We default to fp32 for gradient accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
     - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
-
-## Benchmarks
-
-0. Vanilla HF Native
-1. HF Native w/ tuning (kernelize + compile + better attn)
-2. Replace limited kernelize w/ full Liger Kernel
-3. Try #2 but with compile
-4. Fight OOM's with CCE
-5. Kitchen sink strategy (liger + cce + compile)
+- Current best performance seems to be Liger Kernels + CCE loss + FA2 + `torch.compile(mode='max-autotune')`
+    - FA3 benchmarks soon!
