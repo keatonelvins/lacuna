@@ -6,7 +6,7 @@ attention = "FA3"
 liger = true
 
 [trainer]
-steps = 50
+steps = 100
 batch_size = 1
 
 [scheduler]

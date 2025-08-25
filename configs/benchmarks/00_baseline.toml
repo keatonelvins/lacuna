@@ -5,7 +5,7 @@ name = "Qwen/Qwen3-8B-Base"
 attention = "eager"
 
 [trainer]
-steps = 50
+steps = 100
 batch_size = 1
 
 [scheduler]

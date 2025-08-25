@@ -8,7 +8,7 @@ cce = true
 compile_mode = "max-autotune"
 
 [trainer]
-steps = 50
+steps = 100
 
 [scheduler]
 type = "wsd"
