@@ -12,7 +12,7 @@ class ModelConfig(BaseModel):
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
     attention: Literal["FA2", "FA3", "SDPA", "eager"] = Field(
-        "FA2",
+        "FA3",
         description="Attention implementation (use FA2/FA3/SDPA, eager is just for baseline)",
     )
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
@@ -70,7 +70,7 @@ class DataConfig(BaseModel):
 
     dataset_name: str = Field(description="HF dataset name")
     split: str = Field("train", description="Dataset split")
-    seq_len: int = Field(2048, ge=1, description="Sequence length")
+    seq_len: int = Field(512, ge=1, description="Sequence length")
     use_random_data: bool = Field(False, description="Use random data for testing")
 
 
@@ -114,7 +114,7 @@ class TorchrunConfig(BaseModel):
 class TrainerConfig(BaseModel):
     """Training loop config"""
 
-    batch_size: int = Field(8, ge=1, description="Global training batch size")
+    batch_size: int = Field(1, ge=1, description="Global training batch size")
 
 
 class MetricsConfig(BaseModel):

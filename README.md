@@ -7,15 +7,16 @@ Seeing how far we can push HF modeling code!
 ## Quick Start
 
 ```bash
-# Single command install (or clone + `uv sync`)
+# Install (or clone + `uv sync`) and test (requires ~5GB VRAM)
 curl -sSL https://raw.githubusercontent.com/keatonelvins/lacuna/main/scripts/install.sh | bash
+uv run pt
 
 # See all config options
 uv run pt --help
 uv run sft --help
 
 # Pass args directly
-uv run pt --model.name Qwen/Qwen2.5-0.5B --trainer.steps 5000
+uv run pt --model.name Qwen/Qwen3-8B --trainer.steps 5000
 
 # Load args from a toml (w/ overrides)
 uv run sft path/to/config.toml

@@ -6,7 +6,9 @@ attention = "FA2"
 
 [trainer]
 steps = 500
-batch_size = 1
+
+[data]
+seq_len = 2048
 
 [scheduler]
 type = "wsd"

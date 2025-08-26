@@ -54,7 +54,7 @@ def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
     model = apply_cut_cross_entropy(model, config.model)
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
-    model = apply_torch_compile(model, config.model, config)
+    model = apply_torch_compile(model, config)
 
     model = model.cuda()
     model.train()
