@@ -9,9 +9,10 @@ compile_mode = "max-autotune"
 
 [trainer]
 steps = 500
+batch_size = 2
 
 [data]
-seq_len = 2048
+seq_len = 1024
 
 [scheduler]
 type = "wsd"

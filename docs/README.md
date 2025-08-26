@@ -6,7 +6,7 @@
 | Mode | Backend | Fullgraph Compile | Notes |
 |------|---------|------------------|-------|
 | PT | SDPA |  Yes | Best performance w/ compile |
-| PT | FA2 |  Yes |  |
+| PT | FA2 |  *Yes | Can only use fullgraph if batch_size > 1 |
 | PT | FA3 |  No | Using kernelhub impl. |
 | SFT (no pack) | Any | Varies | All backends work |
 | SFT (packing) | FA2/FA3 |  No | SDPA blocked (error) |

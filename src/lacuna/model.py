@@ -150,11 +150,13 @@ def apply_torch_compile(
 
     # Determine if we can use fullgraph compilation
     # - SDPA: always can use fullgraph (no position_ids for PT, error for SFT+packing)
-    # - FA2: can use fullgraph for PT (no position_ids), not for SFT with packing
+    # - FA2: can use fullgraph for PT if batch_size > 1 (no position_ids), not for SFT with packing
     # - FA3: currently can't use fullgraph due to kernelhub limitations
     is_sft_with_packing = isinstance(config, SFTConfig) and config.data.packing
     can_use_fullgraph = config.model.attention == "SDPA" or (
-        config.model.attention == "FA2" and not is_sft_with_packing
+        config.model.attention == "FA2"
+        and not is_sft_with_packing
+        and config.trainer.batch_size > 1
     )
 
     if hasattr(torch, "_dynamo"):

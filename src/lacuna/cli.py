@@ -148,6 +148,11 @@ def benchmark_main():
         default="all",
         help="Subset of benchmarks to run (default: 'all')",
     )
+    parser.add_argument(
+        "--seq-len-sweep",
+        action="store_true",
+        help="Sweep across seq_len values (default, 2x, 4x)",
+    )
     args = parser.parse_args()
 
     benchmarks_dir = Path("configs/benchmarks")
@@ -160,107 +165,143 @@ def benchmark_main():
     results_dir = Path("benchmark_results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
+    # Determine seq_len multipliers based on sweep flag
+    seq_len_multipliers = [1, 2, 4] if args.seq_len_sweep else [1]
+    total_runs = len(benchmark_configs) * len(seq_len_multipliers)
+
     print(f"\n{'=' * 60}")
     print(f"Running {len(benchmark_configs)} benchmarks")
+    if args.seq_len_sweep:
+        print(
+            f"With seq_len multipliers: {seq_len_multipliers} (total {total_runs} runs)"
+        )
     print(f"{'=' * 60}\n")
 
     results = []
     start_time = time.perf_counter()
+    run_counter = 0
 
-    for i, config_path in enumerate(benchmark_configs, 1):
+    for config_path in benchmark_configs:
         config_name = config_path.stem
-        print(f"[{i}/{len(benchmark_configs)}] Running {config_name}...")
 
-        # Get save_dir from config
         with open(config_path, "rb") as f:
             config_data = tomllib.load(f)
-        save_dir = Path(
-            config_data.get("checkpoint", {}).get(
-                "save_dir", f"benchmark_results/{config_name}"
-            )
-        )
+        base_seq_len = config_data.get("data", {}).get("seq_len", 512)
 
-        # Run benchmark
-        run_start = time.perf_counter()
-        try:
-            process = subprocess.run(
-                ["uv", "run", "pt", str(config_path)],
-                capture_output=True,
-                text=True,
-                timeout=1800,
+        for multiplier in seq_len_multipliers:
+            run_counter += 1
+            seq_len = base_seq_len * multiplier
+            run_name = (
+                f"{config_name}_seq{seq_len}" if args.seq_len_sweep else config_name
             )
-            runtime = time.perf_counter() - run_start
+            print(f"[{run_counter}/{total_runs}] Running {run_name}...")
 
-            # Always check for checkpoint, regardless of exit code
-            training_state_path = save_dir / "final" / "training_state.pt"
-            if training_state_path.exists():
-                try:
-                    state = torch.load(training_state_path, map_location="cpu")
+            # Get save_dir from config
+            save_dir = Path(
+                config_data.get("checkpoint", {}).get(
+                    "save_dir", f"benchmark_results/{run_name}"
+                )
+            )
+            if args.seq_len_sweep:
+                # Adjust save_dir for sweep runs
+                save_dir = save_dir.parent / f"{save_dir.name}_seq{seq_len}"
+
+            cmd = ["uv", "run", "pt", str(config_path)]
+            if multiplier > 1:
+                cmd.extend(["--data.seq_len", str(seq_len)])
+                cmd.extend(["--checkpoint.save_dir", str(save_dir)])
+
+            # Run benchmark
+            run_start = time.perf_counter()
+            try:
+                process = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=1800,
+                )
+                runtime = time.perf_counter() - run_start
+
+                training_state_path = save_dir / "final" / "training_state.pt"
+                if training_state_path.exists():
+                    try:
+                        state = torch.load(training_state_path, map_location="cpu")
+                        error = (
+                            "CUDA OOM"
+                            if "CUDA out of memory" in process.stderr
+                            else None
+                        )
+                        results.append(
+                            {
+                                "config": config_name,
+                                "run_name": run_name,
+                                "seq_len": seq_len,
+                                "success": error is None,
+                                "error": error,
+                                "runtime_seconds": runtime,
+                                "peak_mfu": state.get("peak_mfu", 0.0),
+                                "peak_tflops": state.get("peak_tflops", 0.0),
+                                "peak_memory_gb": state.get("peak_memory_gb", 0.0),
+                                "total_tokens": state.get("total_tokens", 0),
+                                "final_step": state.get("step", 0),
+                            }
+                        )
+                    except Exception as e:
+                        results.append(
+                            {
+                                "config": config_name,
+                                "run_name": run_name,
+                                "seq_len": seq_len,
+                                "success": False,
+                                "error": f"Failed to load metrics: {e}",
+                                "runtime_seconds": runtime,
+                            }
+                        )
+                else:
                     error = (
-                        "CUDA OOM" if "CUDA out of memory" in process.stderr else None
+                        "CUDA OOM"
+                        if "CUDA out of memory" in process.stderr
+                        else f"Exit code {process.returncode}"
                     )
                     results.append(
                         {
                             "config": config_name,
-                            "success": error is None,
+                            "run_name": run_name,
+                            "seq_len": seq_len,
+                            "success": False,
                             "error": error,
                             "runtime_seconds": runtime,
-                            "peak_mfu": state.get("peak_mfu", 0.0),
-                            "peak_tflops": state.get("peak_tflops", 0.0),
-                            "peak_memory_gb": state.get("peak_memory_gb", 0.0),
-                            "total_tokens": state.get("total_tokens", 0),
-                            "final_step": state.get("step", 0),
                         }
                     )
-                except Exception as e:
-                    results.append(
-                        {
-                            "config": config_name,
-                            "success": False,
-                            "error": f"Failed to load metrics: {e}",
-                            "runtime_seconds": runtime,
-                        }
-                    )
-            else:
-                error = (
-                    "CUDA OOM"
-                    if "CUDA out of memory" in process.stderr
-                    else f"Exit code {process.returncode}"
-                )
+
+            except subprocess.TimeoutExpired:
                 results.append(
                     {
                         "config": config_name,
+                        "run_name": run_name,
+                        "seq_len": seq_len,
                         "success": False,
-                        "error": error,
-                        "runtime_seconds": runtime,
+                        "error": "Timeout",
+                        "runtime_seconds": 1800,
+                    }
+                )
+            except Exception as e:
+                results.append(
+                    {
+                        "config": config_name,
+                        "run_name": run_name,
+                        "seq_len": seq_len,
+                        "success": False,
+                        "error": str(e),
+                        "runtime_seconds": time.perf_counter() - run_start,
                     }
                 )
 
-        except subprocess.TimeoutExpired:
-            results.append(
-                {
-                    "config": config_name,
-                    "success": False,
-                    "error": "Timeout",
-                    "runtime_seconds": 1800,
-                }
-            )
-        except Exception as e:
-            results.append(
-                {
-                    "config": config_name,
-                    "success": False,
-                    "error": str(e),
-                    "runtime_seconds": time.perf_counter() - run_start,
-                }
-            )
+            # Clean up memory between runs
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
 
-        # Clean up memory between runs
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-    # Save and display results
     results_file = (
         results_dir
         / f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -276,20 +317,21 @@ def benchmark_main():
             indent=2,
         )
 
-    print(f"\n{'=' * 80}\nBenchmark Summary\n{'=' * 80}")
+    print(f"\n{'=' * 95}\nBenchmark Summary\n{'=' * 95}")
     print(
-        f"{'Config':<30} {'Status':<15} {'MFU %':<8} {'TFLOPS':<10} {'Mem(GB)':<10} {'Runtime(s)':<12}"
+        f"{'Config':<30} {'SeqLen':<8} {'Status':<15} {'MFU %':<8} {'TFLOPS':<10} {'Mem(GB)':<10} {'Runtime(s)':<12}"
     )
-    print("-" * 80)
+    print("-" * 95)
     for r in results:
         status = "Success!" if r["success"] else f"{r['error']}"
         mfu = f"{r.get('peak_mfu', 0):.1f}" if r["success"] else "-"
         tflops = f"{r.get('peak_tflops', 0):.1f}" if r["success"] else "-"
         memory = f"{r.get('peak_memory_gb', 0):.1f}" if r["success"] else "-"
         runtime = f"{r.get('runtime_seconds', 0):.1f}"
+        seq_len = str(r.get("seq_len", "-"))
         print(
-            f"{r['config']:<30} {status:<15} {mfu:<8} {tflops:<10} {memory:<10} {runtime:<12}"
+            f"{r.get('run_name', r['config']):<30} {seq_len:<8} {status:<15} {mfu:<8} {tflops:<10} {memory:<10} {runtime:<12}"
         )
     print(
-        f"{'=' * 80}\nResults saved to: {results_file}\nTotal runtime: {time.perf_counter() - start_time:.1f}s\n{'=' * 80}\n"
+        f"{'=' * 95}\nResults saved to: {results_file}\nTotal runtime: {time.perf_counter() - start_time:.1f}s\n{'=' * 95}\n"
     )
