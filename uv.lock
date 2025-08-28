@@ -244,8 +244,8 @@ wheels = [
 
 [[package]]
 name = "cut-cross-entropy"
-version = "25.5.1"
-source = { git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git?rev=0ee9ee8#0ee9ee88b7ce79ec8e3137b38e751674377fae1a" }
+version = "25.5.2"
+source = { git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git?rev=c6a32c#c6a32c528be6e1512b816a5594f9908ffcaeab69" }
 dependencies = [
     { name = "torch" },
     { name = "triton", marker = "sys_platform != 'darwin'" },
@@ -544,7 +544,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cut-cross-entropy", extras = ["transformers"], git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git?rev=0ee9ee8" },
+    { name = "cut-cross-entropy", extras = ["transformers"], git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git?rev=c6a32c" },
     { name = "datasets", specifier = ">=4.0.0" },
     { name = "flash-attn", specifier = ">=2.8.3" },
     { name = "kernels", specifier = ">=0.9.0" },

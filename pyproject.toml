@@ -59,7 +59,7 @@ no-build-isolation-package = ["flash-attn"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128" }]
-cut-cross-entropy = { git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git", rev = "0ee9ee8" }
+cut-cross-entropy = { git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git", rev = "c6a32c" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
