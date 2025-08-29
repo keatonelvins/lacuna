@@ -1,4 +1,4 @@
-"""Entry point with TOML config loading and CLI overrides."""
+"""lacuna cli entry point for uv scripts."""
 
 import os
 import sys

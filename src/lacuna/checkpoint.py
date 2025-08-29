@@ -23,65 +23,52 @@ from .config import PretrainConfig, SFTConfig
 
 
 class ModelState(Stateful):
-    """Stateful protocol for model state."""
-
     def __init__(self, model: torch.nn.Module):
         self.model = model
 
     def state_dict(self) -> dict[str, Any]:
-        """Get the model's state dictionary with FSDP support."""
         return get_model_state_dict(
             self.model,
             options=StateDictOptions(cpu_offload=True),
         )
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """Load the state dictionary into the model."""
         set_model_state_dict(self.model, state_dict)
 
 
 class OptimizerState(Stateful):
-    """Stateful protocol for optimizer and scheduler state."""
-
     def __init__(
         self,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        scheduler: Any = None,
+        scheduler: torch.optim.lr_scheduler.LRScheduler,
     ):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
 
     def state_dict(self) -> dict[str, Any]:
-        """Get the optimizer and scheduler state dictionaries."""
-        optimizer_state_dict = get_optimizer_state_dict(
+        state_dict = {}
+        state_dict["optimizer"] = get_optimizer_state_dict(
             self.model,
             self.optimizer,
             options=StateDictOptions(cpu_offload=True),
         )
-
-        state_dict = {"optimizer": optimizer_state_dict}
-        if self.scheduler is not None:
-            state_dict["scheduler"] = self.scheduler.state_dict()
+        state_dict["scheduler"] = self.scheduler.state_dict()
 
         return state_dict
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """Load the state dictionaries into the optimizer and scheduler."""
         set_optimizer_state_dict(
             self.model,
             self.optimizer,
             state_dict["optimizer"],
         )
 
-        if "scheduler" in state_dict and self.scheduler is not None:
-            self.scheduler.load_state_dict(state_dict["scheduler"])
+        self.scheduler.load_state_dict(state_dict["scheduler"])
 
 
 class TrainingState(Stateful):
-    """Stateful protocol for training metadata (step, tokens, MFU)."""
-
     def __init__(
         self,
         step: int = 0,
@@ -97,7 +84,6 @@ class TrainingState(Stateful):
         self.peak_memory_gb = peak_memory_gb
 
     def state_dict(self) -> dict[str, Any]:
-        """Get the training state dictionary."""
         return {
             "step": self.step,
             "total_tokens": self.total_tokens,
@@ -107,7 +93,6 @@ class TrainingState(Stateful):
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """Load the training state."""
         self.step = state_dict["step"]
         self.total_tokens = state_dict["total_tokens"]
         self.peak_mfu = state_dict.get("peak_mfu", 0.0)
@@ -118,7 +103,7 @@ class TrainingState(Stateful):
 def save_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
-    scheduler: Any,
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
     step: int,
     total_tokens: int,
     path: Path,

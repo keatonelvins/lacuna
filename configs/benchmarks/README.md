@@ -37,3 +37,5 @@ Config                         Status          MFU %    TFLOPS     Mem(GB)    Ru
 Results saved to: benchmark_results/benchmark_results_20250825_185902.json
 Total runtime: 4208.5s
 =========================================================================================
+
+TODO: try torch_compile version of cce
