@@ -2,7 +2,7 @@
 
 ## Attention Backends
 
-### Quick Reference
+### Compatibility
 | Mode | Backend | Fullgraph Compile | Notes |
 |------|---------|------------------|-------|
 | PT | SDPA |  Yes | Best performance w/ compile |
@@ -11,5 +11,11 @@
 | SFT (no pack) | Any | Varies | All backends work |
 | SFT (packing) | FA2/FA3 |  No | SDPA blocked (error) |
 
-**Why no SDPA+packing?** SDPA doesn't respect position_id boundaries!
-    - some examples floating around of SDPA with varlen attention, may look into eventually
+Packing needs varlen attention, have seen some examples using SDPA but will look into later
+
+### Order of Optimizations
+AC -> torch.compile
+Today, compile wrapping AC is more recommended than AC wrapping compile. Compile already does recompute via the min-cut partitioner, so wrapping AC over a compiled region may lead to recomputing multiple times. If compile wraps AC, compile would incorporate the AC region information during the partitioner. It may be possible to improve this behavior though, e.g. detect any ambient AC contexts, and do something different in the partitioner and during runtime.
+
+torch.compile -> FSDP
+because torch.compile would graph break on FSDP2 wrapped modules.

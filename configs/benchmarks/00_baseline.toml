@@ -2,7 +2,7 @@
 
 [model]
 name = "Qwen/Qwen3-8B-Base"
-attention = "eager"
+attention = "EAGER"
 
 [trainer]
 steps = 500

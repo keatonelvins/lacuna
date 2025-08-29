@@ -208,8 +208,8 @@ def benchmark_main():
 
             cmd = ["uv", "run", "pt", str(config_path)]
             if multiplier > 1:
-                cmd.extend(["--data.seq_len", str(seq_len)])
-                cmd.extend(["--checkpoint.save_dir", str(save_dir)])
+                cmd.extend(["--data.seq-len", str(seq_len)])
+                cmd.extend(["--checkpoint.save-dir", str(save_dir)])
 
             # Run benchmark
             run_start = time.perf_counter()
