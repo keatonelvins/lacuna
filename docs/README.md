@@ -1,6 +1,6 @@
 # lacuna docs
 
-## Attention Backends
+## Attention backends
 | Mode | Backend | Fullgraph Compile | Notes |
 |------|---------|------------------|-------|
 | PT | SDPA |  Yes | Best performance w/ compile |
@@ -9,11 +9,15 @@
 | SFT (no packing) | Any | *Yes | All backends work |
 | SFT (packing) | FA2/FA3 |  No | SDPA blocked (needs varlen) |
 
-## Order of Optimizations
+## Order of model builder
 Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 - Model patches always happens first
 - Compile wrapped AC: compile already does recompute via the min-cut partitioner, so wrapping AC over a compiled region may lead to recomputing multiple times
 - torch.compile before FSDP, otherwise FSDP2 wrapped modules would cause graph breaks
 
-## Considerations
+## Other considerations
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
+- We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
+    - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
+    - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
+- FA2 and torch.compile(fullgraph=True) can't be stacked when batch_size = 1 due to HF limitation.
