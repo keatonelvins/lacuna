@@ -1,12 +1,9 @@
-"""Logging and miscellaneous utilities."""
-
 from loguru import logger
 
 from .distributed import get_rank
 
 
 def _rank_filter(record):
-    """Filter to only log from rank 0."""
     return get_rank() == 0
 
 

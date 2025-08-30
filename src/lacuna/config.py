@@ -220,9 +220,7 @@ class SFTConfig(BaseSettings):
         """Validate that attention backend is compatible with data configuration."""
         if self.data.packing and self.model.attention == "SDPA":
             raise ValueError(
-                "SDPA attention backend is not supported for SFT with packing. "
-                "SDPA doesn't understand position_id boundaries in packed sequences, "
-                "causing incorrect cross-sequence attention. "
-                "Please use FA2 or FA3 instead: --model.attention FA2"
+                "SDPA backend is currently not supported for SFT w/ packing. "
+                "Please use FA2 or FA3 instead: --model.attention FA3"
             )
         return self

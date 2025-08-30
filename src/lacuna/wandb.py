@@ -6,10 +6,7 @@ from .config import PretrainConfig, SFTConfig
 from .distributed import get_rank
 
 
-def init_wandb(
-    config: PretrainConfig | SFTConfig,
-) -> wandb.sdk.wandb_run.Run | None:
-    """Initialize wandb logging if enabled and on rank 0."""
+def init_wandb(config: PretrainConfig | SFTConfig) -> wandb.sdk.wandb_run.Run | None:
     if not config.wandb.enabled or get_rank() != 0:
         return None
 
@@ -31,12 +28,10 @@ def log_metrics(
     step: int,
     run: wandb.sdk.wandb_run.Run | None,
 ) -> None:
-    """Log metrics to wandb if run is active."""
     if run:
         wandb.log(metrics, step=step)
 
 
 def finish(run: wandb.sdk.wandb_run.Run | None) -> None:
-    """Finish wandb run if active."""
     if run:
         wandb.finish()
