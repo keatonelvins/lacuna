@@ -5,18 +5,12 @@ description = "pretrain and finetune hf models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    # core
     "torch>=2.8.0",
     "datasets>=4.0.0",
     "liger-kernel>=0.6.2",
     "transformers>=4.56.0",
-
-    # mixins
-    "flash-attn>=2.8.3",
     "kernels>=0.9.0",
     "cut-cross-entropy[transformers]",
-
-    # config/utils
     "pydantic-settings>=2.10.1",
     "wandb>=0.21.2",
     "loguru>=0.7.3",
@@ -35,7 +29,6 @@ dev = [
     "pytest-cov>=6.2.1",
     "ruff>=0.12.11",
     "ty>=0.0.1a19",
-    "toml>=0.10.2",
 ]
 
 [build-system]
@@ -54,9 +47,6 @@ addopts = [
     "--cov=lacuna",
     "--cov-report=term-missing",
 ]
-
-[tool.uv]
-no-build-isolation-package = ["flash-attn"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128" }]

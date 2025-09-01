@@ -11,9 +11,9 @@ class ModelConfig(BaseModel):
     """Model config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
-    attention: Literal["FA2", "FA3", "SDPA", "EAGER"] = Field(
+    attention: Literal["FA3", "SDPA", "EAGER"] = Field(
         "FA3",
-        description="Attention implementation (use FA2/FA3/SDPA, eager is just for baseline)",
+        description="Attention implementation (use FA3/SDPA, eager is just for baseline)",
     )
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
     liger: bool = Field(False, description="Enable Liger kernels")
@@ -221,6 +221,6 @@ class SFTConfig(BaseSettings):
         if self.data.packing and self.model.attention == "SDPA":
             raise ValueError(
                 "SDPA backend is currently not supported for SFT w/ packing. "
-                "Please use FA2 or FA3 instead: --model.attention FA3"
+                "Please use FA3 instead: --model.attention FA3"
             )
         return self

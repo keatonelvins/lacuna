@@ -25,7 +25,6 @@ from .config import (
 
 ATTN_IMPL_MAP = {
     "EAGER": "eager",
-    "FA2": "flash_attention_2",
     "FA3": "kernels-community/flash-attn3",
     "SDPA": "sdpa",
 }
@@ -148,35 +147,26 @@ def apply_torch_compile(
     if not config.model.compile_mode:
         return model
 
-    # Determine if we can use fullgraph compilation
-    # - SDPA: always can use fullgraph (no position_ids for PT, error for SFT+packing)
-    # - FA2: can use fullgraph for PT if batch_size > 1 (no position_ids), not for SFT with packing
-    # - FA3: currently can't use fullgraph due to kernelhub limitations
-    is_sft_with_packing = isinstance(config, SFTConfig) and config.data.packing
-    can_use_fullgraph = config.model.attention == "SDPA" or (
-        config.model.attention == "FA2"
-        and not is_sft_with_packing
-        and config.trainer.batch_size > 1
-    )
+    fullgraph = config.model.attention == "SDPA"
 
     if hasattr(torch, "_dynamo"):
         torch._dynamo.config.cache_size_limit = 256
         torch._dynamo.config.suppress_errors = True
 
-        # Need to use capture_scalar_outputs for FA2/FA3 compatibility
-        if "FA" in config.model.attention:
+        # Need to use capture_scalar_outputs for FA3 compatibility
+        if config.model.attention == "FA3":
             torch._dynamo.config.capture_scalar_outputs = True
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
         compiled_layer = torch.compile(
             layer,
-            fullgraph=can_use_fullgraph,
+            fullgraph=fullgraph,
             mode=config.model.compile_mode,
         )
         layers[idx] = compiled_layer
     logger.info(
-        f"Applied torch.compile (mode={config.model.compile_mode}, fullgraph={can_use_fullgraph})"
+        f"Applied torch.compile (mode={config.model.compile_mode}, fullgraph={fullgraph})"
     )
 
     return model

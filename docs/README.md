@@ -11,10 +11,9 @@ Ethos is most similar to prime-rl, but focused on PT/SFT rather than SFT/RL.
 | Mode | Backend | Fullgraph Compile | Notes |
 |------|---------|------------------|-------|
 | PT | SDPA |  Yes | Best performance w/ compile |
-| PT | FA2 |  *Yes | *Can only use fullgraph if batch_size > 1 |
 | PT | FA3 |  No | Using kernelhub impl. |
 | SFT (no packing) | Any | *Yes | All backends work |
-| SFT (packing) | FA2/FA3 |  No | SDPA blocked (needs varlen) |
+| SFT (packing) | FA3 |  No | SDPA blocked (needs varlen) |
 
 ## Order of model builder
 Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
@@ -27,4 +26,3 @@ Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
     - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
-- FA2 and torch.compile(fullgraph=True) can't be stacked when batch_size = 1 due to HF limitation.
