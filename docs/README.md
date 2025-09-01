@@ -1,5 +1,12 @@
 # lacuna docs
 
+My goal is for this to be (in spirit) a nano-torchtitan with the following modifications:
+- can be much simpler by not supporting TP/PP/CP
+- no modeling code (for now) means we can lean on community resources like Liger Kernel and CCE
+- also support SFT w/ assistant-only loss and sample packing
+
+Ethos is most similar to prime-rl, but focused on PT/SFT rather than SFT/RL.
+
 ## Attention backends
 | Mode | Backend | Fullgraph Compile | Notes |
 |------|---------|------------------|-------|

@@ -7,7 +7,7 @@ import pyarrow.compute as pc
 from .distributed import get_rank
 
 
-def _rank_filter(record):
+def _rank_filter(_):
     return get_rank() == 0
 
 

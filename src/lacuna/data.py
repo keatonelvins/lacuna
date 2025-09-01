@@ -2,7 +2,6 @@
 
 import torch
 import pyarrow as pa
-import pyarrow.types
 from dataclasses import dataclass
 from datasets import load_dataset
 from loguru import logger

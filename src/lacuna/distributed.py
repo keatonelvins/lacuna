@@ -89,7 +89,6 @@ def setup_fsdp2(
 
     logger.info("Setting up FSDP2...")
 
-    # Opinionated mixed precision policy: bf16 params, fp32 reduce/output for stability
     mp_policy = MixedPrecisionPolicy(
         param_dtype=torch.bfloat16,
         reduce_dtype=torch.float32,

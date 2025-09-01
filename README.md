@@ -32,9 +32,6 @@ uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 1
 # Convert an early checkpoint to hf safetensors
 uv run dcp_to_hf --help
 
-# Run benchmarks for different speedups
-uv run benchmark
-
 # Log runs + access gated repos
 uv run wandb login
 uv run hf auth login
@@ -49,7 +46,7 @@ uv run pre-commit install
 
 ## Acknowledgemnt
 
-There are a ton of great training repos out there already! Some that influenced my implementation:
+There are a ton of great training repos out there already! Some influences:
 - [prime-rl](https://github.com/PrimeIntellect-ai/prime-rl)
 - [torchtitan](https://github.com/pytorch/torchtitan)
 - [AutoModel](https://github.com/NVIDIA-NeMo/Automodel)
