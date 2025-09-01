@@ -90,19 +90,19 @@ def parse_argv(config_cls: Type[T]) -> T:
     return config
 
 
-def pretrain_main():
+def pretrain():
     """Entry point for pretraining."""
     config = parse_argv(PretrainConfig)
     train(config)
 
 
-def sft_main():
+def sft():
     """Entry point for SFT."""
     config = parse_argv(SFTConfig)
     train(config)
 
 
-def dcp_to_hf_main():
+def dcp_to_hf():
     """Convert DCP checkpoint to HF format."""
     parser = argparse.ArgumentParser(
         description="Convert DCP checkpoint to HuggingFace format"
@@ -139,7 +139,7 @@ def dcp_to_hf_main():
     tokenizer.save_pretrained(hf_path)
 
 
-def benchmark_main():
+def benchmark():
     """Entry point for benchmark."""
     parser = argparse.ArgumentParser(description="Run benchmarks")
     parser.add_argument(

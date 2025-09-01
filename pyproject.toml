@@ -18,14 +18,13 @@ dependencies = [
     "cut-cross-entropy[transformers]",
     "pydantic-settings>=2.10.1",
     "kernels>=0.9.0",
-    "ninja>=1.13.0",
 ]
 
 [project.scripts]
-pt = "lacuna.cli:pretrain_main"
-sft = "lacuna.cli:sft_main"
-dcp_to_hf = "lacuna.cli:dcp_to_hf_main"
-benchmark = "lacuna.cli:benchmark_main"
+pt = "lacuna.cli:pretrain"
+sft = "lacuna.cli:sft"
+dcp_to_hf = "lacuna.cli:dcp_to_hf"
+benchmark = "lacuna.cli:benchmark"
 
 [dependency-groups]
 dev = [
