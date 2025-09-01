@@ -22,13 +22,6 @@ uv run pt --model.name Qwen/Qwen3-8B --trainer.steps 5000
 uv run sft path/to/config.toml
 uv run sft path/to/config.toml --optimizer.lr 1e-5
 
-# Multi-GPU with torchrun
-uv run pt --torchrun configs/fsdp2_example.toml
-
-# Multi-node (launch on each node)
-uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 0
-uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 1
-
 # Convert an early checkpoint to hf safetensors
 uv run dcp_to_hf --help
 
