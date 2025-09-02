@@ -1,7 +1,6 @@
 """MFU, memory, and throughput tracking."""
 
 import time
-
 import torch
 from loguru import logger
 
@@ -47,12 +46,12 @@ class MFUTracker:
         self,
         model: torch.nn.Module,
         seq_len: int,
-        window_size: int = 10,
         world_size: int = 1,
+        window_size: int = 10,
     ):
-        self.window_size = window_size
-        self.world_size = world_size
         self.seq_len = seq_len
+        self.world_size = world_size
+        self.window_size = window_size
 
         self.tokens = []
         self.times = []

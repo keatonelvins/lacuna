@@ -156,6 +156,9 @@ class CheckpointConfig(BaseModel):
     resume_path: Optional[Path] = Field(
         None, description="Path to checkpoint to resume from"
     )
+    resumable_final_save: bool = Field(
+        False, description=("Make the final save resumable by storing optimizer state")
+    )
 
 
 class PretrainTrainerConfig(TrainerConfig):

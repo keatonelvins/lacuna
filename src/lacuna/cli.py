@@ -2,6 +2,7 @@
 
 import os
 import sys
+import json
 import argparse
 from pathlib import Path
 from typing import Type, TypeVar
@@ -98,35 +99,48 @@ def sft():
 
 
 def dcp_to_hf():
-    """Convert DCP checkpoint to HF format."""
+    """Convert a lacuna DCP checkpoint (step dir) to HF sharded safetensors."""
     parser = argparse.ArgumentParser(
-        description="Convert DCP checkpoint to HuggingFace format"
+        description="Convert DCP step dir to HF sharded safetensors"
     )
-    parser.add_argument("checkpoint_path", type=Path, help="Path to DCP checkpoint")
+    parser.add_argument(
+        "checkpoint_path",
+        type=Path,
+        help="Path to DCP step dir (contains model/.metadata)",
+    )
     parser.add_argument(
         "--output-dir", type=Path, help="Output directory (default: {checkpoint}_hf)"
     )
     args = parser.parse_args()
 
-    dcp_path = args.checkpoint_path
-    if not dcp_path.exists() or not (dcp_path / ".metadata").exists():
-        print(f"Error: {dcp_path} is not a valid DCP checkpoint")
+    src = args.checkpoint_path
+    if not src.exists():
+        print(f"Error: {src} does not exist")
+        sys.exit(1)
+    model_dir = src / "model"
+    if not (model_dir / ".metadata").exists():
+        print(f"Error: {src} must be a step directory containing model/.metadata")
         sys.exit(1)
 
-    hf_path = (
-        args.output_dir if args.output_dir else dcp_path.parent / f"{dcp_path.name}_hf"
-    )
+    hf_path = args.output_dir if args.output_dir else src.parent / f"{src.name}_hf"
     hf_path.mkdir(parents=True, exist_ok=True)
 
-    state_dict = {"config": {}}
-    dcp.load(state_dict, checkpoint_id=str(dcp_path))
-    model_name = state_dict["config"]["model"]["name"]
+    state_path = src / "training_state.json"
+    if not state_path.exists():
+        print(f"Error: {state_path} not found.")
+        sys.exit(1)
+    state = json.load(state_path.open("r"))
+    model_name = state["hf_model_id"]
 
-    weights_path = hf_path / "pytorch_model.bin"
-    dcp_to_torch_save(str(dcp_path), str(weights_path))
+    tmp_pt = hf_path / "_weights.tmp.pt"
+    dcp_to_torch_save(str(model_dir), str(tmp_pt))
+    pt_state = torch.load(tmp_pt, map_location="cpu")
+    tmp_pt.unlink(missing_ok=True)
 
-    state_dict = torch.load(weights_path, map_location="cpu")
-    torch.save(state_dict["model"], weights_path)
+    dcp.save(
+        pt_state["model"],
+        storage_writer=dcp.HuggingFaceStorageWriter(path=str(hf_path)),
+    )
 
     config = AutoConfig.from_pretrained(model_name)
     config.save_pretrained(hf_path)

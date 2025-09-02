@@ -1,10 +1,14 @@
-from loguru import logger
 import torch
 import numpy as np
-from collections import defaultdict, deque
 import pyarrow as pa
 import pyarrow.compute as pc
+from loguru import logger
+from collections import defaultdict, deque
+from rich.pretty import Pretty
+from rich.console import Console
+
 from .distributed import get_rank
+from .config import SFTConfig, PretrainConfig
 
 
 def _rank_filter(_):
@@ -19,6 +23,15 @@ def setup_logger() -> None:
         level="INFO",
         filter=_rank_filter,
     )
+
+
+def display_config(config: SFTConfig | PretrainConfig) -> None:
+    console = Console()
+    with console.capture() as capture:
+        console.print(
+            Pretty(config, expand_all=True)
+        )  # omg Will you've outdone yourself
+    logger.info("Starting training with config:\n" + capture.get().strip())
 
 
 # Fast Best Fit Decreasing sample packing strategy
