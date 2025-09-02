@@ -125,12 +125,12 @@ def dcp_to_hf():
     hf_path = args.output_dir if args.output_dir else src.parent / f"{src.name}_hf"
     hf_path.mkdir(parents=True, exist_ok=True)
 
-    state_path = src / "training_state.json"
-    if not state_path.exists():
-        print(f"Error: {state_path} not found.")
+    settings_path = src / "settings.json"
+    if not settings_path.exists():
+        print(f"Error: {settings_path} not found.")
         sys.exit(1)
-    state = json.load(state_path.open("r"))
-    model_name = state["hf_model_id"]
+    state = json.load(settings_path.open("r"))
+    model_name = state["model"]["name"]
 
     tmp_pt = hf_path / "_weights.tmp.pt"
     dcp_to_torch_save(str(model_dir), str(tmp_pt))

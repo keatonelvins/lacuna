@@ -42,6 +42,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     torch.set_float32_matmul_precision("high")
 
     wandb_run = init_wandb(config)
+    config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
 
     world_size = get_world_size()
     batch_size = config.trainer.batch_size

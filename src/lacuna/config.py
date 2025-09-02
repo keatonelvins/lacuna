@@ -161,9 +161,8 @@ class CheckpointConfig(BaseModel):
         False, description=("Make the final save resumable by storing optimizer state")
     )
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        # If resume_path is empty/None, clear save_dir
+    def prepare_save_dir(self) -> None:
+        """Clear save_dir if not resuming from checkpoint."""
         if not self.resume_path and self.save_dir.exists():
             shutil.rmtree(self.save_dir, ignore_errors=True)
 
