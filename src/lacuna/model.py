@@ -19,8 +19,7 @@ from loguru import logger
 from .config import (
     ActivationCheckpointConfig,
     ModelConfig,
-    PretrainConfig,
-    SFTConfig,
+    LacunaConfig,
 )
 
 ATTN_IMPL_MAP = {
@@ -30,14 +29,11 @@ ATTN_IMPL_MAP = {
 }
 
 
-def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
+def setup_model(config: LacunaConfig) -> PreTrainedModel:
     """Load and fully configure model for training."""
     model_path = config.model.name
 
-    if (
-        config.checkpoint.resume_path
-        and (config.checkpoint.resume_path / "config.json").exists()
-    ):
+    if config.checkpoint.resume_path and (config.checkpoint.resume_path / "config.json").exists():
         model_path = config.checkpoint.resume_path
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
@@ -79,9 +75,7 @@ def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrain
     return model
 
 
-def apply_cut_cross_entropy(
-    model: PreTrainedModel, config: ModelConfig
-) -> PreTrainedModel:
+def apply_cut_cross_entropy(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Apply Cut Cross Entropy optimization to model."""
     if not config.cce:
         return model
@@ -96,9 +90,7 @@ def apply_cut_cross_entropy(
     return model
 
 
-def apply_activation_checkpointing(
-    model: PreTrainedModel, ac_config: ActivationCheckpointConfig
-) -> PreTrainedModel:
+def apply_activation_checkpointing(model: PreTrainedModel, ac_config: ActivationCheckpointConfig) -> PreTrainedModel:
     """Apply activation checkpointing to transformer blocks."""
     if ac_config.mode == "none":
         return model
@@ -122,9 +114,7 @@ def apply_activation_checkpointing(
     return model
 
 
-def apply_torch_compile(
-    model: PreTrainedModel, config: PretrainConfig | SFTConfig
-) -> PreTrainedModel:
+def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     """Apply torch.compile to each individual transformer block."""
     # Patch model.forward with SDPA kernel if using SDPA
     if config.model.attention == "SDPA":
@@ -165,9 +155,7 @@ def apply_torch_compile(
             mode=config.model.compile_mode,
         )
         layers[idx] = compiled_layer
-    logger.info(
-        f"Applied torch.compile (mode={config.model.compile_mode}, fullgraph={fullgraph})"
-    )
+    logger.info(f"Applied torch.compile (mode={config.model.compile_mode}, fullgraph={fullgraph})")
 
     return model
 

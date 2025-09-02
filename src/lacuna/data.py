@@ -56,9 +56,7 @@ class DataCollator:
 
             if "seq_lengths" in examples[0]:
                 # Use packed sequence lengths for position IDs
-                position_ids = self._get_position_ids_from_packed_seq_lengths(
-                    [example["seq_lengths"] for example in examples]
-                )
+                position_ids = self._get_position_ids_from_packed_seq_lengths([example["seq_lengths"] for example in examples])
                 output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
             else:
                 # Generate position IDs for individual sequences
@@ -80,13 +78,7 @@ class DataCollator:
     ) -> list[torch.Tensor]:
         """Generate position IDs for packed sequences."""
         example_lengths = [sum(seq_lengths) for seq_lengths in batch_seq_lengths]
-        batch_seq_tensor = torch.tensor(
-            [
-                seq_length
-                for seq_lengths in batch_seq_lengths
-                for seq_length in seq_lengths
-            ]
-        )
+        batch_seq_tensor = torch.tensor([seq_length for seq_lengths in batch_seq_lengths for seq_length in seq_lengths])
         position_ids = torch.ones(sum(example_lengths), dtype=batch_seq_tensor.dtype)
         position_ids[0] = 0
         position_ids[batch_seq_tensor[:-1].cumsum(0)] = -(batch_seq_tensor[:-1] - 1)
@@ -126,9 +118,7 @@ class PretrainDataset(Dataset):
 
         for text in dataset["text"]:
             text_with_eos = text + tokenizer.eos_token
-            tokens = tokenizer(text_with_eos, truncation=False, padding=False)[
-                "input_ids"
-            ]
+            tokens = tokenizer(text_with_eos, truncation=False, padding=False)["input_ids"]
             all_tokens.extend(tokens)
 
         tokens = all_tokens
@@ -137,9 +127,7 @@ class PretrainDataset(Dataset):
         self.chunks = []
         for i in range(0, len(tokens) - seq_len, seq_len):
             input_chunk = tokens[i : i + seq_len]
-            label_chunk = tokens[
-                i + 1 : i + seq_len + 1
-            ]  # Labels are input shifted by 1
+            label_chunk = tokens[i + 1 : i + seq_len + 1]  # Labels are input shifted by 1
 
             if len(input_chunk) == seq_len == len(label_chunk):
                 self.chunks.append(
@@ -220,18 +208,14 @@ class SFTDataset(Dataset):
             if len(sample["input_ids"]) <= seq_len:
                 tokenized_samples.append(sample)
             else:
-                logger.warning(
-                    f"Sample is too long, skipping: {len(sample['input_ids'])} > {seq_len}"
-                )
+                logger.warning(f"Sample is too long, skipping: {len(sample['input_ids'])} > {seq_len}")
 
         if packing:
             logger.info("Packing samples...")
             pre_packing_sample_count = len(tokenized_samples)
             self.samples = self._pack_samples(tokenized_samples, seq_len)
             post_packing_sample_count = len(self.samples)
-            logger.info(
-                f"Packed {pre_packing_sample_count} samples into {post_packing_sample_count} samples"
-            )
+            logger.info(f"Packed {pre_packing_sample_count} samples into {post_packing_sample_count} samples")
         else:
             logger.info("Padding samples...")
             self.samples = tokenized_samples
@@ -256,9 +240,7 @@ class SFTDataset(Dataset):
         labels_arrays = packed_table["labels"].to_pylist()
         seq_lengths_arrays = packed_table["seq_lengths"].to_pylist()
 
-        for input_ids, labels, seq_lengths in zip(
-            input_ids_arrays, labels_arrays, seq_lengths_arrays
-        ):
+        for input_ids, labels, seq_lengths in zip(input_ids_arrays, labels_arrays, seq_lengths_arrays):
             packed_samples.append(
                 {
                     "input_ids": input_ids,
@@ -330,9 +312,7 @@ def setup_dataloader(
         )
         packing = False
     elif isinstance(config, PretrainConfig):
-        dataset = PretrainDataset(
-            config.data.dataset_name, config.data.split, tokenizer, config.data.seq_len
-        )
+        dataset = PretrainDataset(config.data.dataset_name, config.data.split, tokenizer, config.data.seq_len)
         packing = False  # Pretrain just concatenates and chunks
     else:  # SFTConfig
         dataset = SFTDataset(
@@ -362,8 +342,6 @@ def setup_dataloader(
         collate_fn=collator,
     )
 
-    logger.info(
-        f"Dataloader created with {len(dataset)} samples, batch_size={micro_batch_size}"
-    )
+    logger.info(f"Dataloader created with {len(dataset)} samples, batch_size={micro_batch_size}")
 
     return dataloader, tokenizer, sampler

@@ -2,11 +2,11 @@ from typing import Any
 
 import wandb
 
-from .config import PretrainConfig, SFTConfig
+from .config import LacunaConfig
 from .distributed import get_rank
 
 
-def init_wandb(config: PretrainConfig | SFTConfig) -> wandb.sdk.wandb_run.Run | None:
+def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
     if not config.wandb.enabled or get_rank() != 0:
         return None
 

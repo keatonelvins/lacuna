@@ -47,15 +47,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     batch_size = config.trainer.batch_size
 
     if not batch_size % world_size == 0:
-        raise ValueError(
-            f"Batch size {batch_size} must be divisible by world_size {world_size}"
-        )
+        raise ValueError(f"Batch size {batch_size} must be divisible by world_size {world_size}")
 
     micro_batch_size = batch_size // world_size
 
-    logger.info(
-        f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
-    )
+    logger.info(f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)")
 
     logger.info("Setting up model")
     model = setup_model(config)
@@ -152,9 +148,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             loss.backward()
             accumulated_loss += loss.item()
 
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                model.parameters(), config.optimizer.grad_clip
-            )
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
             optimizer.step()
             scheduler.step()
 
@@ -179,9 +173,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     state.peak_mfu = max(state.peak_mfu, mfu_metrics["mfu_pct"])
                     state.peak_tflops = max(state.peak_tflops, mfu_metrics["tflops"])
 
-                state.peak_mem_gb = max(
-                    state.peak_mem_gb, memory_stats["max_reserved_gb"]
-                )
+                state.peak_mem_gb = max(state.peak_mem_gb, memory_stats["max_reserved_gb"])
 
                 log_parts = [
                     f"\033[91mStep {step:>6}\033[0m",
@@ -192,9 +184,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 ]
 
                 if "mfu_pct" in mfu_metrics:
-                    log_parts.append(
-                        f"\033[92mMFU: {mfu_metrics['mfu_pct']:5.1f}%\033[0m"
-                    )
+                    log_parts.append(f"\033[92mMFU: {mfu_metrics['mfu_pct']:5.1f}%\033[0m")
 
                 if data_pct > 5:  # Only show if > 5% of wall-clock time
                     log_parts.append(f"\033[33mData: {data_pct:5.1f}%\033[0m")
@@ -229,9 +219,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 data_loading_times.clear()
 
             if step > 0 and step % config.checkpoint.save_every == 0:
-                logger.info(
-                    f"Saving checkpoint at step {step} (peak MFU: {state.peak_mfu:.1f}%, peak memory: {state.peak_mem_gb:.1f}GB)"
-                )
+                logger.info(f"Saving checkpoint at step {step} (peak MFU: {state.peak_mfu:.1f}%, peak memory: {state.peak_mem_gb:.1f}GB)")
                 checkpoint_path = config.checkpoint.save_dir / f"step_{step}"
                 save_checkpoint(
                     model=model,
@@ -244,9 +232,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     final=False,
                     tokenizer=tokenizer,
                 )
-                cleanup_old_checkpoints(
-                    config.checkpoint.save_dir, config.checkpoint.keep_latest
-                )
+                cleanup_old_checkpoints(config.checkpoint.save_dir, config.checkpoint.keep_latest)
 
             state.step += 1
 

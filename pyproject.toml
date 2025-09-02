@@ -36,6 +36,9 @@ dev = [
 requires = ["uv_build>=0.8.11,<0.9.0"]
 build-backend = "uv_build"
 
+[tool.ruff]
+line-length = 150
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

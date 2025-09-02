@@ -40,9 +40,7 @@ def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, in
     num_params = sum(p.numel() for p in model.parameters())
     head_dim = config.hidden_size // config.num_attention_heads
 
-    attn_flops = (
-        12 * config.num_hidden_layers * config.num_attention_heads * head_dim * seq_len
-    )
+    attn_flops = 12 * config.num_hidden_layers * config.num_attention_heads * head_dim * seq_len
     flops_per_token = 6 * num_params + attn_flops
 
     return int(num_params), int(flops_per_token)
@@ -165,9 +163,7 @@ class MemoryTracker:
 
         # Warn about memory pressure
         if stats["num_alloc_retries"] > 0:
-            logger.warning(
-                f"GPU memory allocation retries detected: {stats['num_alloc_retries']}"
-            )
+            logger.warning(f"GPU memory allocation retries detected: {stats['num_alloc_retries']}")
 
         return stats
 

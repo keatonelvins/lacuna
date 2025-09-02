@@ -14,7 +14,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import PreTrainedModel
 from loguru import logger
 
-from .config import PretrainConfig, SFTConfig
+from .config import LacunaConfig
 
 
 def init_distributed() -> None:
@@ -57,10 +57,7 @@ def get_world_info() -> dict[str, Any]:
     }
 
 
-def setup_distributed(
-    model: PreTrainedModel,
-    config: PretrainConfig | SFTConfig,
-) -> PreTrainedModel:
+def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     """Setup distributed training based on backend configuration."""
 
     world_size = get_world_size()

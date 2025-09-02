@@ -19,9 +19,7 @@ class ModelConfig(BaseModel):
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
     liger: bool = Field(False, description="Enable Liger kernels")
     cce: bool = Field(False, description="Enable Cut Cross Entropy patch")
-    kernelize: bool = Field(
-        False, description="Enable Hugging Face kernels.kernelize(model)"
-    )
+    kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
     compile_mode: Optional[
         Literal[
             "default",
@@ -29,9 +27,7 @@ class ModelConfig(BaseModel):
             "max-autotune",
             "max-autotune-no-cudagraphs",
         ]
-    ] = Field(
-        None, description="Compile mode (if omitted, torch.compile will not be applied)"
-    )
+    ] = Field(None, description="Compile mode (if omitted, torch.compile will not be applied)")
 
 
 class OptimizerConfig(BaseModel):
@@ -49,9 +45,7 @@ class CosineSchedulerConfig(BaseModel):
 
     type: Literal["cosine"] = "cosine"
     warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio")
-    min_lr_ratio: float = Field(
-        0, ge=0, le=1, description="Minimum LR as ratio of max LR"
-    )
+    min_lr_ratio: float = Field(0, ge=0, le=1, description="Minimum LR as ratio of max LR")
 
 
 class WSDSchedulerConfig(BaseModel):
@@ -60,9 +54,7 @@ class WSDSchedulerConfig(BaseModel):
     type: Literal["wsd"] = "wsd"
     warmup_steps: int = Field(100, ge=0, description="Warmup steps")
     decay_steps: int = Field(100, ge=0, description="Decay steps")
-    min_lr_ratio: float = Field(
-        0, ge=0, le=1, description="Minimum LR as ratio of max LR"
-    )
+    min_lr_ratio: float = Field(0, ge=0, le=1, description="Minimum LR as ratio of max LR")
     decay_type: Literal["linear", "cosine"] = "linear"
 
 
@@ -95,9 +87,7 @@ class DistributedConfig(BaseModel):
         "none",
         description="FSDP for large models, DDP for small models, none to disable",
     )
-    cpu_offload: bool = Field(
-        False, description="Offload params to CPU (enable if OOM, FSDP only)"
-    )
+    cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
 
 
 class TorchrunConfig(BaseModel):
@@ -107,9 +97,7 @@ class TorchrunConfig(BaseModel):
     nnodes: int = Field(1, ge=1, description="Number of nodes")
     master_addr: str = Field("localhost", description="Master node address")
     master_port: str = Field("29500", description="Master node port")
-    node_rank: int | None = Field(
-        None, ge=0, description="Node rank for multi-node training"
-    )
+    node_rank: int | None = Field(None, ge=0, description="Node rank for multi-node training")
 
 
 class TrainerConfig(BaseModel):
@@ -137,9 +125,7 @@ class WandbConfig(BaseModel):
 class ActivationCheckpointConfig(BaseModel):
     """Activation checkpointing configuration"""
 
-    mode: Literal["none", "full", "partial"] = Field(
-        "none", description="Activation checkpointing mode"
-    )
+    mode: Literal["none", "full", "partial"] = Field("none", description="Activation checkpointing mode")
     stride: Optional[int] = Field(
         None,
         description="If partial, checkpoint every nth layer (or sqrt(num_layers) if unspecified)",
@@ -150,16 +136,10 @@ class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
     save_every: int = Field(1000, gt=0, description="Steps between checkpoint saves")
-    keep_latest: int = Field(
-        3, gt=0, description="Number of recent checkpoints to keep"
-    )
+    keep_latest: int = Field(3, gt=0, description="Number of recent checkpoints to keep")
     save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
-    resume_path: Optional[Path] = Field(
-        None, description="Path to checkpoint to resume from"
-    )
-    resumable_final_save: bool = Field(
-        False, description=("Make the final save resumable by storing optimizer state")
-    )
+    resume_path: Optional[Path] = Field(None, description="Path to checkpoint to resume from")
+    resumable_final_save: bool = Field(False, description=("Make the final save resumable by storing optimizer state"))
 
     def prepare_save_dir(self) -> None:
         """Clear save_dir if not resuming from checkpoint."""
@@ -181,20 +161,25 @@ class SFTTrainerConfig(TrainerConfig):
     eval_every: int = Field(1, gt=0, description="Epochs between evaluations")
 
 
-class PretrainConfig(BaseSettings):
-    """Pretraining config loader"""
+class LacunaConfig(BaseSettings):
+    """Shared base loader for pretraining and SFT"""
 
     model: ModelConfig = ModelConfig()
-    data: PretrainDataConfig = PretrainDataConfig()
-    trainer: PretrainTrainerConfig = PretrainTrainerConfig()
     optimizer: OptimizerConfig = OptimizerConfig()
-    scheduler: WSDSchedulerConfig = WSDSchedulerConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
     metrics: MetricsConfig = MetricsConfig()
     wandb: WandbConfig = WandbConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     dist: DistributedConfig = DistributedConfig()
     torchrun: TorchrunConfig = TorchrunConfig()
+
+
+class PretrainConfig(LacunaConfig):
+    """Pretraining config loader"""
+
+    data: PretrainDataConfig = PretrainDataConfig()
+    trainer: PretrainTrainerConfig = PretrainTrainerConfig()
+    scheduler: WSDSchedulerConfig = WSDSchedulerConfig()
 
     model_config = SettingsConfigDict(
         cli_parse_args=True,
@@ -203,20 +188,12 @@ class PretrainConfig(BaseSettings):
     )
 
 
-class SFTConfig(BaseSettings):
+class SFTConfig(LacunaConfig):
     """SFT config loader"""
 
-    model: ModelConfig = ModelConfig()
     data: SFTDataConfig = SFTDataConfig()
     trainer: SFTTrainerConfig = SFTTrainerConfig()
-    optimizer: OptimizerConfig = OptimizerConfig()
     scheduler: CosineSchedulerConfig = CosineSchedulerConfig()
-    checkpoint: CheckpointConfig = CheckpointConfig()
-    metrics: MetricsConfig = MetricsConfig()
-    wandb: WandbConfig = WandbConfig()
-    ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
-    dist: DistributedConfig = DistributedConfig()
-    torchrun: TorchrunConfig = TorchrunConfig()
 
     model_config = SettingsConfigDict(
         cli_parse_args=True,
@@ -228,8 +205,5 @@ class SFTConfig(BaseSettings):
     def validate_attention_backend(self):
         """Validate that attention backend is compatible with data configuration."""
         if self.data.packing and self.model.attention == "SDPA":
-            raise ValueError(
-                "SDPA backend is currently not supported for SFT w/ packing. "
-                "Please use FA3 instead: --model.attention FA3"
-            )
+            raise ValueError("SDPA backend is currently not supported for SFT w/ packing. Please use FA3 instead: --model.attention FA3")
         return self

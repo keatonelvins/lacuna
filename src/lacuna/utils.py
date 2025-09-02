@@ -10,7 +10,7 @@ from rich.pretty import Pretty
 from rich.console import Console
 
 from .distributed import get_rank
-from .config import SFTConfig, PretrainConfig
+from .config import LacunaConfig
 from .metrics import StateTracker
 
 
@@ -28,12 +28,10 @@ def setup_logger() -> None:
     )
 
 
-def display_config(config: SFTConfig | PretrainConfig) -> None:
+def display_config(config: LacunaConfig) -> None:
     console = Console()
     with console.capture() as capture:
-        console.print(
-            Pretty(config, expand_all=True)
-        )  # omg Will you've outdone yourself
+        console.print(Pretty(config, expand_all=True))  # omg Will you've outdone yourself
     logger.info("Starting training with config:\n" + capture.get().strip())
 
 
@@ -45,7 +43,7 @@ def save_state_json(path: Path, state: StateTracker) -> None:
         json.dump(state.model_dump(), f, indent=4)
 
 
-def save_settings_json(path: Path, config: PretrainConfig | SFTConfig) -> None:
+def save_settings_json(path: Path, config: LacunaConfig) -> None:
     if get_rank() != 0:
         return
     path.mkdir(parents=True, exist_ok=True)
@@ -104,11 +102,7 @@ def pad(tensors: list[torch.Tensor], padding_value: int) -> torch.Tensor:
     padded = []
     for tensor in tensors:
         pad_len = max_len - len(tensor)
-        padded.append(
-            torch.cat(
-                [tensor, torch.full((pad_len,), padding_value, dtype=tensor.dtype)]
-            )
-        )
+        padded.append(torch.cat([tensor, torch.full((pad_len,), padding_value, dtype=tensor.dtype)]))
     return torch.stack(padded)
 
 
@@ -127,9 +121,7 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
     ids = np.arange(len(examples))
     assert list_column_idx is not None
     lengths = pc.list_value_length(examples[list_column_idx]).combine_chunks()
-    examples = examples.append_column(
-        "seq_lengths", lengths
-    )  # Allows us to later construct `position_ids`
+    examples = examples.append_column("seq_lengths", lengths)  # Allows us to later construct `position_ids`
     lengths = pc.make_struct(lengths, ids)
     lengths = lengths.sort("descending", by=0)
 
@@ -164,15 +156,11 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
     offsets = np.array([0] + [bin["length"] for bin in bins])
     offsets = np.cumsum(offsets)
 
-    assert all(
-        column.num_chunks == 1 for column in examples.columns
-    )  # `pc.take` returns a ChunkedArray with a single chunk
+    assert all(column.num_chunks == 1 for column in examples.columns)  # `pc.take` returns a ChunkedArray with a single chunk
 
     lengths = examples["seq_lengths"].chunks[0]
     examples = examples.drop_columns("seq_lengths")
-    lengths = pa.ListArray.from_arrays(
-        np.cumsum([0] + [len(bin["ids"]) for bin in bins], dtype=np.int32), lengths
-    )
+    lengths = pa.ListArray.from_arrays(np.cumsum([0] + [len(bin["ids"]) for bin in bins], dtype=np.int32), lengths)
 
     columns = []
     for column in examples.columns:
@@ -181,6 +169,4 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
             dtype = column.offsets.type.to_pandas_dtype()
             column = type(column).from_arrays(offsets.astype(dtype), column.values)
         columns.append(column)
-    return pa.Table.from_arrays(
-        columns + [lengths], names=examples.column_names + ["seq_lengths"]
-    )
+    return pa.Table.from_arrays(columns + [lengths], names=examples.column_names + ["seq_lengths"])

@@ -30,12 +30,8 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     if hasattr(torchrun, "node_rank") and torchrun.node_rank is not None:
         cmd.append(f"--node_rank={torchrun.node_rank}")
     elif torchrun.nnodes > 1:
-        print(
-            f"Error: For multi-node training (nnodes={torchrun.nnodes}), node_rank must be specified in config or via --torchrun.node_rank"
-        )
-        print(
-            "Example: uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 0"
-        )
+        print(f"Error: For multi-node training (nnodes={torchrun.nnodes}), node_rank must be specified in config or via --torchrun.node_rank")
+        print("Example: uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 0")
         sys.exit(1)
 
     cmd.extend(["-m", "lacuna.cli", entry_point])

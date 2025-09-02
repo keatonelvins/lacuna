@@ -1,12 +1,10 @@
 from torch.optim import Optimizer, AdamW
 from transformers import PreTrainedModel
 
-from .config import PretrainConfig, SFTConfig
+from .config import LacunaConfig
 
 
-def setup_optimizer(
-    model: PreTrainedModel, config: PretrainConfig | SFTConfig
-) -> Optimizer:
+def setup_optimizer(model: PreTrainedModel, config: LacunaConfig) -> Optimizer:
     """Setup AdamW optimizer."""
     return AdamW(
         model.parameters(),

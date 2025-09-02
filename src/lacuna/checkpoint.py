@@ -4,6 +4,7 @@ import shutil
 from typing import Any
 from loguru import logger
 from pathlib import Path
+import warnings
 
 import torch
 import torch.distributed.checkpoint as dcp
@@ -25,7 +26,7 @@ from torch.optim.optimizer import Optimizer
 from torchdata.stateful_dataloader import StatefulDataLoader
 
 from .distributed import get_rank
-from .config import PretrainConfig, SFTConfig
+from .config import LacunaConfig
 from .metrics import StateTracker
 from .utils import save_state_json, save_settings_json, load_state_json
 
@@ -46,9 +47,7 @@ class TrainerState(Stateful):
         self.dataloader = dataloader
 
     def state_dict(self) -> dict[str, Any]:
-        model_state_dict, optimizer_state_dict = get_state_dict(
-            self.model, self.optimizer, options=StateDictOptions(cpu_offload=True)
-        )
+        model_state_dict, optimizer_state_dict = get_state_dict(self.model, self.optimizer, options=StateDictOptions(cpu_offload=True))
         scheduler_state_dict = self.scheduler.state_dict()
         state_dict = {
             "model": model_state_dict,
@@ -79,7 +78,7 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     dataloader: StatefulDataLoader,
-    config: PretrainConfig | SFTConfig,
+    config: LacunaConfig,
     tokenizer: PreTrainedTokenizerBase,
     final: bool = False,
 ) -> None:
@@ -95,7 +94,9 @@ def save_checkpoint(
     unwrapped_model = model.module if hasattr(model, "module") else model
     unwrapped_model.config.save_pretrained(path)
     tokenizer.save_pretrained(path)
-    dcp.save({"trainer": trainer_state}, storage_writer=writer)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
+        dcp.save({"trainer": trainer_state}, storage_writer=writer)
 
     save_state_json(path, state)
     save_settings_json(path, config)
