@@ -1,5 +1,6 @@
 """Pydantic configurations for pretraining and SFT."""
 
+import shutil
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -159,6 +160,12 @@ class CheckpointConfig(BaseModel):
     resumable_final_save: bool = Field(
         False, description=("Make the final save resumable by storing optimizer state")
     )
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # If resume_path is empty/None, clear save_dir
+        if not self.resume_path and self.save_dir.exists():
+            shutil.rmtree(self.save_dir, ignore_errors=True)
 
 
 class PretrainTrainerConfig(TrainerConfig):

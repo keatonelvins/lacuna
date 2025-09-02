@@ -44,7 +44,7 @@ def setup_model(config: PretrainConfig | SFTConfig) -> PreTrainedModel:
 
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         attn_implementation=ATTN_IMPL_MAP[config.model.attention],
         use_cache=False,
     )

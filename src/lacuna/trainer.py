@@ -99,9 +99,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:
         raise ValueError(f"Unsupported scheduler type: {config.scheduler.type}")
 
-    if config.model.liger and not config.model.cce:
-        # pass through accum_dtype if using Liger FLCE
-        accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
+    accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
     if config.checkpoint.resume_path is not None:
         logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_path}")
@@ -145,7 +143,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 torch.compiler.cudagraph_mark_step_begin()
 
             model_inputs = {k: v.cuda() for k, v in batch.items()}
-            model_inputs["accum_dtype"] = accum_dtype
+            model_inputs["accum_dtype"] = accum_dtype  # only used for Liger FLCE
 
             with autocast("cuda", dtype=torch.bfloat16):
                 outputs = model(**model_inputs)
@@ -248,6 +246,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 cleanup_old_checkpoints(
                     config.checkpoint.save_dir, config.checkpoint.keep_latest
                 )
+
+            state.step += 1
 
     except KeyboardInterrupt:
         logger.info("Training interrupted!!!")

@@ -86,15 +86,15 @@ class OptimizerState(Stateful):
 def _write_training_state_json(
     path: Path,
     training_state: TrainingState,
+    config: PretrainConfig | SFTConfig,
 ) -> None:
     if get_rank() != 0:
         return
-    try:
-        path.mkdir(parents=True, exist_ok=True)
-        with (path / "training_state.json").open("w") as f:
-            json.dump(training_state.model_dump(), f)
-    except Exception as e:
-        logger.warning(f"Failed writing training_state.json: {e}")
+    path.mkdir(parents=True, exist_ok=True)
+    with (path / "training_state.json").open("w") as f:
+        json.dump(training_state.model_dump(), f, indent=4)
+    with (path / "settings.json").open("w") as f:
+        json.dump(config.model_dump(mode="json"), f, indent=4)
 
 
 def _read_training_state_json(path: Path) -> TrainingState:
@@ -137,15 +137,12 @@ def save_checkpoint(
                 str(optim_dir), serialization_format=SerializationFormat.SAFETENSORS
             ),
         )
-        _write_training_state_json(path, state)
+        _write_training_state_json(path, state, config)
         logger.info(f"Saved DCP checkpoint shards to {path}")
         return
 
     weights_sd = ModelState(model).state_dict()
-    dcp.save(
-        weights_sd,
-        storage_writer=HuggingFaceStorageWriter(path=str(path), save_sharded=True),
-    )
+    dcp.save(weights_sd, storage_writer=HuggingFaceStorageWriter(path=str(path)))
 
     if get_rank() == 0:
         unwrapped_model.config.save_pretrained(path)
@@ -159,7 +156,8 @@ def save_checkpoint(
                 str(optim_dir), serialization_format=SerializationFormat.SAFETENSORS
             ),
         )
-    _write_training_state_json(path, state)
+    _write_training_state_json(path, state, config)
+
     logger.info(f"Saved final HF sharded checkpoint to {path}")
 
 

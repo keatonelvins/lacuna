@@ -140,6 +140,7 @@ def dcp_to_hf():
     dcp.save(
         pt_state["model"],
         storage_writer=dcp.HuggingFaceStorageWriter(path=str(hf_path)),
+        no_dist=True,
     )
 
     config = AutoConfig.from_pretrained(model_name)
