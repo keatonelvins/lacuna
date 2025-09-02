@@ -2,19 +2,11 @@
 
 import os
 import sys
-import json
-import argparse
 import subprocess
+import tomllib
 from pathlib import Path
 from typing import Type, TypeVar
-
-import torch
-import tomllib
-import torch.distributed.checkpoint as dcp
-
 from pydantic_settings import BaseSettings
-from transformers import AutoTokenizer, AutoConfig
-from torch.distributed.checkpoint.format_utils import dcp_to_torch_save
 
 from lacuna.config import PretrainConfig, SFTConfig
 from lacuna.trainer import train
@@ -97,57 +89,6 @@ def sft():
     """Entry point for SFT."""
     config = parse_argv(SFTConfig)
     train(config)
-
-
-def dcp_to_hf():
-    """Convert a lacuna DCP checkpoint (step dir) to HF sharded safetensors."""
-    parser = argparse.ArgumentParser(
-        description="Convert DCP step dir to HF sharded safetensors"
-    )
-    parser.add_argument(
-        "checkpoint_path",
-        type=Path,
-        help="Path to DCP step dir (contains model/.metadata)",
-    )
-    parser.add_argument(
-        "--output-dir", type=Path, help="Output directory (default: {checkpoint}_hf)"
-    )
-    args = parser.parse_args()
-
-    src = args.checkpoint_path
-    if not src.exists():
-        print(f"Error: {src} does not exist")
-        sys.exit(1)
-    model_dir = src / "model"
-    if not (model_dir / ".metadata").exists():
-        print(f"Error: {src} must be a step directory containing model/.metadata")
-        sys.exit(1)
-
-    hf_path = args.output_dir if args.output_dir else src.parent / f"{src.name}_hf"
-    hf_path.mkdir(parents=True, exist_ok=True)
-
-    settings_path = src / "settings.json"
-    if not settings_path.exists():
-        print(f"Error: {settings_path} not found.")
-        sys.exit(1)
-    state = json.load(settings_path.open("r"))
-    model_name = state["model"]["name"]
-
-    tmp_pt = hf_path / "_weights.tmp.pt"
-    dcp_to_torch_save(str(model_dir), str(tmp_pt))
-    pt_state = torch.load(tmp_pt, map_location="cpu")
-    tmp_pt.unlink(missing_ok=True)
-
-    dcp.save(
-        pt_state["model"],
-        storage_writer=dcp.HuggingFaceStorageWriter(path=str(hf_path)),
-        no_dist=True,
-    )
-
-    config = AutoConfig.from_pretrained(model_name)
-    config.save_pretrained(hf_path)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.save_pretrained(hf_path)
 
 
 def bloat_check():

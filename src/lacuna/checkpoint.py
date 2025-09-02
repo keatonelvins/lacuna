@@ -111,8 +111,8 @@ def load_checkpoint(
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at {path}")
 
-    is_resumable = (path / "trainer" / ".metadata").exists()
-    is_hf_final = (path / "trainer.safetensors.index.json").exists()
+    is_resumable = (path / ".metadata").exists()
+    is_hf_final = (path / "model.safetensors.index.json").exists()
 
     if is_resumable:
         dcp.load(

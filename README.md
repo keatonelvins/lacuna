@@ -22,9 +22,6 @@ uv run pt --model.name Qwen/Qwen3-8B --trainer.steps 5000
 uv run sft path/to/config.toml
 uv run sft path/to/config.toml --optimizer.lr 1e-5
 
-# Convert an early checkpoint to hf safetensors
-uv run dcp_to_hf --help
-
 # Log runs + access gated repos
 uv run wandb login
 uv run hf auth login
