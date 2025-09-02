@@ -29,6 +29,8 @@ from .config import PretrainConfig, SFTConfig
 from .metrics import StateTracker
 from .utils import save_state_json, save_settings_json, load_state_json
 
+HF_FORMAT = SerializationFormat.SAFETENSORS
+
 
 class TrainerState(Stateful):
     def __init__(
@@ -87,14 +89,12 @@ def save_checkpoint(
 
     trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
     if not final or config.checkpoint.resumable_final_save:
-        writer = FileSystemWriter(
-            str(path), serialization_format=SerializationFormat.SAFETENSORS
-        )
+        writer = FileSystemWriter(str(path), serialization_format=HF_FORMAT)
     else:
         writer = HuggingFaceStorageWriter(path=str(path))
-        unwrapped_model = model.module if hasattr(model, "module") else model
-        unwrapped_model.config.save_pretrained(path)
-        tokenizer.save_pretrained(path)
+    unwrapped_model = model.module if hasattr(model, "module") else model
+    unwrapped_model.config.save_pretrained(path)
+    tokenizer.save_pretrained(path)
     dcp.save({"trainer": trainer_state}, storage_writer=writer)
 
     save_state_json(path, state)
@@ -110,26 +110,19 @@ def load_checkpoint(
 ) -> StateTracker:
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at {path}")
+    if not (path / ".metadata").exists():
+        raise ValueError(f"Checkpoint is not a DCP checkpoint at {path}")
 
-    is_resumable = (path / ".metadata").exists()
-    is_hf_final = (path / "model.safetensors.index.json").exists()
+    is_hf = (path / "model.safetensors.index.json").exists()
+    reader = HuggingFaceStorageReader(path=str(path)) if is_hf else None
 
-    if is_resumable:
-        dcp.load(
-            {"trainer": TrainerState(model, optimizer, scheduler)},
-            checkpoint_id=str(path / "trainer"),
-        )
-        logger.info(f"Loaded DCP checkpoint from {path}")
-        return load_state_json(path)
-    elif is_hf_final:
-        dcp.load(
-            {"trainer": TrainerState(model, optimizer, scheduler)},
-            storage_reader=HuggingFaceStorageReader(path=str(path)),
-        )
-        logger.info(f"Loaded HF final (resumable) checkpoint from {path}")
-        return load_state_json(path)
-
-    raise ValueError(f"Unknown checkpoint format at {path}")
+    # TODO: untested, probably broken.
+    dcp.load(
+        {"trainer": TrainerState(model, optimizer, scheduler)},
+        storage_reader=reader,
+    )
+    logger.info(f"Loaded DCP checkpoint from {path}")
+    return load_state_json(path)
 
 
 def cleanup_old_checkpoints(save_dir: Path, keep_latest: int) -> None:
