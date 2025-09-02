@@ -3,6 +3,15 @@
 import time
 import torch
 from loguru import logger
+from pydantic import BaseModel
+
+
+class StateTracker(BaseModel):
+    step: int = 0
+    total_tokens: int = 0
+    peak_mfu: float = 0.0
+    peak_tflops: float = 0.0
+    peak_mem_gb: float = 0.0
 
 
 def get_peak_flops(device_name: str) -> int:

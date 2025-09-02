@@ -1,4 +1,6 @@
 import torch
+import json
+from pathlib import Path
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -9,6 +11,7 @@ from rich.console import Console
 
 from .distributed import get_rank
 from .config import SFTConfig, PretrainConfig
+from .metrics import StateTracker
 
 
 def _rank_filter(_):
@@ -32,6 +35,30 @@ def display_config(config: SFTConfig | PretrainConfig) -> None:
             Pretty(config, expand_all=True)
         )  # omg Will you've outdone yourself
     logger.info("Starting training with config:\n" + capture.get().strip())
+
+
+def save_state_json(path: Path, state: StateTracker) -> None:
+    if get_rank() != 0:
+        return
+    path.mkdir(parents=True, exist_ok=True)
+    with (path / "state.json").open("w") as f:
+        json.dump(state.model_dump(), f, indent=4)
+
+
+def save_settings_json(path: Path, config: PretrainConfig | SFTConfig) -> None:
+    if get_rank() != 0:
+        return
+    path.mkdir(parents=True, exist_ok=True)
+    with (path / "settings.json").open("w") as f:
+        json.dump(config.model_dump(mode="json"), f, indent=4)
+
+
+def load_state_json(path: Path) -> StateTracker:
+    ts_path = path / "state.json"
+    if ts_path.exists():
+        with ts_path.open("r") as f:
+            return StateTracker(**json.load(f))
+    return StateTracker()
 
 
 # Fast Best Fit Decreasing sample packing strategy

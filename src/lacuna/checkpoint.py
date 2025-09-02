@@ -1,164 +1,105 @@
 """Distributed checkpoint saving and loading."""
 
-import json
 import shutil
 from typing import Any
 from loguru import logger
 from pathlib import Path
-from pydantic import BaseModel
 
 import torch
 import torch.distributed.checkpoint as dcp
+from transformers import PreTrainedTokenizerBase
 from torch.distributed.checkpoint import (
     FileSystemWriter,
     HuggingFaceStorageReader,
     HuggingFaceStorageWriter,
 )
 from torch.distributed.checkpoint.filesystem import SerializationFormat
+from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
-    get_model_state_dict,
-    get_optimizer_state_dict,
-    set_model_state_dict,
-    set_optimizer_state_dict,
+    get_state_dict,
+    set_state_dict,
     StateDictOptions,
 )
-from torch.distributed.checkpoint.stateful import Stateful
-from transformers import PreTrainedTokenizerBase
+from torch.optim.lr_scheduler import LRScheduler
+from torch.optim.optimizer import Optimizer
+from torchdata.stateful_dataloader import StatefulDataLoader
 
 from .distributed import get_rank
 from .config import PretrainConfig, SFTConfig
+from .metrics import StateTracker
+from .utils import save_state_json, save_settings_json, load_state_json
 
 
-class TrainingState(BaseModel):
-    step: int = 0
-    total_tokens: int = 0
-    peak_mfu: float = 0.0
-    peak_tflops: float = 0.0
-    peak_mem_gb: float = 0.0
-
-
-class ModelState(Stateful):
-    def __init__(self, model: torch.nn.Module):
-        self.model = model
-
-    def state_dict(self) -> dict[str, Any]:
-        return get_model_state_dict(
-            self.model,
-            options=StateDictOptions(cpu_offload=True),
-        )
-
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        set_model_state_dict(self.model, state_dict)
-
-
-class OptimizerState(Stateful):
+class TrainerState(Stateful):
     def __init__(
         self,
         model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.LRScheduler,
+        optimizer: Optimizer,
+        scheduler: LRScheduler,
+        dataloader: StatefulDataLoader | None = None,
     ):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.dataloader = dataloader
 
     def state_dict(self) -> dict[str, Any]:
-        state_dict = {}
-        state_dict["optimizer"] = get_optimizer_state_dict(
-            self.model,
-            self.optimizer,
-            options=StateDictOptions(cpu_offload=True),
+        model_state_dict, optimizer_state_dict = get_state_dict(
+            self.model, self.optimizer, options=StateDictOptions(cpu_offload=True)
         )
-        state_dict["scheduler"] = self.scheduler.state_dict()
-
+        scheduler_state_dict = self.scheduler.state_dict()
+        state_dict = {
+            "model": model_state_dict,
+            "optimizer": optimizer_state_dict,
+            "scheduler": scheduler_state_dict,
+        }
+        if self.dataloader is not None:
+            state_dict["dataloader"] = self.dataloader.state_dict()
         return state_dict
 
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        set_optimizer_state_dict(
+    def load_state_dict(self, state_dict: dict[str, Any]):
+        set_state_dict(
             self.model,
             self.optimizer,
-            state_dict["optimizer"],
+            model_state_dict=state_dict["model"],
+            optim_state_dict=state_dict["optimizer"],
         )
-
         self.scheduler.load_state_dict(state_dict["scheduler"])
-
-
-def _write_training_state_json(
-    path: Path,
-    training_state: TrainingState,
-    config: PretrainConfig | SFTConfig,
-) -> None:
-    if get_rank() != 0:
-        return
-    path.mkdir(parents=True, exist_ok=True)
-    with (path / "training_state.json").open("w") as f:
-        json.dump(training_state.model_dump(), f, indent=4)
-    with (path / "settings.json").open("w") as f:
-        json.dump(config.model_dump(mode="json"), f, indent=4)
-
-
-def _read_training_state_json(path: Path) -> TrainingState:
-    ts_path = path / "training_state.json"
-    if ts_path.exists():
-        with ts_path.open("r") as f:
-            return TrainingState(**json.load(f))
-    return TrainingState()
+        if self.dataloader is not None:
+            assert "dataloader" in state_dict
+            self.dataloader.load_state_dict(state_dict["dataloader"])
 
 
 def save_checkpoint(
+    path: Path,
+    state: StateTracker,
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
-    path: Path,
-    tokenizer: PreTrainedTokenizerBase,
+    dataloader: StatefulDataLoader,
     config: PretrainConfig | SFTConfig,
-    state: TrainingState,
+    tokenizer: PreTrainedTokenizerBase,
     final: bool = False,
 ) -> None:
     """Save DCP shards or final HF sharded weights."""
     if get_rank() == 0:
         path.mkdir(parents=True, exist_ok=True)
 
-    unwrapped_model = model.module if hasattr(model, "module") else model
-
-    if not final:
-        model_dir = path / "model"
-        optim_dir = path / "optim"
-
-        dcp.save(
-            {"model": ModelState(model)},
-            storage_writer=FileSystemWriter(
-                str(model_dir), serialization_format=SerializationFormat.SAFETENSORS
-            ),
+    trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
+    if not final or config.checkpoint.resumable_final_save:
+        writer = FileSystemWriter(
+            str(path), serialization_format=SerializationFormat.SAFETENSORS
         )
-        dcp.save(
-            {"optim": OptimizerState(model, optimizer, scheduler)},
-            storage_writer=FileSystemWriter(
-                str(optim_dir), serialization_format=SerializationFormat.SAFETENSORS
-            ),
-        )
-        _write_training_state_json(path, state, config)
-        logger.info(f"Saved DCP checkpoint shards to {path}")
-        return
-
-    weights_sd = ModelState(model).state_dict()
-    dcp.save(weights_sd, storage_writer=HuggingFaceStorageWriter(path=str(path)))
-
-    if get_rank() == 0:
+    else:
+        writer = HuggingFaceStorageWriter(path=str(path))
+        unwrapped_model = model.module if hasattr(model, "module") else model
         unwrapped_model.config.save_pretrained(path)
         tokenizer.save_pretrained(path)
+    dcp.save({"trainer": trainer_state}, storage_writer=writer)
 
-    if config.checkpoint.resumable_final_save:
-        optim_dir = path / "optim"
-        dcp.save(
-            {"optim": OptimizerState(model, optimizer, scheduler)},
-            storage_writer=FileSystemWriter(
-                str(optim_dir), serialization_format=SerializationFormat.SAFETENSORS
-            ),
-        )
-    _write_training_state_json(path, state, config)
-
-    logger.info(f"Saved final HF sharded checkpoint to {path}")
+    save_state_json(path, state)
+    save_settings_json(path, config)
+    logger.info(f"Saved DCP checkpoint shards to {path}")
 
 
 def load_checkpoint(
@@ -166,41 +107,27 @@ def load_checkpoint(
     optimizer: torch.optim.Optimizer,
     scheduler: Any,
     path: Path,
-) -> TrainingState:
+) -> StateTracker:
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at {path}")
 
-    is_step_dir = (path / "model" / ".metadata").exists() and (
-        path / "optim" / ".metadata"
-    ).exists()
-    is_hf_final = (path / "model.safetensors.index.json").exists()
+    is_resumable = (path / "trainer" / ".metadata").exists()
+    is_hf_final = (path / "trainer.safetensors.index.json").exists()
 
-    if is_step_dir:
-        dcp.load({"model": ModelState(model)}, checkpoint_id=str(path / "model"))
+    if is_resumable:
         dcp.load(
-            {"optim": OptimizerState(model, optimizer, scheduler)},
-            checkpoint_id=str(path / "optim"),
+            {"trainer": TrainerState(model, optimizer, scheduler)},
+            checkpoint_id=str(path / "trainer"),
         )
         logger.info(f"Loaded DCP checkpoint from {path}")
-        return _read_training_state_json(path)
-
+        return load_state_json(path)
     elif is_hf_final:
-        optim_meta = (path / "optim" / ".metadata").exists()
-        ts_json = (path / "training_state.json").exists()
-        if not (optim_meta and ts_json):
-            raise ValueError(
-                f"Final checkpoint at {path} is not resumable. Set resumable_final_save=True during save."
-            )
         dcp.load(
-            {"model": ModelState(model)},
+            {"trainer": TrainerState(model, optimizer, scheduler)},
             storage_reader=HuggingFaceStorageReader(path=str(path)),
         )
-        dcp.load(
-            {"optim": OptimizerState(model, optimizer, scheduler)},
-            checkpoint_id=str(path / "optim"),
-        )
         logger.info(f"Loaded HF final (resumable) checkpoint from {path}")
-        return _read_training_state_json(path)
+        return load_state_json(path)
 
     raise ValueError(f"Unknown checkpoint format at {path}")
 

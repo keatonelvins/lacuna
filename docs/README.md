@@ -9,14 +9,6 @@ I'm writing this mainly for personal use and because I learn best by building.
 
 Personal goal: `uv run bloat_check` should return < 5k lines (currently clocking in ~2.5k)
 
-## Attention backends
-| Mode | Backend | Fullgraph Compile | Notes |
-|------|---------|------------------|-------|
-| PT | SDPA |  Yes | Best performance w/ compile |
-| PT | FA3 |  No | Using kernelhub impl. |
-| SFT (no packing) | Any | *Yes | All backends work |
-| SFT (packing) | FA3 |  No | SDPA blocked (needs varlen) |
-
 ## Order of model builder
 Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 - Model patches always happens first
@@ -24,6 +16,7 @@ Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 - torch.compile before FSDP, otherwise FSDP2 wrapped modules would cause graph breaks
 
 ## Other considerations
+- Only FA3 is supported for SFT w/ packing, SDPA needs some more work to get varlen attention working
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830

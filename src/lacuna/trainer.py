@@ -13,7 +13,6 @@ from .checkpoint import (
     cleanup_old_checkpoints,
     load_checkpoint,
     save_checkpoint,
-    TrainingState,
 )
 from .config import (
     CosineSchedulerConfig,
@@ -23,7 +22,7 @@ from .config import (
 )
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_distributed
-from .metrics import MFUTracker, MemoryTracker
+from .metrics import MFUTracker, MemoryTracker, StateTracker
 from .model import setup_model
 from .optim import setup_optimizer
 from .utils import setup_logger, display_config
@@ -73,7 +72,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:  # SFTConfig
         max_steps = len(dataloader) * config.trainer.epochs
 
-    state = TrainingState()
+    state = StateTracker()
     mfu_tracker = MFUTracker(
         model=model,
         seq_len=config.data.seq_len,
@@ -240,9 +239,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     scheduler=scheduler,
                     state=state,
                     path=checkpoint_path,
-                    tokenizer=tokenizer,
                     config=config,
+                    dataloader=None,
                     final=False,
+                    tokenizer=tokenizer,
                 )
                 cleanup_old_checkpoints(
                     config.checkpoint.save_dir, config.checkpoint.keep_latest
@@ -261,9 +261,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             optimizer=optimizer,
             scheduler=scheduler,
             path=final_path,
-            tokenizer=tokenizer,
             config=config,
             state=state,
+            dataloader=None,
+            tokenizer=tokenizer,
             final=True,  # Final checkpoint in HF format
         )
 
