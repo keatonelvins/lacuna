@@ -126,29 +126,28 @@ class MemoryTracker:
         self.reset_peak_stats()
         torch.cuda.empty_cache()
 
+    def _calc_gb_and_pct(self, name: str, value: int) -> tuple[float, float]:
+        """Calculate memory stats in GB and percent of total."""
+        gb = 1024**3
+        return {
+            f"{name}_gb": value / gb,
+            f"{name}_pct": 100 * value / self.total_memory,
+        }
+
     def get_memory_stats(self) -> dict[str, float]:
         """Get current memory statistics in GB."""
         stats = {}
-        gb = 1024**3
 
         allocated = torch.cuda.memory_allocated(self.device)
         reserved = torch.cuda.memory_reserved(self.device)
-
         max_allocated = torch.cuda.max_memory_allocated(self.device)
         max_reserved = torch.cuda.max_memory_reserved(self.device)
 
         # Calculate amount and percentages
-        stats["allocated_gb"] = allocated / gb
-        stats["allocated_pct"] = 100 * allocated / self.total_memory
-
-        stats["reserved_gb"] = reserved / gb
-        stats["reserved_pct"] = 100 * reserved / self.total_memory
-
-        stats["max_allocated_gb"] = max_allocated / gb
-        stats["max_allocated_pct"] = 100 * max_allocated / self.total_memory
-
-        stats["max_reserved_gb"] = max_reserved / gb
-        stats["max_reserved_pct"] = 100 * max_reserved / self.total_memory
+        stats.update(self._calc_gb_and_pct("allocated", allocated))
+        stats.update(self._calc_gb_and_pct("reserved", reserved))
+        stats.update(self._calc_gb_and_pct("max_allocated", max_allocated))
+        stats.update(self._calc_gb_and_pct("max_reserved", max_reserved))
 
         # Check for memory allocation issues
         memory_info = torch.cuda.memory_stats(self.device)

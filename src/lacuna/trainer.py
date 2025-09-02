@@ -1,18 +1,20 @@
 """Core training loop for pretraining and SFT."""
 
 import time
-
 import torch
-from rich.pretty import Pretty
-from rich.console import Console
+from loguru import logger
 from torch.amp import autocast
-from transformers import PreTrainedModel
 from transformers.optimization import (
     get_cosine_with_min_lr_schedule_with_warmup,
     get_wsd_schedule,
 )
 
-from .checkpoint import cleanup_old_checkpoints, load_checkpoint, save_checkpoint
+from .checkpoint import (
+    cleanup_old_checkpoints,
+    load_checkpoint,
+    save_checkpoint,
+    TrainingState,
+)
 from .config import (
     CosineSchedulerConfig,
     WSDSchedulerConfig,
@@ -23,34 +25,16 @@ from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_distributed
 from .metrics import MFUTracker, MemoryTracker
 from .model import setup_model
-from .utils import setup_logger
+from .optim import setup_optimizer
+from .utils import setup_logger, display_config
 from .wandb import init_wandb, log_metrics, finish
-from loguru import logger
 
 
-def setup_optimizer(
-    model: PreTrainedModel, config: PretrainConfig | SFTConfig
-) -> torch.optim.AdamW:
-    """Setup AdamW optimizer."""
-    return torch.optim.AdamW(
-        model.parameters(),
-        lr=config.optimizer.lr,
-        weight_decay=config.optimizer.weight_decay,
-        betas=config.optimizer.betas,
-        fused=True,
-    )
-
-
+@logger.catch(reraise=True)
 def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
-
-    console = Console()
-    with console.capture() as capture:
-        console.print(
-            Pretty(config, expand_all=True)
-        )  # omg Will you've outdone yourself
-    logger.info("Starting training with config:\n" + capture.get().strip())
+    display_config(config)
 
     init_distributed()
 
@@ -73,9 +57,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)"
     )
 
+    logger.info("Setting up model")
     model = setup_model(config)
-
-    # Apply distributed training (FSDP2 or DDP)
     model = setup_distributed(model, config)
 
     logger.info("Setting up optimizer and scheduler")
@@ -89,11 +72,10 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:  # SFTConfig
         max_steps = len(dataloader) * config.trainer.epochs
 
-    # Setup MFU and memory tracking
+    state = TrainingState()
     mfu_tracker = MFUTracker(
         model=model,
         seq_len=config.data.seq_len,
-        window_size=10,
         world_size=world_size,
     )
     memory_tracker = MemoryTracker()
@@ -117,33 +99,21 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:
         raise ValueError(f"Unsupported scheduler type: {config.scheduler.type}")
 
-    start_step = 0
-    total_tokens = 0
-    peak_mfu = 0.0
-    peak_tflops = 0.0
-    peak_memory_gb = 0.0
+    if config.model.liger and not config.model.cce:
+        # pass through accum_dtype if using Liger FLCE
+        accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
-    # Resume from checkpoint if specified
     if config.checkpoint.resume_path is not None:
         logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_path}")
-        training_state = load_checkpoint(
+        state = load_checkpoint(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
             path=config.checkpoint.resume_path,
         )
-        start_step = training_state["step"]
-        total_tokens = training_state["total_tokens"]
-        peak_mfu = training_state.get("peak_mfu", 0.0)
-        peak_tflops = training_state.get("peak_tflops", 0.0)
-        peak_memory_gb = training_state.get("peak_memory_gb", 0.0)
-        logger.info(
-            f"Resumed from step {start_step}, total tokens: {total_tokens:,}, "
-            f"peak MFU: {peak_mfu:.1f}%, peak TFLOPS: {peak_tflops:.1f}, "
-            f"peak memory: {peak_memory_gb:.1f}GB"
-        )
+        logger.info(f"Resumed from checkpoint: {config.checkpoint.resume_path}")
 
-    logger.info(f"Starting training: {max_steps} steps (current step: {start_step})")
+    logger.info(f"Starting training: {max_steps} steps")
 
     # Track data loading times and start time
     data_loading_times = []
@@ -152,6 +122,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     try:
         dataloader_iter = iter(dataloader)
         current_epoch = 0
+        start_step = state.step
 
         for step in range(start_step, max_steps):
             accumulated_loss = 0.0
@@ -174,15 +145,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 torch.compiler.cudagraph_mark_step_begin()
 
             model_inputs = {k: v.cuda() for k, v in batch.items()}
+            model_inputs["accum_dtype"] = accum_dtype
 
             with autocast("cuda", dtype=torch.bfloat16):
-                if config.model.liger and not config.model.cce:
-                    # pass through accum_dtype if using Liger FLCE
-                    accum_dtype = (
-                        torch.float32 if config.model.accum_fp32 else torch.bfloat16
-                    )
-                    model_inputs["accum_dtype"] = accum_dtype
-
                 outputs = model(**model_inputs)
                 loss = outputs.loss
 
@@ -196,7 +161,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             scheduler.step()
 
             step_tokens = batch_size * config.data.seq_len
-            total_tokens += step_tokens
+            state.total_tokens += step_tokens
 
             mfu_tracker.update(step_tokens)
 
@@ -213,11 +178,12 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                     data_pct = 0
 
                 if "mfu_pct" in mfu_metrics:
-                    peak_mfu = max(peak_mfu, mfu_metrics["mfu_pct"])
-                    peak_tflops = max(peak_tflops, mfu_metrics["tflops"])
+                    state.peak_mfu = max(state.peak_mfu, mfu_metrics["mfu_pct"])
+                    state.peak_tflops = max(state.peak_tflops, mfu_metrics["tflops"])
 
-                # Track peak memory usage
-                peak_memory_gb = max(peak_memory_gb, memory_stats["max_reserved_gb"])
+                state.peak_mem_gb = max(
+                    state.peak_mem_gb, memory_stats["max_reserved_gb"]
+                )
 
                 log_parts = [
                     f"\033[91mStep {step:>6}\033[0m",
@@ -242,7 +208,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                         "train/loss": accumulated_loss,
                         "train/grad_norm": grad_norm,
                         "train/lr": current_lr,
-                        "train/total_tokens": total_tokens,
+                        "train/total_tokens": state.total_tokens,
                         "perf/data_loading_pct": data_pct,
                         "memory/max_reserved_gb": memory_stats["max_reserved_gb"],
                         "memory/max_reserved_pct": memory_stats["max_reserved_pct"],
@@ -254,8 +220,8 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                                 "perf/tps": mfu_metrics["tps"],
                                 "perf/tflops": mfu_metrics["tflops"],
                                 "perf/mfu_pct": mfu_metrics["mfu_pct"],
-                                "perf/peak_mfu_pct": peak_mfu,
-                                "perf/peak_tflops": peak_tflops,
+                                "perf/peak_mfu_pct": state.peak_mfu,
+                                "perf/peak_tflops": state.peak_tflops,
                             }
                         )
 
@@ -266,21 +232,17 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
             if step > 0 and step % config.checkpoint.save_every == 0:
                 logger.info(
-                    f"Saving checkpoint at step {step} (peak MFU: {peak_mfu:.1f}%, peak memory: {peak_memory_gb:.1f}GB)"
+                    f"Saving checkpoint at step {step} (peak MFU: {state.peak_mfu:.1f}%, peak memory: {state.peak_mem_gb:.1f}GB)"
                 )
                 checkpoint_path = config.checkpoint.save_dir / f"step_{step}"
                 save_checkpoint(
                     model=model,
                     optimizer=optimizer,
                     scheduler=scheduler,
-                    step=step,
-                    total_tokens=total_tokens,
+                    state=state,
                     path=checkpoint_path,
                     tokenizer=tokenizer,
                     config=config,
-                    peak_mfu=peak_mfu,
-                    peak_tflops=peak_tflops,
-                    peak_memory_gb=peak_memory_gb,
                     final=False,
                 )
                 cleanup_old_checkpoints(
@@ -297,21 +259,11 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            step=step,
-            total_tokens=total_tokens,
             path=final_path,
             tokenizer=tokenizer,
             config=config,
-            peak_mfu=peak_mfu,
-            peak_tflops=peak_tflops,
-            peak_memory_gb=peak_memory_gb,
+            state=state,
             final=True,  # Final checkpoint in HF format
         )
 
         finish(wandb_run)
-
-        logger.info(
-            f"All done! Total steps: {step}, Total tokens: {total_tokens:,}, "
-            f"Peak MFU: {peak_mfu:.1f}%, Peak TFLOPS: {peak_tflops:.1f}, "
-            f"Peak Memory: {peak_memory_gb:.1f}GB"
-        )
