@@ -97,6 +97,14 @@ def _write_training_state_json(
         logger.warning(f"Failed writing training_state.json: {e}")
 
 
+def _read_training_state_json(path: Path) -> TrainingState:
+    ts_path = path / "training_state.json"
+    if ts_path.exists():
+        with ts_path.open("r") as f:
+            return TrainingState(**json.load(f))
+    return TrainingState()
+
+
 def save_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -140,20 +148,8 @@ def save_checkpoint(
     )
 
     if get_rank() == 0:
-        try:
-            unwrapped_model.config.save_pretrained(path)
-        except Exception as e:
-            logger.warning(f"Failed saving config.json: {e}")
-        try:
-            gen_cfg = getattr(unwrapped_model, "generation_config", None)
-            if gen_cfg is not None:
-                gen_cfg.save_pretrained(path)
-        except Exception as e:
-            logger.warning(f"Failed saving generation_config.json: {e}")
-        try:
-            tokenizer.save_pretrained(path)
-        except Exception as e:
-            logger.warning(f"Failed saving tokenizer files: {e}")
+        unwrapped_model.config.save_pretrained(path)
+        tokenizer.save_pretrained(path)
 
     if config.checkpoint.resumable_final_save:
         optim_dir = path / "optim"
@@ -181,16 +177,6 @@ def load_checkpoint(
     ).exists()
     is_hf_final = (path / "model.safetensors.index.json").exists()
 
-    def _read_training_state_json(p: Path) -> dict[str, Any]:
-        ts_path = p / "training_state.json"
-        if ts_path.exists():
-            try:
-                with ts_path.open("r") as f:
-                    return TrainingState(**json.load(f))
-            except Exception as e:
-                logger.warning(f"Failed reading training_state.json: {e}")
-        return TrainingState()
-
     if is_step_dir:
         dcp.load({"model": ModelState(model)}, checkpoint_id=str(path / "model"))
         dcp.load(
@@ -200,8 +186,7 @@ def load_checkpoint(
         logger.info(f"Loaded DCP checkpoint from {path}")
         return _read_training_state_json(path)
 
-    if is_hf_final:
-        # Require resumable components to exist
+    elif is_hf_final:
         optim_meta = (path / "optim" / ".metadata").exists()
         ts_json = (path / "training_state.json").exists()
         if not (optim_meta and ts_json):
