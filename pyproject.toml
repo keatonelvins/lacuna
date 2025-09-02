@@ -21,6 +21,7 @@ dependencies = [
 pt = "lacuna.cli:pretrain"
 sft = "lacuna.cli:sft"
 dcp_to_hf = "lacuna.cli:dcp_to_hf"
+bloat_check = "lacuna.cli:bloat_check"
 
 [dependency-groups]
 dev = [

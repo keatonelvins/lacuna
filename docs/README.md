@@ -1,11 +1,13 @@
 # lacuna docs
 
-My goal is for this to be (in spirit) a nano-torchtitan with the following modifications:
+My goal for `lacuna` is to boil down `torchtitan` into a more hf-friendly, minimal package:
 - can be much simpler by not supporting TP/PP/CP
-- no modeling code (for now) means we can lean on community resources like Liger Kernel and CCE
+- no modeling code (for now), can lean on community kernels from kernel hub, liger, cce
 - also support SFT w/ assistant-only loss and sample packing
 
-Ethos is most similar to prime-rl, but focused on PT/SFT rather than SFT/RL.
+I'm writing this mainly for personal use and because I learn best by building.
+
+Personal goal: `uv run bloat_check` should return < 5k lines (currently clocking in ~2.5k)
 
 ## Attention backends
 | Mode | Backend | Fullgraph Compile | Notes |
@@ -24,5 +26,5 @@ Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 ## Other considerations
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
-    - For LigerKernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
+    - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
     - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py

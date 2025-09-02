@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import argparse
+import subprocess
 from pathlib import Path
 from typing import Type, TypeVar
 
@@ -147,3 +148,17 @@ def dcp_to_hf():
     config.save_pretrained(hf_path)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.save_pretrained(hf_path)
+
+
+def bloat_check():
+    """Check the total repo line count."""
+    result = subprocess.run(
+        "git ls-files | grep -v '^uv\\.lock$' | xargs cat | wc -l",
+        shell=True,
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+
+    line_count = int(result.stdout.strip())
+    print(f"Total repo lines: {line_count}")
