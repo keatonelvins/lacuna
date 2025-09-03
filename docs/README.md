@@ -12,7 +12,8 @@ Personal goal: `uv run bloat_check` should return < 5k lines (currently clocking
 ## Order of model builder
 Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 - Model patches always happens first
-- Compile wrapped AC: compile already does recompute via the min-cut partitioner, so wrapping AC over a compiled region may lead to recomputing multiple times
+- Compile wrapped AC: compile already recomputes with the min-cut partitioner, so wrapping AC over a compiled region might mean multiple recomputations
+    - see https://pytorch.org/blog/activation-checkpointing-techniques/ for more info
 - torch.compile before FSDP, otherwise FSDP2 wrapped modules would cause graph breaks
 
 ## Other considerations

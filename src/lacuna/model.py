@@ -1,7 +1,6 @@
 """Model setup and optimization utilities."""
 
 import os
-import math
 import functools
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -96,15 +95,11 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
         return model
 
     layers = model.model.layers
-    num_layers = len(layers)
 
     if ac_config.mode == "full":
         checkpoint_freq = 1
     elif ac_config.mode == "partial":
-        if ac_config.stride is None:
-            checkpoint_freq = max(1, int(math.sqrt(num_layers)))
-        else:
-            checkpoint_freq = ac_config.stride
+        checkpoint_freq = ac_config.stride
 
     for idx, layer in enumerate(layers):
         if idx % checkpoint_freq == 0:

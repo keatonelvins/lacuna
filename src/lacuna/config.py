@@ -126,10 +126,7 @@ class ActivationCheckpointConfig(BaseModel):
     """Activation checkpointing configuration"""
 
     mode: Literal["none", "full", "partial"] = Field("none", description="Activation checkpointing mode")
-    stride: Optional[int] = Field(
-        None,
-        description="If partial, checkpoint every nth layer (or sqrt(num_layers) if unspecified)",
-    )
+    stride: int = Field(2, ge=1, description="If partial, checkpoint every nth layer")
 
 
 class CheckpointConfig(BaseModel):
