@@ -18,7 +18,6 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     """Launch torchrun using config's torchrun settings."""
     torchrun = config.torchrun
 
-    # Build torchrun command
     cmd = [
         "torchrun",
         f"--nproc_per_node={torchrun.nproc_per_node}",
@@ -27,7 +26,7 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
         f"--master_port={torchrun.master_port}",
     ]
 
-    if hasattr(torchrun, "node_rank") and torchrun.node_rank is not None:
+    if torchrun.node_rank is not None:
         cmd.append(f"--node_rank={torchrun.node_rank}")
     elif torchrun.nnodes > 1:
         print(f"Error: For multi-node training (nnodes={torchrun.nnodes}), node_rank must be specified in config or via --torchrun.node_rank")

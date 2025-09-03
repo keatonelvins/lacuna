@@ -25,12 +25,12 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from .distributed import get_rank
+from .distributed import is_master
 from .config import LacunaConfig
 from .metrics import StateTracker
 from .utils import save_state_json, save_settings_json, load_state_json
 
-HF_FORMAT = SerializationFormat.SAFETENSORS
+SAFETENSOR = SerializationFormat.SAFETENSORS
 
 
 class TrainerState(Stateful):
@@ -83,18 +83,19 @@ def save_checkpoint(
     final: bool = False,
 ) -> None:
     """Save DCP shards or final HF sharded weights."""
-    if get_rank() == 0:
+    if is_master():
         path.mkdir(parents=True, exist_ok=True)
 
     trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
     if not final or config.checkpoint.resumable_final_save:
-        writer = FileSystemWriter(str(path), serialization_format=HF_FORMAT)
+        writer = FileSystemWriter(str(path), serialization_format=SAFETENSOR)
     else:
         writer = HuggingFaceStorageWriter(path=str(path))
+
     unwrapped_model = model.module if hasattr(model, "module") else model
     unwrapped_model.config.save_pretrained(path)
     tokenizer.save_pretrained(path)
-    with warnings.catch_warnings():
+    with warnings.catch_warnings():  # ignore warnings if on single device
         warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
         dcp.save({"trainer": trainer_state}, storage_writer=writer)
 
@@ -127,8 +128,7 @@ def load_checkpoint(
 
 
 def cleanup_old_checkpoints(save_dir: Path, keep_latest: int) -> None:
-    """Cleanup old checkpoints, keeping the latest ones."""
-    if get_rank() != 0:
+    if not is_master():
         return
 
     if not save_dir.exists():

@@ -91,27 +91,24 @@ def setup_fsdp2(
         reduce_dtype=torch.float32,
     )
 
-    # CPU offload if requested
     cpu_offload_policy = CPUOffloadPolicy(pin_memory=True) if cpu_offload else None
 
-    # Apply FSDP2 to transformer blocks with smart resharding
-    if hasattr(model, "model") and hasattr(model.model, "layers"):
-        layers = model.model.layers
-        num_layers = len(layers)
+    layers = model.model.layers
+    num_layers = len(layers)
 
-        for layer_id, transformer_block in enumerate(layers):
-            # Last block optimization: don't reshard since FSDP prefetches
-            reshard = layer_id < num_layers - 1
+    for layer_id, transformer_block in enumerate(layers):
+        # Last block: don't reshard since FSDP prefetches
+        reshard = layer_id < num_layers - 1
 
-            fully_shard(
-                transformer_block,
-                mp_policy=mp_policy,
-                cpu_offload_policy=cpu_offload_policy,
-                reshard_after_forward=reshard,
-                sync_module_states=True,
-            )
+        fully_shard(
+            transformer_block,
+            mp_policy=mp_policy,
+            cpu_offload_policy=cpu_offload_policy,
+            reshard_after_forward=reshard,
+            sync_module_states=True,
+        )
 
-        logger.info(f"Wrapped {num_layers} transformer blocks with FSDP2")
+    logger.info(f"Wrapped {num_layers} transformer blocks with FSDP2")
 
     # Apply root FSDP wrapping (never reshard root)
     fully_shard(
@@ -135,7 +132,7 @@ def setup_ddp(model: PreTrainedModel, is_compiled: bool = False) -> PreTrainedMo
 
     logger.info("Setting up DDP...")
 
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    local_rank = get_rank()
 
     model = DDP(
         model,

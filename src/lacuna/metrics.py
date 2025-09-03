@@ -150,7 +150,7 @@ class MemoryTracker:
         max_allocated = torch.cuda.max_memory_allocated(self.device)
         max_reserved = torch.cuda.max_memory_reserved(self.device)
 
-        # Calculate amount and percentages
+        # Calculate alloc/reserved amount and percentages
         stats.update(self._calc_gb_and_pct("allocated", allocated))
         stats.update(self._calc_gb_and_pct("reserved", reserved))
         stats.update(self._calc_gb_and_pct("max_allocated", max_allocated))

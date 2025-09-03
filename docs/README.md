@@ -5,8 +5,6 @@ My goal for `lacuna` is to boil down `torchtitan` into a more hf-friendly, minim
 - no modeling code (for now), can lean on community kernels from kernel hub, liger, cce
 - also support SFT w/ assistant-only loss and sample packing
 
-I'm writing this mainly for personal use and because I learn best by building.
-
 Personal goal: `uv run bloat_check` should return < 5k lines (currently clocking in ~2.5k)
 
 ## Order of model builder

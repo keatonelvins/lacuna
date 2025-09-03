@@ -9,13 +9,9 @@ from collections import defaultdict, deque
 from rich.pretty import Pretty
 from rich.console import Console
 
-from .distributed import get_rank
+from .distributed import is_master
 from .config import LacunaConfig
 from .metrics import StateTracker
-
-
-def _rank_filter(_):
-    return get_rank() == 0
 
 
 def setup_logger() -> None:
@@ -24,7 +20,7 @@ def setup_logger() -> None:
         sink=lambda msg: print(msg, end=""),
         format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {message}",
         level="INFO",
-        filter=_rank_filter,
+        filter=is_master,
     )
 
 
@@ -36,7 +32,7 @@ def display_config(config: LacunaConfig) -> None:
 
 
 def save_state_json(path: Path, state: StateTracker) -> None:
-    if get_rank() != 0:
+    if not is_master():
         return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "state.json").open("w") as f:
@@ -44,7 +40,7 @@ def save_state_json(path: Path, state: StateTracker) -> None:
 
 
 def save_settings_json(path: Path, config: LacunaConfig) -> None:
-    if get_rank() != 0:
+    if not is_master():
         return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "settings.json").open("w") as f:
