@@ -9,10 +9,10 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
 from torch.nn.attention import sdpa_kernel, SDPBackend
-from cut_cross_entropy.transformers import cce_patch
-from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from kernels import kernelize
+from cut_cross_entropy.transformers import cce_patch
+from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from loguru import logger
 
 from .config import (
@@ -134,13 +134,12 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
 
     fullgraph = config.model.attention == "SDPA"
 
-    if hasattr(torch, "_dynamo"):
-        torch._dynamo.config.cache_size_limit = 256
-        torch._dynamo.config.suppress_errors = True
+    torch._dynamo.config.cache_size_limit = 256
+    torch._dynamo.config.suppress_errors = True
 
-        # Need to use capture_scalar_outputs for FA3 compatibility
-        if config.model.attention == "FA3":
-            torch._dynamo.config.capture_scalar_outputs = True
+    # Need to use capture_scalar_outputs for FA3 compatibility
+    if config.model.attention == "FA3":
+        torch._dynamo.config.capture_scalar_outputs = True
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
@@ -156,7 +155,7 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
 
 
 def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Optionally apply Hugging Face kernels.kernelize to the model."""
+    """Apply HuggingFace kernels.kernelize to the model."""
     if not config.kernelize:
         return model
 
