@@ -61,7 +61,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     optimizer = setup_optimizer(model, config)
 
     logger.info("Setting up dataloader")
-    dataloader, tokenizer, sampler = setup_dataloader(config, micro_batch_size)
+    dataloader, tokenizer = setup_dataloader(config, micro_batch_size)
 
     if isinstance(config, PretrainConfig):
         max_steps = config.trainer.steps
@@ -115,7 +115,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     try:
         dataloader_iter = iter(dataloader)
-        current_epoch = 0
         start_step = state.step
 
         for step in range(start_step, max_steps):
@@ -124,15 +123,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
             # Track data loading time
             data_load_start = time.perf_counter()
-            try:
-                batch = next(dataloader_iter)
-            except StopIteration:
-                # For SFT with epochs, need to update sampler so shuffling works
-                if isinstance(config, SFTConfig) and sampler is not None:
-                    current_epoch += 1
-                    sampler.set_epoch(current_epoch)
-                dataloader_iter = iter(dataloader)
-                batch = next(dataloader_iter)
+            batch = next(dataloader_iter)
             data_loading_times.append(time.perf_counter() - data_load_start)
 
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:

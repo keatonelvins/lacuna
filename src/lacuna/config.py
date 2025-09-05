@@ -61,22 +61,23 @@ class WSDSchedulerConfig(BaseModel):
 class DataConfig(BaseModel):
     """Base config for data loading"""
 
-    dataset_name: str = Field(description="HF dataset name")
-    split: str = Field("train", description="Dataset split")
+    dataset_names: list[str] = Field(description="HF dataset names")
+    split: str = Field("train", description="Split for all datasets")
     seq_len: int = Field(512, ge=1, description="Sequence length")
-    use_random_data: bool = Field(False, description="Use random data for testing")
+    stream: bool = Field(False, description="Stream in the datasets")
+    num_workers: int = Field(1, ge=0, description="Number of workers for data loading")
 
 
 class PretrainDataConfig(DataConfig):
     """Pretraining data config"""
 
-    dataset_name: str = Field("keatone/TinierStories", description="HF dataset name")
+    dataset_names: list[str] = Field(["keatone/TinierStories"], description="HF dataset names")
 
 
 class SFTDataConfig(DataConfig):
     """SFT data config"""
 
-    dataset_name: str = Field("keatone/s1K", description="HF dataset name")
+    dataset_names: list[str] = Field(["keatone/s1K"], description="HF dataset names")
     packing: bool = Field(True, description="Pack multiple message lists per sample")
 
 

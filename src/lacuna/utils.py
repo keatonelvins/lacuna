@@ -1,6 +1,8 @@
 import torch
 import json
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Any
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -20,7 +22,7 @@ def setup_logger() -> None:
         sink=lambda msg: print(msg, end=""),
         format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {message}",
         level="INFO",
-        filter=is_master,
+        filter=lambda r: is_master(),
     )
 
 
@@ -166,3 +168,53 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
             column = type(column).from_arrays(offsets.astype(dtype), column.values)
         columns.append(column)
     return pa.Table.from_arrays(columns + [lengths], names=examples.column_names + ["seq_lengths"])
+
+
+@dataclass
+class DataCollator:
+    """Data collator w/ multipacking (lean on FA for attention mask)"""
+
+    pad_token_id: int
+    packing: bool = True
+
+    def __call__(self, examples: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
+        input_ids = [torch.tensor(example["input_ids"]) for example in examples]
+        labels = [torch.tensor(example["labels"]) for example in examples]
+
+        if self.packing:
+            # Concatenate all sequences into single tensor (no padding)
+            output = {
+                "input_ids": torch.cat(input_ids, dim=0).unsqueeze(0),
+                "labels": torch.cat(labels, dim=0).unsqueeze(0),
+            }
+
+            if "seq_lengths" in examples[0]:
+                # Use packed sequence lengths for position IDs
+                position_ids = self._get_position_ids_from_packed_seq_lengths([example["seq_lengths"] for example in examples])
+                output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
+            else:
+                # Generate position IDs for individual sequences
+                position_ids = [torch.arange(len(ids)) for ids in input_ids]
+                output["position_ids"] = torch.cat(position_ids, dim=0).unsqueeze(0)
+        else:
+            # Standard right padding (no position_ids needed for non-packed)
+            output = {
+                "input_ids": pad(input_ids, self.pad_token_id),
+                "attention_mask": pad([torch.ones_like(ids) for ids in input_ids], 0),
+                "labels": pad(labels, -100),
+            }
+
+        return output
+
+    @staticmethod
+    def _get_position_ids_from_packed_seq_lengths(
+        batch_seq_lengths: list[list[int]],
+    ) -> list[torch.Tensor]:
+        """Generate position IDs for packed sequences."""
+        example_lengths = [sum(seq_lengths) for seq_lengths in batch_seq_lengths]
+        batch_seq_tensor = torch.tensor([seq_length for seq_lengths in batch_seq_lengths for seq_length in seq_lengths])
+        position_ids = torch.ones(sum(example_lengths), dtype=batch_seq_tensor.dtype)
+        position_ids[0] = 0
+        position_ids[batch_seq_tensor[:-1].cumsum(0)] = -(batch_seq_tensor[:-1] - 1)
+        position_ids = position_ids.cumsum(0)
+        return list(position_ids.split(example_lengths))
