@@ -37,7 +37,7 @@ requires = ["uv_build>=0.8.11,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
-line-length = 140
+line-length = 130
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

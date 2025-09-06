@@ -55,13 +55,13 @@ class PretrainDataset(IterableDataset, Stateful):
         self._token_buffer = []
 
     def _encode(self, examples):
-        examples_with_eos = map(lambda x: x + self.tokenizer.eos_token, examples["text"])
-        return self.tokenizer(list(examples_with_eos), truncation=False, padding=False)
+        return self.tokenizer(examples, add_special_tokens=False, truncation=False, padding=False)
 
     def __iter__(self):
         for sample in self._data:
             sample_tokens = sample["input_ids"]
             self._token_buffer.extend(sample_tokens)
+            self._token_buffer.append(self.tokenizer.eos_token_id)
             self._sample_idx += 1
 
             while len(self._token_buffer) > self.seq_len:
@@ -74,7 +74,6 @@ class PretrainDataset(IterableDataset, Stateful):
 
 def setup_dataloader(config: PretrainConfig | SFTConfig, micro_batch_size: int) -> tuple[DataLoader, PreTrainedTokenizerBase]:
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-    tokenizer.pad_token = tokenizer.eos_token
 
     if isinstance(config, PretrainConfig):
         dataset = PretrainDataset(config, tokenizer)
@@ -83,9 +82,7 @@ def setup_dataloader(config: PretrainConfig | SFTConfig, micro_batch_size: int) 
 
     workers = config.data.num_workers
     if workers > dataset.num_shards:
-        logger.warning(
-            f"Number of workers {workers} is greater than number of dataset shards {dataset.num_shards}, setting to {dataset.num_shards}"
-        )
+        logger.warning(f"num_workers {workers} is >= the dataset shards {dataset.num_shards}")
         workers = dataset.num_shards
 
     dataloader = StatefulDataLoader(
