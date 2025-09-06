@@ -10,7 +10,6 @@ from transformers.optimization import (
 )
 
 from .checkpoint import (
-    cleanup_old_checkpoints,
     load_checkpoint,
     save_checkpoint,
 )
@@ -97,15 +96,15 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
-    if config.checkpoint.resume_path is not None:
-        logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_path}")
+    if config.checkpoint.resume_from is not None:
+        logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
         state = load_checkpoint(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            path=config.checkpoint.resume_path,
+            path=config.checkpoint.resume_from,
         )
-        logger.info(f"Resumed from checkpoint: {config.checkpoint.resume_path}")
+        logger.info(f"Resumed from checkpoint: {config.checkpoint.resume_from}")
 
     logger.info(f"Starting training: {max_steps} steps")
 
@@ -209,20 +208,19 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 data_loading_times.clear()
 
             if step > 0 and step % config.checkpoint.save_every == 0:
-                logger.info(f"Saving checkpoint at step {step} (peak MFU: {state.peak_mfu:.1f}%, peak memory: {state.peak_mem_gb:.1f}GB)")
-                checkpoint_path = config.checkpoint.save_dir / f"step_{step}"
+                logger.info(
+                    f"Saving checkpoint at step {step} (peak MFU: {state.peak_mfu:.1f}%, peak memory: {state.peak_mem_gb:.1f}GB)"
+                )
                 save_checkpoint(
                     model=model,
                     optimizer=optimizer,
                     scheduler=scheduler,
                     state=state,
-                    path=checkpoint_path,
                     config=config,
-                    dataloader=None,
+                    dataloader=dataloader,
                     final=False,
                     tokenizer=tokenizer,
                 )
-                cleanup_old_checkpoints(config.checkpoint.save_dir, config.checkpoint.keep_latest)
 
             state.step += 1
 
@@ -231,15 +229,13 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     finally:
         logger.info("Saving final checkpoint")
-        final_path = config.checkpoint.save_dir / "final"
         save_checkpoint(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            path=final_path,
             config=config,
             state=state,
-            dataloader=None,
+            dataloader=dataloader,
             tokenizer=tokenizer,
             final=True,  # Final checkpoint in HF format
         )

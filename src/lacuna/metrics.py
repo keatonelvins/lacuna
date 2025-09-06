@@ -14,20 +14,18 @@ class StateTracker(BaseModel):
     peak_mem_gb: float = 0.0
 
 
+# ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/tools/utils.py
 def get_peak_flops(device_name: str) -> int:
-    """
-    Ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/tools/utils.py
-    """
     if "H100" in device_name:
-        return 989e12  # assume H100 SXM bc otherwise what are you doing my guy
+        return 989e12  # assuming H100 SXM bc otherwise what are you doing my guy
     elif "H200" in device_name:
         return 989e12
     elif "B200" in device_name:
         return 2.25e15
     elif "3090" in device_name:
-        return 142e12  # i use an RTX 3090 for dev
+        return 142e12
     else:
-        logger.warning(f"Peak flops undefined for: {device_name}, fallback to A100")
+        logger.warning(f"Peak flops undefined for: {device_name}, falling back to A100")
         return 312e12
 
 

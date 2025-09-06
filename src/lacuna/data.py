@@ -16,13 +16,13 @@ from .distributed import get_rank, get_world_size
 
 
 def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset:
+    """Get single IterableDataset from merged hf datasets."""
     loader = partial(load_dataset, split=config.data.split, streaming=config.data.stream)
     datasets = [loader(name) for name in config.data.dataset_names]
 
     if not config.data.stream:
         datasets = [dataset.to_iterable_dataset(num_shards=get_world_size()) for dataset in datasets]
 
-    # TODO: add weighting & stopping strategy
     dataset = interleave_datasets(datasets)
 
     if dataset.num_shards != get_world_size():
@@ -32,7 +32,7 @@ def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset
 
 
 class PretrainDataset(IterableDataset, Stateful):
-    """Pretraining dataset."""
+    """Stateful pretraining dataset w/ packing."""
 
     def __init__(
         self,
@@ -70,6 +70,15 @@ class PretrainDataset(IterableDataset, Stateful):
                 input_ids = seq_len_tokens[:-1]
                 labels = seq_len_tokens[1:]
                 yield {"input_ids": input_ids, "labels": labels}
+
+    def state_dict(self):
+        state_dict = {"token_buffer": self._token_buffer}
+        state_dict["data"] = self._data.state_dict()
+        return state_dict
+
+    def load_state_dict(self, state_dict):
+        self._token_buffer = state_dict["token_buffer"]
+        self._data.load_state_dict(state_dict["data"])
 
 
 def setup_dataloader(config: PretrainConfig | SFTConfig, micro_batch_size: int) -> tuple[DataLoader, PreTrainedTokenizerBase]:

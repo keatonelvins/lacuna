@@ -1,7 +1,6 @@
 """FSDP2 and DDP distributed training utilities."""
 
 import os
-from typing import Any
 
 import torch
 import torch.distributed as dist
@@ -22,7 +21,6 @@ def init_distributed() -> None:
     if not dist.is_available():
         return
 
-    # Check if we're running under torchrun
     if "RANK" not in os.environ:
         return
 
@@ -46,17 +44,6 @@ def is_master() -> bool:
     return get_rank() == 0
 
 
-def get_world_info() -> dict[str, Any]:
-    """Get distributed world information."""
-    return {
-        "rank": get_rank(),
-        "world_size": get_world_size(),
-        "local_rank": int(os.environ.get("LOCAL_RANK", "0")),
-        "is_master": is_master(),
-        "distributed": dist.is_initialized(),
-    }
-
-
 def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     """Setup distributed training based on backend configuration."""
 
@@ -66,10 +53,10 @@ def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTraine
         logger.info("Single GPU training - no distributed wrapping")
         return model
 
-    if config.dist.backend == "none":
+    if config.dist.backend == "NONE":
         logger.info("Multi-GPU available but distributed backend disabled")
         return model
-    elif config.dist.backend == "ddp":
+    elif config.dist.backend == "DDP":
         return setup_ddp(model, config.model.compile_mode is not None)
     else:  # fsdp
         return setup_fsdp2(model, config.dist.cpu_offload)
@@ -86,38 +73,20 @@ def setup_fsdp2(
 
     logger.info("Setting up FSDP2...")
 
-    mp_policy = MixedPrecisionPolicy(
-        param_dtype=torch.bfloat16,
-        reduce_dtype=torch.float32,
-    )
-
+    mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
     cpu_offload_policy = CPUOffloadPolicy(pin_memory=True) if cpu_offload else None
 
-    layers = model.model.layers
-    num_layers = len(layers)
-
-    for layer_id, transformer_block in enumerate(layers):
+    for i, block in enumerate(model.model.layers):
         # Last block: don't reshard since FSDP prefetches
-        reshard = layer_id < num_layers - 1
+        reshard = i < len(model.model.layers) - 1
 
         fully_shard(
-            transformer_block,
+            block,
             mp_policy=mp_policy,
             cpu_offload_policy=cpu_offload_policy,
             reshard_after_forward=reshard,
             sync_module_states=True,
         )
-
-    logger.info(f"Wrapped {num_layers} transformer blocks with FSDP2")
-
-    # Apply root FSDP wrapping (never reshard root)
-    fully_shard(
-        model,
-        mp_policy=mp_policy,
-        cpu_offload_policy=cpu_offload_policy,
-        reshard_after_forward=False,
-        sync_module_states=True,
-    )
 
     logger.info(f"FSDP2 setup complete (cpu_offload={cpu_offload})")
     return model
@@ -132,14 +101,12 @@ def setup_ddp(model: PreTrainedModel, is_compiled: bool = False) -> PreTrainedMo
 
     logger.info("Setting up DDP...")
 
-    local_rank = get_rank()
-
     model = DDP(
         model,
-        device_ids=[local_rank],
+        device_ids=[get_rank()],
         broadcast_buffers=False,
         gradient_as_bucket_view=True,
-        static_graph=is_compiled,  # Only use static graph if model is compiled
+        static_graph=is_compiled,  # only use static graph if model is compiled
         find_unused_parameters=False,
     )
 

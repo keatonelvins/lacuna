@@ -16,7 +16,7 @@ class ModelConfig(BaseModel):
         "FA3",
         description="Attention implementation (use FA3/SDPA, eager is just for baseline)",
     )
-    accum_fp32: bool = Field(True, description="Use fp32 accumulation for gradients")
+    accum_fp32: bool = Field(True, description="Use fp32 accumulation for cross entropy loss")
     liger: bool = Field(False, description="Enable Liger kernels")
     cce: bool = Field(False, description="Enable Cut Cross Entropy patch")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
@@ -82,11 +82,11 @@ class SFTDataConfig(DataConfig):
 
 
 class DistributedConfig(BaseModel):
-    """Distributed training configuration"""
+    """Distributed training config"""
 
-    backend: Literal["fsdp", "ddp", "none"] = Field(
-        "none",
-        description="FSDP for large models, DDP for small models, none to disable",
+    backend: Literal["FSDP", "DDP", "NONE"] = Field(
+        "NONE",
+        description="FSDP for large models, DDP for small models, NONE to disable",
     )
     cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
 
@@ -98,7 +98,7 @@ class TorchrunConfig(BaseModel):
     nnodes: int = Field(1, ge=1, description="Number of nodes")
     master_addr: str = Field("localhost", description="Master node address")
     master_port: str = Field("29500", description="Master node port")
-    node_rank: int | None = Field(None, ge=0, description="Node rank for multi-node training")
+    node_rank: int = Field(None, ge=0, description="Node rank for multi-node training")
 
 
 class TrainerConfig(BaseModel):
@@ -117,14 +117,14 @@ class WandbConfig(BaseModel):
     """Weights and Biases logging config"""
 
     enabled: bool = Field(False, description="Enable wandb logging")
-    project: str = Field("lacuna", description="Wandb project name")
+    project: str = Field(None, description="wandb project name")
     name: str = Field(None, description="Run name")
-    entity: str = Field(None, description="Wandb entity (team/user)")
+    entity: str = Field(None, description="wandb entity (team/user)")
     offline: bool = Field(False, description="Run wandb in offline mode")
 
 
 class ActivationCheckpointConfig(BaseModel):
-    """Activation checkpointing configuration"""
+    """Activation checkpointing config"""
 
     mode: Literal["none", "full", "partial"] = Field("none", description="Activation checkpointing mode")
     stride: int = Field(2, ge=1, description="If partial, checkpoint every nth layer")
@@ -133,15 +133,14 @@ class ActivationCheckpointConfig(BaseModel):
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
-    save_every: int = Field(1000, gt=0, description="Steps between checkpoint saves")
-    keep_latest: int = Field(3, gt=0, description="Number of recent checkpoints to keep")
+    save_every: int = Field(None, description="Steps between checkpoint saves (default no checkpointing)")
     save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
-    resume_path: Optional[Path] = Field(None, description="Path to checkpoint to resume from")
-    resumable_final_save: bool = Field(False, description=("Make the final save resumable by storing optimizer state"))
+    resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
+    resumable_final_save: bool = Field(False, description="Make the final save resumable by storing optimizer state")
 
     def prepare_save_dir(self) -> None:
         """Clear save_dir if not resuming from checkpoint."""
-        if not self.resume_path and self.save_dir.exists():
+        if not self.resume_from and self.save_dir.exists():
             shutil.rmtree(self.save_dir, ignore_errors=True)
 
 
@@ -203,5 +202,7 @@ class SFTConfig(LacunaConfig):
     def validate_attention_backend(self):
         """Validate that attention backend is compatible with data configuration."""
         if self.data.packing and self.model.attention == "SDPA":
-            raise ValueError("SDPA backend is currently not supported for SFT w/ packing. Please use FA3 instead: --model.attention FA3")
+            raise ValueError(
+                "SDPA backend is currently not supported for SFT w/ packing. Please use FA3 instead: --model.attention FA3"
+            )
         return self

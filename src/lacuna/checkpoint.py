@@ -1,6 +1,5 @@
 """Distributed checkpoint saving and loading."""
 
-import shutil
 from typing import Any
 from loguru import logger
 from pathlib import Path
@@ -19,7 +18,6 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
     get_state_dict,
     set_state_dict,
-    StateDictOptions,
 )
 from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
@@ -33,13 +31,14 @@ from .utils import save_state_json, save_settings_json, load_state_json
 SAFETENSOR = SerializationFormat.SAFETENSORS
 
 
+# ref: https://docs.pytorch.org/tutorials/recipes/distributed_async_checkpoint_recipe.html
 class TrainerState(Stateful):
     def __init__(
         self,
         model: torch.nn.Module,
         optimizer: Optimizer,
         scheduler: LRScheduler,
-        dataloader: StatefulDataLoader | None = None,
+        dataloader: StatefulDataLoader,
     ):
         self.model = model
         self.optimizer = optimizer
@@ -47,15 +46,13 @@ class TrainerState(Stateful):
         self.dataloader = dataloader
 
     def state_dict(self) -> dict[str, Any]:
-        model_state_dict, optimizer_state_dict = get_state_dict(self.model, self.optimizer, options=StateDictOptions(cpu_offload=True))
-        scheduler_state_dict = self.scheduler.state_dict()
+        model_state_dict, optimizer_state_dict = get_state_dict(self.model, self.optimizer)
         state_dict = {
             "model": model_state_dict,
             "optimizer": optimizer_state_dict,
-            "scheduler": scheduler_state_dict,
+            "scheduler": self.scheduler.state_dict(),
+            "dataloader": self.dataloader.state_dict(),
         }
-        if self.dataloader is not None:
-            state_dict["dataloader"] = self.dataloader.state_dict()
         return state_dict
 
     def load_state_dict(self, state_dict: dict[str, Any]):
@@ -66,23 +63,22 @@ class TrainerState(Stateful):
             optim_state_dict=state_dict["optimizer"],
         )
         self.scheduler.load_state_dict(state_dict["scheduler"])
-        if self.dataloader is not None:
-            assert "dataloader" in state_dict
-            self.dataloader.load_state_dict(state_dict["dataloader"])
+        self.dataloader.load_state_dict(state_dict["dataloader"])
 
 
 def save_checkpoint(
-    path: Path,
     state: StateTracker,
+    config: LacunaConfig,
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     dataloader: StatefulDataLoader,
-    config: LacunaConfig,
     tokenizer: PreTrainedTokenizerBase,
     final: bool = False,
 ) -> None:
     """Save DCP shards or final HF sharded weights."""
+    ckpt_name = "final" if final else f"step_{state.step}"
+    path = config.checkpoint.save_dir / ckpt_name
     if is_master():
         path.mkdir(parents=True, exist_ok=True)
 
@@ -125,22 +121,3 @@ def load_checkpoint(
     )
     logger.info(f"Loaded DCP checkpoint from {path}")
     return load_state_json(path)
-
-
-def cleanup_old_checkpoints(save_dir: Path, keep_latest: int) -> None:
-    if not is_master():
-        return
-
-    if not save_dir.exists():
-        return
-
-    checkpoint_dirs = [d for d in save_dir.glob("step_*") if d.is_dir()]
-
-    if len(checkpoint_dirs) <= keep_latest:
-        return
-
-    checkpoint_dirs.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-
-    for old_checkpoint in checkpoint_dirs[keep_latest:]:
-        shutil.rmtree(old_checkpoint)
-        logger.info(f"Removed old checkpoint directory: {old_checkpoint}")
