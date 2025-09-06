@@ -48,3 +48,24 @@ def load_state_json(path: Path) -> StateTracker:
         with ts_path.open("r") as f:
             return StateTracker(**json.load(f))
     return StateTracker()
+
+
+def log_training_metrics(
+    step: int,
+    loss: float,
+    grad_norm: float,
+    lr: float,
+    metrics: dict[str, float],
+) -> None:
+    """Log training metrics in a colorful format."""
+    log_parts = [
+        f"\033[91mStep {step:>6}\033[0m",
+        f"\033[92mLoss: {loss:7.4f}\033[0m",
+        f"\033[93mGrad: {grad_norm:8.4f}\033[0m",
+        f"\033[94mLR: {lr:9.2e}\033[0m",
+        f"\033[36mMem: {metrics.get('max_reserved_gb', 0.0):5.1f}GB ({metrics.get('max_reserved_pct', 0.0):3.0f}%)\033[0m",
+        f"\033[92mMFU: {metrics.get('mfu_pct', 0.0):5.1f}%\033[0m",
+        f"\033[33mData: {metrics.get('data_pct', 0.0):5.1f}%\033[0m",
+    ]
+
+    logger.info(" | ".join(log_parts))

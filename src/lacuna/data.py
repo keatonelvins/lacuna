@@ -55,7 +55,7 @@ class PretrainDataset(IterableDataset, Stateful):
         self._token_buffer = []
 
     def _encode(self, examples):
-        return self.tokenizer(examples, add_special_tokens=False, truncation=False, padding=False)
+        return self.tokenizer(examples["text"], add_special_tokens=False, truncation=False, padding=False)
 
     def __iter__(self):
         for sample in self._data:

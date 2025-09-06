@@ -21,11 +21,11 @@ from .config import (
 )
 from .data import setup_dataloader
 from .distributed import get_world_size, init_distributed, setup_distributed
-from .metrics import MFUTracker, MemoryTracker, StateTracker
+from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
-from .utils import setup_logger, display_config
-from .wandb import init_wandb, log_metrics, finish
+from .utils import setup_logger, display_config, log_training_metrics
+from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 
 
 @logger.catch(reraise=True)
@@ -43,14 +43,13 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
 
     world_size = get_world_size()
-    batch_size = config.trainer.batch_size
 
-    if not batch_size % world_size == 0:
-        raise ValueError(f"Batch size {batch_size} must be divisible by world_size {world_size}")
+    if not config.trainer.batch_size % world_size == 0:
+        raise ValueError(f"Batch size {config.trainer.batch_size} must be divisible by world_size {world_size}")
 
-    micro_batch_size = batch_size // world_size
+    micro_batch_size = config.trainer.batch_size // world_size
 
-    logger.info(f"GPU setup: {world_size} GPUs, batch_size={batch_size} ({micro_batch_size} per GPU)")
+    logger.info(f"GPU setup: {world_size} GPUs, batch_size={config.trainer.batch_size} ({micro_batch_size} per GPU)")
 
     logger.info("Setting up model")
     model = setup_model(config)
@@ -65,15 +64,13 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     if isinstance(config, PretrainConfig):
         max_steps = config.trainer.steps
     else:  # SFTConfig
-        max_steps = len(dataloader) * config.trainer.epochs
+        raise ValueError("SFTConfig is not supported")
 
-    state = StateTracker()
-    mfu_tracker = MFUTracker(
+    redline = Redline(
         model=model,
         seq_len=config.data.seq_len,
         world_size=world_size,
     )
-    memory_tracker = MemoryTracker()
 
     if isinstance(config.scheduler, CosineSchedulerConfig):
         scheduler = get_cosine_with_min_lr_schedule_with_warmup(
@@ -98,7 +95,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     if config.checkpoint.resume_from is not None:
         logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
-        state = load_checkpoint(
+        redline.state = load_checkpoint(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
@@ -108,13 +105,9 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     logger.info(f"Starting training: {max_steps} steps")
 
-    # Track data loading times and start time
-    data_loading_times = []
-    start_time = time.perf_counter()
-
     try:
         dataloader_iter = iter(dataloader)
-        start_step = state.step
+        start_step = redline.state.step
 
         for step in range(start_step, max_steps):
             accumulated_loss = 0.0
@@ -123,7 +116,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             # Track data loading time
             data_load_start = time.perf_counter()
             batch = next(dataloader_iter)
-            data_loading_times.append(time.perf_counter() - data_load_start)
+            data_load_time = time.perf_counter() - data_load_start
 
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
                 torch.compiler.cudagraph_mark_step_begin()
@@ -142,102 +135,51 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             optimizer.step()
             scheduler.step()
 
-            step_tokens = batch_size * config.data.seq_len
-            state.total_tokens += step_tokens
-
-            mfu_tracker.update(step_tokens)
+            step_tokens = config.trainer.batch_size * config.data.seq_len
+            redline.update(step_tokens, data_load_time)
 
             if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
+                metrics = redline.read()
 
-                mfu_metrics = mfu_tracker.get_metrics()
-                memory_stats = memory_tracker.get_memory_stats()
-
-                if data_loading_times:
-                    total_time = time.perf_counter() - start_time
-                    data_pct = 100 * sum(data_loading_times) / max(total_time, 0.001)
-                else:
-                    data_pct = 0
-
-                if "mfu_pct" in mfu_metrics:
-                    state.peak_mfu = max(state.peak_mfu, mfu_metrics["mfu_pct"])
-                    state.peak_tflops = max(state.peak_tflops, mfu_metrics["tflops"])
-
-                state.peak_mem_gb = max(state.peak_mem_gb, memory_stats["max_reserved_gb"])
-
-                log_parts = [
-                    f"\033[91mStep {step:>6}\033[0m",
-                    f"\033[92mLoss: {accumulated_loss:7.4f}\033[0m",
-                    f"\033[93mGrad: {grad_norm:8.4f}\033[0m",
-                    f"\033[94mLR: {current_lr:9.2e}\033[0m",
-                    f"\033[36mMem: {memory_stats['max_reserved_gb']:5.1f}GB ({memory_stats['max_reserved_pct']:3.0f}%)\033[0m",
-                ]
-
-                if "mfu_pct" in mfu_metrics:
-                    log_parts.append(f"\033[92mMFU: {mfu_metrics['mfu_pct']:5.1f}%\033[0m")
-
-                log_parts.append(f"\033[33mData: {data_pct:5.1f}%\033[0m")
-
-                logger.info(" | ".join(log_parts))
+                log_training_metrics(step, accumulated_loss, grad_norm, current_lr, metrics)
 
                 if wandb_run:
-                    wandb_metrics = {
-                        "train/loss": accumulated_loss,
-                        "train/grad_norm": grad_norm,
-                        "train/lr": current_lr,
-                        "train/total_tokens": state.total_tokens,
-                        "perf/data_loading_pct": data_pct,
-                        "memory/max_reserved_gb": memory_stats["max_reserved_gb"],
-                        "memory/max_reserved_pct": memory_stats["max_reserved_pct"],
-                    }
-
-                    if "tps" in mfu_metrics:
-                        wandb_metrics.update(
-                            {
-                                "perf/tps": mfu_metrics["tps"],
-                                "perf/tflops": mfu_metrics["tflops"],
-                                "perf/mfu_pct": mfu_metrics["mfu_pct"],
-                                "perf/peak_mfu_pct": state.peak_mfu,
-                                "perf/peak_tflops": state.peak_tflops,
-                            }
-                        )
-
+                    wandb_metrics = prepare_wandb_metrics(accumulated_loss, grad_norm, current_lr, metrics, redline.state)
                     log_metrics(wandb_metrics, step, wandb_run)
 
-                memory_tracker.reset_peak_stats()
-                data_loading_times.clear()
+                redline.clear_data_times()
 
             if step > 0 and step % config.checkpoint.save_every == 0:
                 logger.info(
-                    f"Saving checkpoint at step {step} (peak MFU: {state.peak_mfu:.1f}%, peak memory: {state.peak_mem_gb:.1f}GB)"
+                    f"Saving checkpoint at step {step} (peak MFU: {redline.state.peak_mfu:.1f}%, peak memory: {redline.state.peak_mem_gb:.1f}GB)"
                 )
                 save_checkpoint(
                     model=model,
                     optimizer=optimizer,
                     scheduler=scheduler,
-                    state=state,
+                    state=redline.state,
                     config=config,
                     dataloader=dataloader,
                     final=False,
                     tokenizer=tokenizer,
                 )
 
-            state.step += 1
-
     except KeyboardInterrupt:
         logger.info("Training interrupted!!!")
 
     finally:
-        logger.info("Saving final checkpoint")
-        save_checkpoint(
-            model=model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            config=config,
-            state=state,
-            dataloader=dataloader,
-            tokenizer=tokenizer,
-            final=True,  # Final checkpoint in HF format
-        )
+        if redline.state.step > start_step:  # don't save if training insta-crashed
+            logger.info("Saving final checkpoint")
+            save_checkpoint(
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                config=config,
+                state=redline.state,
+                dataloader=dataloader,
+                tokenizer=tokenizer,
+                final=True,  # Final checkpoint in HF format
+            )
 
         finish(wandb_run)

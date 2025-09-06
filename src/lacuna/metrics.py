@@ -1,6 +1,7 @@
 """MFU, memory, and throughput tracking."""
 
 import time
+from collections import deque
 import torch
 from loguru import logger
 from pydantic import BaseModel
@@ -44,127 +45,128 @@ def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, in
     return int(num_params), int(flops_per_token)
 
 
-class MFUTracker:
-    """Track MFU with rolling window."""
+class Redline:
+    """GPU performance metrics tracker."""
 
     def __init__(
         self,
         model: torch.nn.Module,
         seq_len: int,
         world_size: int = 1,
-        window_size: int = 10,
+        window_sec: float = 30.0,
+        device: torch.device | None = None,
     ):
         self.seq_len = seq_len
         self.world_size = world_size
-        self.window_size = window_size
+        self.window_sec = window_sec
+        self.device = device or torch.device("cuda", torch.cuda.current_device())
 
-        self.tokens = []
-        self.times = []
+        self._tokens: deque[tuple[float, int]] = deque()
+        self._steps: deque[tuple[float, float]] = deque()  # (timestamp, step_time)
+        self._data_load_times: deque[tuple[float, float]] = deque()  # (timestamp, load_time)
 
-        self.device_name = torch.cuda.get_device_name(torch.device("cuda"))
+        self.device_name = torch.cuda.get_device_name(self.device)
         self.gpu_peak_flops = get_peak_flops(self.device_name)
-
         self.num_params, self.flops_per_token = calculate_model_flops(model, seq_len)
 
-    def update(self, tokens: int) -> None:
-        """Update tracker with new token count."""
-        self.tokens.append(tokens)
-        self.times.append(time.perf_counter())
-
-        if len(self.tokens) > self.window_size:
-            self.tokens.pop(0)
-            self.times.pop(0)
-
-    def get_tokens_per_second(self) -> float | None:
-        """Get tokens per second throughput."""
-        if len(self.tokens) < 2:
-            return None
-
-        total_tokens = sum(self.tokens[1:])
-        time_delta = self.times[-1] - self.times[0]
-
-        if time_delta <= 0:
-            return None
-
-        # Tokens per second per device
-        return total_tokens / time_delta / self.world_size
-
-    def get_mfu(self) -> float | None:
-        """Get Model FLOPs Utilization percentage."""
-        tps = self.get_tokens_per_second()
-        if tps is None:
-            return None
-
-        actual_flops = self.flops_per_token * tps
-        return 100 * actual_flops / self.gpu_peak_flops
-
-    def get_tflops(self) -> float | None:
-        """Get actual TFLOPS being achieved."""
-        tps = self.get_tokens_per_second()
-        if tps is None:
-            return None
-
-        return self.flops_per_token * tps / 1e12
-
-    def get_metrics(self) -> dict[str, float]:
-        """Get all metrics as a dict."""
-        metrics = {}
-
-        tps = self.get_tokens_per_second()
-        if tps is not None:
-            metrics["tps"] = tps
-            metrics["tflops"] = self.get_tflops()
-            metrics["mfu_pct"] = self.get_mfu()
-
-        return metrics
-
-
-class MemoryTracker:
-    """Track GPU memory usage."""
-
-    def __init__(self, device: torch.device | None = None):
-        self.device = device or torch.device("cuda")
         self.device_props = torch.cuda.get_device_properties(self.device)
         self.total_memory = self.device_props.total_memory
 
-        # Reset stats on init
-        self.reset_peak_stats()
-        torch.cuda.empty_cache()
+        self._last_time: float | None = None
+        self._start_time = time.perf_counter()
 
-    def _calc_gb_and_pct(self, name: str, value: int) -> tuple[float, float]:
-        """Calculate memory stats in GB and percent of total."""
+        self.state = StateTracker()
+
+    def update(self, tokens: int, data_load_time: float | None = None) -> None:
+        """Update tracker with tokens processed."""
+        now = time.perf_counter()
+        self._tokens.append((now, tokens))
+
+        self.state.total_tokens += tokens
+        self.state.step += 1
+
+        if self._last_time is not None:
+            step_time = now - self._last_time
+            self._steps.append((now, step_time))
+        self._last_time = now
+
+        if data_load_time is not None:
+            self._data_load_times.append((now, data_load_time))
+
+        self._shed(now)
+
+    def read(self) -> dict[str, float]:
+        """Get all metrics as a dict."""
+        now = time.perf_counter()
+        self._shed(now)
+
+        metrics = {}
+
+        tps = self._get_tps(now)
+        if tps is not None:
+            metrics["tps"] = tps
+
+            actual_flops = self.flops_per_token * tps
+            metrics["mfu_pct"] = 100 * actual_flops / self.gpu_peak_flops
+            metrics["tflops"] = actual_flops / 1e12
+
+            self.state.peak_mfu = max(self.state.peak_mfu, metrics["mfu_pct"])
+            self.state.peak_tflops = max(self.state.peak_tflops, metrics["tflops"])
+
+        if self._steps:
+            avg_step_time = sum(t for _, t in self._steps) / len(self._steps)
+            metrics["latency_ms"] = avg_step_time * 1000
+            metrics["steps_per_s"] = 1.0 / avg_step_time if avg_step_time > 0 else 0.0
+
+        if self._data_load_times:
+            total_data_time = sum(t for _, t in self._data_load_times)
+            total_time = now - self._start_time
+            metrics["data_pct"] = 100 * total_data_time / max(total_time, 0.001)
+        else:
+            metrics["data_pct"] = 0.0
+
+        metrics.update(self._get_memory())
+
+        self.state.peak_mem_gb = max(self.state.peak_mem_gb, metrics.get("max_reserved_gb", 0.0))
+
+        return metrics
+
+    def clear_data_times(self) -> None:
+        """Clear data loading times after logging."""
+        self._data_load_times.clear()
+
+    def _shed(self, now: float) -> None:
+        """Remove data outside the time window."""
+        cutoff = now - self.window_sec
+
+        while self._tokens and self._tokens[0][0] < cutoff:
+            self._tokens.popleft()
+        while self._steps and self._steps[0][0] < cutoff:
+            self._steps.popleft()
+        while self._data_load_times and self._data_load_times[0][0] < cutoff:
+            self._data_load_times.popleft()
+
+    def _get_tps(self, now: float) -> float | None:
+        """Calculate tokens per second per device."""
+        if len(self._tokens) < 2:
+            return None
+
+        total_tokens = sum(tokens for _, tokens in self._tokens)
+        time_span = max(1e-9, now - self._tokens[0][0])
+
+        return total_tokens / time_span / self.world_size
+
+    def _get_memory(self) -> dict[str, float]:
+        """Get memory statistics in GB and percentage."""
+        if self.device.type != "cuda" or not torch.cuda.is_available():
+            return {"max_reserved_gb": 0.0, "max_reserved_pct": 0.0}
+
         gb = 1024**3
-        return {
-            f"{name}_gb": value / gb,
-            f"{name}_pct": 100 * value / self.total_memory,
-        }
-
-    def get_memory_stats(self) -> dict[str, float]:
-        """Get current memory statistics in GB."""
-        stats = {}
-
-        allocated = torch.cuda.memory_allocated(self.device)
-        reserved = torch.cuda.memory_reserved(self.device)
-        max_allocated = torch.cuda.max_memory_allocated(self.device)
         max_reserved = torch.cuda.max_memory_reserved(self.device)
+        max_reserved_gb = max_reserved / gb
+        max_reserved_pct = 100 * max_reserved / self.total_memory if self.total_memory > 0 else 0.0
 
-        # Calculate alloc/reserved amount and percentages
-        stats.update(self._calc_gb_and_pct("allocated", allocated))
-        stats.update(self._calc_gb_and_pct("reserved", reserved))
-        stats.update(self._calc_gb_and_pct("max_allocated", max_allocated))
-        stats.update(self._calc_gb_and_pct("max_reserved", max_reserved))
-
-        # Check for memory allocation issues
-        memory_info = torch.cuda.memory_stats(self.device)
-        stats["num_alloc_retries"] = memory_info.get("num_alloc_retries", 0)
-        stats["num_ooms"] = memory_info.get("num_ooms", 0)
-
-        # Warn about memory pressure
-        if stats["num_alloc_retries"] > 0:
-            logger.warning(f"GPU memory allocation retries detected: {stats['num_alloc_retries']}")
-
-        return stats
-
-    def reset_peak_stats(self) -> None:
-        """Reset peak memory statistics."""
-        torch.cuda.reset_peak_memory_stats(self.device)
+        return {
+            "max_reserved_gb": max_reserved_gb,
+            "max_reserved_pct": max_reserved_pct,
+        }

@@ -109,7 +109,7 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
 
 def apply_sdpa_kernel(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Patch model.forward with SDPA kernel if using SDPA."""
-    if config.model.attention == "SDPA":
+    if config.attention == "SDPA":
         backends = [SDPBackend.FLASH_ATTENTION]
         capability = torch.cuda.get_device_capability()
         if capability[0] >= 9:  # H100 is 9.0, H200/B200 are 9.0+
