@@ -86,10 +86,10 @@ def sft():
     train(config)
 
 
-def bloat_check():
+def count_lines():
     """Check the total repo line count."""
     result = subprocess.run(
-        "git ls-files | grep -v '^uv\\.lock$' | xargs cat | wc -l",
+        "git ls-files '*.py' | xargs cat | wc -l",
         shell=True,
         check=True,
         stdout=subprocess.PIPE,

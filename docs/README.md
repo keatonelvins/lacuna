@@ -5,7 +5,7 @@ My goal for `lacuna` is to boil down `torchtitan` into a more hf-friendly, minim
 - no modeling code (for now), can lean on community kernels from kernel hub, liger, cce
 - also support SFT w/ assistant-only loss and sample packing
 
-Personal goal: `uv run bloat_check` should return < 5k lines (currently clocking in ~2.5k)
+Personal goal: `uv run count_lines` should return < 5k lines (currently clocking in ~1.5k)
 
 ## Order of model builder
 Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP

@@ -21,7 +21,7 @@ dependencies = [
 [project.scripts]
 pt = "lacuna.cli:pretrain"
 sft = "lacuna.cli:sft"
-bloat_check = "lacuna.cli:bloat_check"
+count_lines = "lacuna.cli:count_lines"
 
 [dependency-groups]
 dev = [
