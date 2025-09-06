@@ -150,7 +150,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
                 redline.clear_data_times()
 
-            if step > 0 and step % config.checkpoint.save_every == 0:
+            if step > 0 and config.checkpoint.save_every and step % config.checkpoint.save_every == 0:
                 logger.info(
                     f"Saving checkpoint at step {step} (peak MFU: {redline.state.peak_mfu:.1f}%, peak memory: {redline.state.peak_mem_gb:.1f}GB)"
                 )
