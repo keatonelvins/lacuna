@@ -18,7 +18,7 @@ from .distributed import get_rank, get_world_size
 def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset:
     """Get single IterableDataset from merged hf datasets."""
     loader = partial(load_dataset, split=config.data.split, streaming=config.data.stream)
-    datasets = [loader(name) for name in config.data.dataset_names]
+    datasets = [loader(name) for name in config.data.datasets]
 
     if not config.data.stream:
         datasets = [dataset.to_iterable_dataset(num_shards=get_world_size()) for dataset in datasets]
@@ -42,7 +42,7 @@ class PretrainDataset(IterableDataset, Stateful):
         self.config = config
         self.tokenizer = tokenizer
 
-        logger.info(f"Loading datasets: {config.data.dataset_names}")
+        logger.info(f"Loading datasets: {config.data.datasets}")
         dataset = _get_iterable_dataset(config)
         self._data = split_dataset_by_node(dataset, get_rank(), get_world_size())
         self._data = self._data.map(self._encode, batched=True, batch_size=1000)
