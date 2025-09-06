@@ -18,6 +18,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
     get_state_dict,
     set_state_dict,
+    StateDictOptions,
 )
 from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
@@ -46,7 +47,9 @@ class TrainerState(Stateful):
         self.dataloader = dataloader
 
     def state_dict(self) -> dict[str, Any]:
-        model_state_dict, optimizer_state_dict = get_state_dict(self.model, self.optimizer)
+        model_state_dict, optimizer_state_dict = get_state_dict(
+            self.model, self.optimizer, options=StateDictOptions(cpu_offload=True)
+        )
         state_dict = {
             "model": model_state_dict,
             "optimizer": optimizer_state_dict,

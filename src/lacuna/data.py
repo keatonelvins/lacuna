@@ -23,7 +23,7 @@ def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset
     if not config.data.stream:
         datasets = [dataset.to_iterable_dataset(num_shards=get_world_size()) for dataset in datasets]
 
-    dataset = interleave_datasets(datasets)
+    dataset = interleave_datasets(datasets, stopping_strategy="all_exhausted", probabilities=config.data.sampling_probs)
 
     if dataset.num_shards != get_world_size():
         logger.warning(f"Dataset has {dataset.num_shards} shards, but world size is {get_world_size()}")

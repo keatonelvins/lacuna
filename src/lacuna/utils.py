@@ -32,7 +32,7 @@ def save_state_json(path: Path, state: StateTracker) -> None:
         return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "state.json").open("w") as f:
-        json.dumps(asdict(state), f, indent=4)
+        f.write(json.dumps(asdict(state), indent=4))
 
 
 def save_settings_json(path: Path, config: LacunaConfig) -> None:

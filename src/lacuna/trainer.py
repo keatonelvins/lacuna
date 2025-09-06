@@ -110,7 +110,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         start_step = redline.state.step
 
         for step in range(start_step, max_steps):
-            accumulated_loss = 0.0
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
@@ -128,7 +127,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 loss = outputs.loss
 
             loss.backward()
-            accumulated_loss += loss.item()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
             optimizer.step()
@@ -141,16 +139,14 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 current_lr = scheduler.get_last_lr()[0]
                 metrics = redline.read()
 
-                log_training_metrics(step, accumulated_loss, grad_norm, current_lr, metrics)
+                log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics)
 
                 if wandb_run:
-                    wandb_metrics = prepare_wandb_metrics(accumulated_loss, grad_norm, current_lr, metrics, redline.state)
+                    wandb_metrics = prepare_wandb_metrics(loss.item(), grad_norm, current_lr, metrics, redline.state)
                     log_metrics(wandb_metrics, step, wandb_run)
 
             if step > 0 and config.checkpoint.save_every and step % config.checkpoint.save_every == 0:
-                logger.info(
-                    f"Saving checkpoint at step {step} (peak MFU: {redline.state.peak_mfu:.1f}%, peak memory: {redline.state.peak_mem_gb:.1f}GB)"
-                )
+                logger.info(f"Saving checkpoint at step {step}")
                 save_checkpoint(
                     model=model,
                     optimizer=optimizer,
@@ -176,7 +172,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 state=redline.state,
                 dataloader=dataloader,
                 tokenizer=tokenizer,
-                final=True,  # Final checkpoint in HF format
+                final=True,
             )
 
         finish(wandb_run)

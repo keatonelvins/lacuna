@@ -66,6 +66,7 @@ class DataConfig(BaseModel):
     seq_len: int = Field(512, ge=1, description="Sequence length")
     stream: bool = Field(False, description="Stream in the datasets")
     num_workers: int = Field(1, ge=0, description="Number of workers for data loading")
+    sampling_probs: list[float] = Field(default=None, description="Sampling probabilities for each dataset")
 
 
 class PretrainDataConfig(DataConfig):
