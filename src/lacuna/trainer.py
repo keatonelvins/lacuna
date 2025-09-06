@@ -177,8 +177,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 if "mfu_pct" in mfu_metrics:
                     log_parts.append(f"\033[92mMFU: {mfu_metrics['mfu_pct']:5.1f}%\033[0m")
 
-                if data_pct > 5:  # Only show if > 5% of wall-clock time
-                    log_parts.append(f"\033[33mData: {data_pct:5.1f}%\033[0m")
+                log_parts.append(f"\033[33mData: {data_pct:5.1f}%\033[0m")
 
                 logger.info(" | ".join(log_parts))
 

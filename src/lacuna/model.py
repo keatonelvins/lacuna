@@ -136,7 +136,6 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
 
     torch._dynamo.config.cache_size_limit = 256
     torch._dynamo.config.suppress_errors = True
-    # can also try capture_scalar_outputs=True but won't help for FA3
 
     layers = model.model.layers
     for idx, layer in enumerate(layers):
