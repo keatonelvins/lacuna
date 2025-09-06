@@ -480,16 +480,16 @@ wheels = [
 
 [[package]]
 name = "kernels"
-version = "0.9.0"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "packaging" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/4e/626c2155efa978bdec45e57bf0cfd0a76682942964fdc166cab2306d56ed/kernels-0.9.0.tar.gz", hash = "sha256:42a77d824d71f76084f7dd52dcb6d8823e243088117dc5d66006779b10f43bfb", size = 42859, upload-time = "2025-08-01T14:46:29.647Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/81/79e43ff7355c479633e92df61eeadbf4ac32080c1db4dd61717fc7fc2d05/kernels-0.10.0.tar.gz", hash = "sha256:8c3acef89ac3275a3e91e6611e5131f640cefcc5d5960bf0484184ce45786a03", size = 43222, upload-time = "2025-09-05T08:54:14.441Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/60/3f9b0fba0b78bcc9ba4fa0cd3c5132402838bdb42dc69bf81fb89980d978/kernels-0.9.0-py3-none-any.whl", hash = "sha256:81705176b3488d8eb04fa2aff1a4be8dc10eeb6a4338a510e36a6b3aeeb75969", size = 37421, upload-time = "2025-08-01T14:46:28.478Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/43/69bd3f18bb3b5d17d85658222335f186f08e655fc23b18fb5f7471d777fa/kernels-0.10.0-py3-none-any.whl", hash = "sha256:8a2c7bf8e3024412df44df4bfd0720007f4e035d6be581fc25afad23b471fa7e", size = 37628, upload-time = "2025-09-05T08:54:13.043Z" },
 ]
 
 [[package]]
@@ -523,14 +523,14 @@ dev = [
 requires-dist = [
     { name = "cut-cross-entropy", extras = ["transformers"], git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git?rev=c6a32c" },
     { name = "datasets", specifier = ">=4.0.0" },
-    { name = "kernels", specifier = ">=0.9.0" },
+    { name = "kernels", specifier = ">=0.10.0" },
     { name = "liger-kernel", specifier = ">=0.6.2" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "rich", specifier = ">=14.1.0" },
     { name = "torch", specifier = ">=2.8.0", index = "https://download.pytorch.org/whl/cu128" },
     { name = "torchdata", specifier = ">=0.11.0" },
-    { name = "transformers", specifier = ">=4.56.0" },
+    { name = "transformers", specifier = ">=4.56.1" },
     { name = "wandb", specifier = ">=0.21.2" },
 ]
 
@@ -1533,7 +1533,7 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "4.56.0"
+version = "4.56.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -1547,9 +1547,9 @@ dependencies = [
     { name = "tokenizers" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e9/40/2898c1a5f8b2fff2f94dffd856d6793320e590e1cfdc3a1453c31c364094/transformers-4.56.0.tar.gz", hash = "sha256:6ca9c3f38aa4da93ebf877db7156368c1c188c7465f09dbe70951e7622e987fa", size = 9840426, upload-time = "2025-08-29T18:23:46.247Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/21/dc88ef3da1e49af07ed69386a11047a31dcf1aaf4ded3bc4b173fbf94116/transformers-4.56.1.tar.gz", hash = "sha256:0d88b1089a563996fc5f2c34502f10516cad3ea1aa89f179f522b54c8311fe74", size = 9855473, upload-time = "2025-09-04T20:47:13.14Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/41/6ba7c2eafa839069f1f949c30cd22e791b14b90c7af8cb0c65cc47702dca/transformers-4.56.0-py3-none-any.whl", hash = "sha256:bacf539c38dd850690856881c4974321af93a22f2ee96bcc994741a2121d8e71", size = 11607938, upload-time = "2025-08-29T18:23:33.92Z" },
+    { url = "https://files.pythonhosted.org/packages/71/7c/283c3dd35e00e22a7803a0b2a65251347b745474a82399be058bde1c9f15/transformers-4.56.1-py3-none-any.whl", hash = "sha256:1697af6addfb6ddbce9618b763f4b52d5a756f6da4899ffd1b4febf58b779248", size = 11608197, upload-time = "2025-09-04T20:47:04.895Z" },
 ]
 
 [[package]]

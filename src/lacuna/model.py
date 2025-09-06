@@ -10,7 +10,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from transformers import PreTrainedModel, AutoModelForCausalLM
-from kernels import kernelize
+from kernels import kernelize, Mode
 from cut_cross_entropy.transformers import cce_patch
 from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from loguru import logger
@@ -154,6 +154,10 @@ def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedMo
     if not config.kernelize:
         return model
 
-    model = kernelize(model)
+    mode = Mode.TRAINING
+    if config.compile_mode:
+        mode |= Mode.TORCH_COMPILE
+
+    model = kernelize(model, mode=mode)
 
     return model
