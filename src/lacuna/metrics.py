@@ -4,10 +4,11 @@ import time
 from collections import deque
 import torch
 from loguru import logger
-from pydantic import BaseModel
+from dataclasses import dataclass
 
 
-class StateTracker(BaseModel):
+@dataclass
+class StateTracker:
     step: int = 0
     total_tokens: int = 0
     peak_mfu: float = 0.0
@@ -53,118 +54,88 @@ class Redline:
         model: torch.nn.Module,
         seq_len: int,
         world_size: int = 1,
-        window_sec: float = 30.0,
-        device: torch.device | None = None,
+        window_steps: int = 100,
     ):
         self.seq_len = seq_len
         self.world_size = world_size
-        self.window_sec = window_sec
-        self.device = device or torch.device("cuda", torch.cuda.current_device())
+        self.window_steps = window_steps
+        self.device = torch.device("cuda", torch.cuda.current_device())
 
-        self._tokens: deque[tuple[float, int]] = deque()
-        self._steps: deque[tuple[float, float]] = deque()  # (timestamp, step_time)
-        self._data_load_times: deque[tuple[float, float]] = deque()  # (timestamp, load_time)
+        self._tokens: deque[int] = deque(maxlen=window_steps)
+        self._step_times: deque[float] = deque(maxlen=window_steps)
+        self._data_load_times: deque[float] = deque(maxlen=window_steps)
 
-        self.device_name = torch.cuda.get_device_name(self.device)
-        self.gpu_peak_flops = get_peak_flops(self.device_name)
+        self.gpu_peak_flops = get_peak_flops(torch.cuda.get_device_name(self.device))
         self.num_params, self.flops_per_token = calculate_model_flops(model, seq_len)
 
         self.device_props = torch.cuda.get_device_properties(self.device)
         self.total_memory = self.device_props.total_memory
 
         self._last_time: float | None = None
-        self._start_time = time.perf_counter()
 
         self.state = StateTracker()
 
-    def update(self, tokens: int, data_load_time: float | None = None) -> None:
+    def update(self, tokens: int, data_load_time: float) -> None:
         """Update tracker with tokens processed."""
         now = time.perf_counter()
-        self._tokens.append((now, tokens))
+        self._tokens.append(tokens)
+        self._data_load_times.append(data_load_time)
 
         self.state.total_tokens += tokens
         self.state.step += 1
 
         if self._last_time is not None:
             step_time = now - self._last_time
-            self._steps.append((now, step_time))
+            self._step_times.append(step_time)
         self._last_time = now
-
-        if data_load_time is not None:
-            self._data_load_times.append((now, data_load_time))
-
-        self._shed(now)
 
     def read(self) -> dict[str, float]:
         """Get all metrics as a dict."""
-        now = time.perf_counter()
-        self._shed(now)
+        if not self._step_times:
+            return {}
 
         metrics = {}
 
-        tps = self._get_tps(now)
-        if tps is not None:
-            metrics["tps"] = tps
+        total_step_time = sum(self._step_times)
+        total_data_time = sum(self._data_load_times)
 
-            actual_flops = self.flops_per_token * tps
-            metrics["mfu_pct"] = 100 * actual_flops / self.gpu_peak_flops
-            metrics["tflops"] = actual_flops / 1e12
+        tps = self._get_tps()
+        metrics["tps"] = tps
 
-            self.state.peak_mfu = max(self.state.peak_mfu, metrics["mfu_pct"])
-            self.state.peak_tflops = max(self.state.peak_tflops, metrics["tflops"])
+        actual_flops = self.flops_per_token * tps
+        metrics["mfu_pct"] = 100 * actual_flops / self.gpu_peak_flops
+        metrics["tflops"] = actual_flops / 1e12
 
-        if self._steps:
-            avg_step_time = sum(t for _, t in self._steps) / len(self._steps)
-            metrics["latency_ms"] = avg_step_time * 1000
-            metrics["steps_per_s"] = 1.0 / avg_step_time if avg_step_time > 0 else 0.0
+        avg_step_time = total_step_time / len(self._step_times)
+        metrics["latency_ms"] = avg_step_time * 1000
+        metrics["steps_per_s"] = 1.0 / avg_step_time
 
-        if self._data_load_times:
-            total_data_time = sum(t for _, t in self._data_load_times)
-            total_time = now - self._start_time
-            metrics["data_pct"] = 100 * total_data_time / max(total_time, 0.001)
-        else:
-            metrics["data_pct"] = 0.0
+        metrics["data_pct"] = 100 * total_data_time / total_step_time
 
         metrics.update(self._get_memory())
 
+        self.state.peak_mfu = max(self.state.peak_mfu, metrics["mfu_pct"])
+        self.state.peak_tflops = max(self.state.peak_tflops, metrics["tflops"])
         self.state.peak_mem_gb = max(self.state.peak_mem_gb, metrics.get("max_reserved_gb", 0.0))
 
         return metrics
 
-    def clear_data_times(self) -> None:
-        """Clear data loading times after logging."""
-        self._data_load_times.clear()
-
-    def _shed(self, now: float) -> None:
-        """Remove data outside the time window."""
-        cutoff = now - self.window_sec
-
-        while self._tokens and self._tokens[0][0] < cutoff:
-            self._tokens.popleft()
-        while self._steps and self._steps[0][0] < cutoff:
-            self._steps.popleft()
-        while self._data_load_times and self._data_load_times[0][0] < cutoff:
-            self._data_load_times.popleft()
-
-    def _get_tps(self, now: float) -> float | None:
+    def _get_tps(self) -> float:
         """Calculate tokens per second per device."""
-        if len(self._tokens) < 2:
-            return None
+        if not self._step_times:
+            return 0.0
 
-        total_tokens = sum(tokens for _, tokens in self._tokens)
-        time_span = max(1e-9, now - self._tokens[0][0])
+        total_tokens = sum(self._tokens)
+        total_time = sum(self._step_times)
 
-        return total_tokens / time_span / self.world_size
+        return total_tokens / total_time / self.world_size
 
     def _get_memory(self) -> dict[str, float]:
         """Get memory statistics in GB and percentage."""
-        if self.device.type != "cuda" or not torch.cuda.is_available():
-            return {"max_reserved_gb": 0.0, "max_reserved_pct": 0.0}
-
         gb = 1024**3
         max_reserved = torch.cuda.max_memory_reserved(self.device)
         max_reserved_gb = max_reserved / gb
-        max_reserved_pct = 100 * max_reserved / self.total_memory if self.total_memory > 0 else 0.0
+        max_reserved_pct = 100 * max_reserved / self.total_memory
 
         return {
             "max_reserved_gb": max_reserved_gb,

@@ -113,7 +113,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             accumulated_loss = 0.0
             optimizer.zero_grad()
 
-            # Track data loading time
             data_load_start = time.perf_counter()
             batch = next(dataloader_iter)
             data_load_time = time.perf_counter() - data_load_start
@@ -147,8 +146,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
                 if wandb_run:
                     wandb_metrics = prepare_wandb_metrics(accumulated_loss, grad_norm, current_lr, metrics, redline.state)
                     log_metrics(wandb_metrics, step, wandb_run)
-
-                redline.clear_data_times()
 
             if step > 0 and config.checkpoint.save_every and step % config.checkpoint.save_every == 0:
                 logger.info(

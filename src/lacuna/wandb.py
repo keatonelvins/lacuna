@@ -11,7 +11,7 @@ def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
     if not config.wandb.enabled or not is_master():
         return None
 
-    config_dict = config.model_dump()
+    config_dict = config.model_dump(mode="json")
 
     run = wandb.init(
         project=config.wandb.project,

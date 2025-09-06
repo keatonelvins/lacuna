@@ -3,6 +3,7 @@ from pathlib import Path
 from loguru import logger
 from rich.pretty import Pretty
 from rich.console import Console
+from dataclasses import asdict
 
 from .distributed import is_master
 from .config import LacunaConfig
@@ -31,7 +32,7 @@ def save_state_json(path: Path, state: StateTracker) -> None:
         return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "state.json").open("w") as f:
-        json.dump(state.model_dump(), f, indent=4)
+        json.dumps(asdict(state), f, indent=4)
 
 
 def save_settings_json(path: Path, config: LacunaConfig) -> None:
@@ -39,7 +40,7 @@ def save_settings_json(path: Path, config: LacunaConfig) -> None:
         return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "settings.json").open("w") as f:
-        json.dump(config.model_dump(mode="json"), f, indent=4)
+        f.write(config.model_dump_json(indent=4))
 
 
 def load_state_json(path: Path) -> StateTracker:
