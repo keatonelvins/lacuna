@@ -20,7 +20,7 @@ from .config import (
     SFTConfig,
 )
 from .data import setup_dataloader
-from .distributed import get_world_size, init_distributed, setup_distributed
+from .distributed import get_world_size, init_distributed, setup_distributed, is_master
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
@@ -32,9 +32,11 @@ from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
-    display_config(config)
 
     init_distributed()
+
+    if is_master():
+        display_config(config)
 
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
