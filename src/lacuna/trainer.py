@@ -163,7 +163,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
 
     finally:
         if redline.state.step > start_step:  # don't save if training insta-crashed
-            logger.info("Saving final checkpoint")
             save_checkpoint(
                 model=model,
                 optimizer=optimizer,

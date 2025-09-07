@@ -68,7 +68,7 @@ def parse_argv(config_cls: Type[T]) -> T:
 
     # Check for --torchrun flag after parsing config
     if "--torchrun" in args:
-        entry_point = "pretrain_main" if config_cls == PretrainConfig else "sft_main"
+        entry_point = "pretrain" if config_cls == PretrainConfig else "sft"
         launch_torchrun(config, entry_point)
 
     return config
@@ -98,3 +98,21 @@ def count_lines():
 
     line_count = int(result.stdout.strip())
     print(f"Total repo lines: {line_count}")
+
+def main():
+    """Torchrun entry point."""
+    if len(sys.argv) < 2:
+        print("Usage: uv run python -m lacuna.cli [pretrain|sft]")
+        sys.exit(1)
+    cmd = sys.argv[1]
+    sys.argv = [sys.argv[0]] + sys.argv[2:]
+    if cmd == "pretrain":
+        pretrain()
+    elif cmd == "sft":
+        sft()
+    else:
+        print(f"Unknown command: {cmd}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

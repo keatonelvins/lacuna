@@ -87,8 +87,10 @@ def save_checkpoint(
 
     trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
     if not final or config.checkpoint.resumable_final_save:
+        logger.info("Saving resumable checkpoint")
         writer = FileSystemWriter(str(path), serialization_format=SAFETENSOR)
     else:
+        logger.info("Saving final checkpoint in HF format")
         writer = HuggingFaceStorageWriter(path=str(path))
 
     unwrapped_model = model.module if hasattr(model, "module") else model

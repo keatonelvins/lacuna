@@ -83,9 +83,8 @@ def setup_fsdp2(
         fully_shard(
             block,
             mp_policy=mp_policy,
-            cpu_offload_policy=cpu_offload_policy,
+            offload_policy=cpu_offload_policy,
             reshard_after_forward=reshard,
-            sync_module_states=True,
         )
 
     logger.info(f"FSDP2 setup complete (cpu_offload={cpu_offload})")
