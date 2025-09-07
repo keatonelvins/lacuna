@@ -1,9 +1,11 @@
 # TODO
 
 - Distributed/Runtime
-  - DDP buckets: expose `bucket_cap_mb` for better comm/compute overlap on small models.
-  - Static graph: keep `static_graph=is_compiled`; document recommended `compile_mode` per backend.
-  - Validate `DDP(static_graph=...)` vs `torch.compile` interaction; document recommended modes per backend.
+  - Tune bucket_cap_mb for DDP base:
+      scale = (12 * cfg.hidden_size**2) / 1e8
+      bucket = 25 * (1 + scale)
+      bucket *= 1.5 if world_size > 32 else 1
+      return int(min(max(bucket, 10), 250))
   - Explore HSDP mesh (FSDP for blocks + DDP for data) and required wrapping order.
 
 - Training Loop Perf

@@ -108,6 +108,7 @@ def setup_ddp(model: PreTrainedModel, is_compiled: bool = False) -> PreTrainedMo
 
     logger.info("Setting up DDP...")
 
+    # TODO: tune bucket_cap_mb and document these settings
     model = DDP(
         model,
         device_ids=[get_rank()],
@@ -115,6 +116,7 @@ def setup_ddp(model: PreTrainedModel, is_compiled: bool = False) -> PreTrainedMo
         gradient_as_bucket_view=True,
         static_graph=is_compiled,  # only use static graph if model is compiled
         find_unused_parameters=False,
+        bucket_cap_mb=100,
     )
 
     logger.info(f"DDP setup complete (static_graph={is_compiled})")
