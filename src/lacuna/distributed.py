@@ -87,6 +87,13 @@ def setup_fsdp2(
             reshard_after_forward=reshard,
         )
 
+    model = fully_shard(
+        model,
+        mp_policy=mp_policy,
+        offload_policy=cpu_offload_policy,
+        reshard_after_forward=False,
+    )
+
     logger.info(f"FSDP2 setup complete (cpu_offload={cpu_offload})")
     return model
 

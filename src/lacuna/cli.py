@@ -99,6 +99,7 @@ def count_lines():
     line_count = int(result.stdout.strip())
     print(f"Total repo lines: {line_count}")
 
+
 def main():
     """Torchrun entry point."""
     if len(sys.argv) < 2:
@@ -113,6 +114,7 @@ def main():
     else:
         print(f"Unknown command: {cmd}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
