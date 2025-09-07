@@ -36,7 +36,6 @@
 
 - UX/Config
   - Validation: `sampling_probs` length matches `datasets`; save_dir writeable; tokenizer/model existence checks before training starts.
-  - Cleaner logs: suppress torchrun banner; keep rank0 logs only (already mostly done).
 
 - Repro/Robustness
   - Global seeding: seed Python/Torch/CUDA and DataLoader workers.

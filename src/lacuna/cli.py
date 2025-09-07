@@ -91,9 +91,8 @@ def count_lines():
     result = subprocess.run(
         "git ls-files '*.py' | xargs cat | wc -l",
         shell=True,
-        check=True,
-        stdout=subprocess.PIPE,
         text=True,
+        stdout=subprocess.PIPE,
     )
 
     line_count = int(result.stdout.strip())

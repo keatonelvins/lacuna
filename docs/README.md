@@ -1,11 +1,10 @@
 # lacuna docs
 
-My goal for `lacuna` is to boil down `torchtitan` into a more hf-friendly, minimal package:
-- can be much simpler by not supporting TP/PP/CP
-- no modeling code (for now), can lean on community kernels from kernel hub, liger, cce
-- also support SFT w/ assistant-only loss and sample packing
+Seeing smaller labs use `torchtitan` for pretraining and `axolotl` for post-training. These are awesome!
 
-Personal goal: `uv run count_lines` should return < 5k lines (currently clocking in ~1.5k)
+`lacuna` came from using these (and other frameworks) and not really understanding how they worked under the hood.
+
+I want it to be tiny and hackable: `uv run count_lines` should return <3k
 
 ## Order of model builder
 Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
