@@ -1,4 +1,4 @@
-"""Pydantic configurations for pretraining and SFT."""
+"""Pydantic configs for pretraining and SFT."""
 
 import shutil
 from pathlib import Path

@@ -59,9 +59,8 @@ class PretrainDataset(IterableDataset, Stateful):
 
     def __iter__(self):
         for sample in self._data:
-            sample_tokens = sample["input_ids"]
+            sample_tokens = sample["input_ids"] + [self.tokenizer.eos_token_id]
             self._token_buffer.extend(sample_tokens)
-            self._token_buffer.append(self.tokenizer.eos_token_id)
             self._sample_idx += 1
 
             while len(self._token_buffer) > self.seq_len:
