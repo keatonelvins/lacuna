@@ -77,14 +77,11 @@ def setup_fsdp2(
     cpu_offload_policy = CPUOffloadPolicy(pin_memory=True) if cpu_offload else None
 
     for i, block in enumerate(model.model.layers):
-        # Last block: don't reshard since FSDP prefetches
-        reshard = i < len(model.model.layers) - 1
-
         fully_shard(
             block,
             mp_policy=mp_policy,
             offload_policy=cpu_offload_policy,
-            reshard_after_forward=reshard,
+            reshard_after_forward=True,
         )
 
     model = fully_shard(
