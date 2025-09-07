@@ -52,10 +52,6 @@ def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTraine
     if world_size == 1:
         logger.info("Single GPU training - no distributed wrapping")
         return model
-
-    if config.dist.backend == "NONE":
-        logger.info("Multi-GPU available but distributed backend disabled")
-        return model
     elif config.dist.backend == "DDP":
         return setup_ddp(model, config.model.compile_mode is not None)
     else:  # fsdp

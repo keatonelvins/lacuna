@@ -1,13 +1,10 @@
 # TODO
 
 - Usability
-  - Auto-detect GPUs and torchrun: default `torchrun.nproc_per_node = torch.cuda.device_count()` and `nnodes=1`. If multi-GPU or any `--torchrun.*` arg is provided, re-exec under `torchrun` automatically; otherwise run single-process. Remove explicit `--torchrun` flag.
   - Hide torchrun/DDP noise: route logs through rank0 only (already using loguru); suppress torchrun banner/env chatter where possible.
-  - Auto backend: if `world_size > 1` and `dist.backend == NONE`, default to `DDP`.
 
 - Distributed/Runtime
   - Default torchrun when `torch.cuda.device_count()>1`; infer from args/world size (no explicit flag).
-  - Default backend to DDP when `world_size>1` and backend is `NONE`.
   - DDP device binding: use `device_ids=[torch.cuda.current_device()]` (LOCAL_RANK) instead of global rank.
   - DDP buckets: expose `bucket_cap_mb` for better comm/compute overlap on small models.
   - Static graph: keep `static_graph=is_compiled`; document recommended `compile_mode` per backend.
@@ -24,6 +21,7 @@
   - Extract scheduler logic to `scheduler.py`; add prime-rl style schedulers while keeping current cosine/WSD.
 
 - Data Pipeline
+  - Better handle buffer (python list seems suboptimal)
   - Add SegmentTree-style packing to reduce truncation for pretraining streams.
   - Auto-tune `num_workers` based on CPU cores and dataset shard count; set `persistent_workers=True`; warn and clamp as needed (currently clamps to shards).
   - Strategy for poor sharding: guidance/reshard path when `dataset.num_shards != world_size`.

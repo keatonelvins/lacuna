@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Literal, Optional
 
+import torch
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -85,9 +86,9 @@ class SFTDataConfig(DataConfig):
 class DistributedConfig(BaseModel):
     """Distributed training config"""
 
-    backend: Literal["FSDP", "DDP", "NONE"] = Field(
-        "NONE",
-        description="FSDP for large models, DDP for small models, NONE to disable",
+    backend: Literal["FSDP", "DDP"] = Field(
+        "FSDP",
+        description="FSDP for large models, DDP for small models",
     )
     cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
 
@@ -95,7 +96,9 @@ class DistributedConfig(BaseModel):
 class TorchrunConfig(BaseModel):
     """Torchrun distributed config"""
 
-    nproc_per_node: int = Field(8, ge=1, description="Number of processes per node")
+    nproc_per_node: int = Field(
+        default_factory=lambda: torch.cuda.device_count(), ge=1, description="Number of processes per node"
+    )
     nnodes: int = Field(1, ge=1, description="Number of nodes")
     master_addr: str = Field("localhost", description="Master node address")
     master_port: str = Field("29500", description="Master node port")

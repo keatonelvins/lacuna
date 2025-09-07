@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Type, TypeVar
 from pydantic_settings import BaseSettings
 
+import torch
+
 from lacuna.config import PretrainConfig, SFTConfig
 from lacuna.trainer import train
 
@@ -15,41 +17,33 @@ T = TypeVar("T", bound=BaseSettings)
 
 
 def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
-    """Launch torchrun using config's torchrun settings."""
     torchrun = config.torchrun
 
-    cmd = [
-        "torchrun",
-        f"--nproc_per_node={torchrun.nproc_per_node}",
-        f"--nnodes={torchrun.nnodes}",
-        f"--master_addr={torchrun.master_addr}",
-        f"--master_port={torchrun.master_port}",
-    ]
+    cmd = ["torchrun", f"--nproc_per_node={torchrun.nproc_per_node}"]
 
     if torchrun.node_rank is not None:
-        cmd.append(f"--node_rank={torchrun.node_rank}")
+        cmd.extend([
+            f"--nnodes={torchrun.nnodes}",
+            f"--master_addr={torchrun.master_addr}",
+            f"--master_port={torchrun.master_port}",
+            f"--node_rank={torchrun.node_rank}"
+        ])
     elif torchrun.nnodes > 1:
         print(f"Error: For multi-node training (nnodes={torchrun.nnodes}) must specify node_rank")
-        print("Example: uv run pt --torchrun configs/multi_node.toml --torchrun.node_rank 0")
+        print("Example: uv run pt configs/multi_node.toml --torchrun.node_rank 0")
         sys.exit(1)
 
     cmd.extend(["-m", "lacuna.cli", entry_point])
-
-    # Add original CLI args (without --torchrun flag)
-    lacuna_args = [arg for arg in sys.argv[1:] if arg != "--torchrun"]
-    cmd.extend(lacuna_args)
+    cmd.extend(sys.argv[1:])
 
     print(f"Launching: {' '.join(cmd)}")
 
-    # Use os.execvp due to better ctrl+c handling
     os.execvp("torchrun", cmd)
 
 
 def parse_argv(config_cls: Type[T]) -> T:
-    """Parse TOML config file and CLI overrides into pydantic settings"""
     args = sys.argv[1:]
 
-    # First arg is TOML file path if it exists and doesn't start with --
     if args and not args[0].startswith("--"):
         config_path = Path(args[0])
         cli_args = args[1:]
@@ -63,11 +57,10 @@ def parse_argv(config_cls: Type[T]) -> T:
         toml_data = {}
         cli_args = args
 
-    # Create config with TOML data as defaults, then apply CLI overrides
     config = config_cls(**toml_data, _cli_parse_args=cli_args)
 
-    # Check for --torchrun flag after parsing config
-    if "--torchrun" in args:
+    # if we are not in a distributed environment, launch torchrun
+    if torch.cuda.device_count() > 1 and "RANK" not in os.environ:
         entry_point = "pretrain" if config_cls == PretrainConfig else "sft"
         launch_torchrun(config, entry_point)
 

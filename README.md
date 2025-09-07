@@ -16,7 +16,7 @@ uv run pt --help
 uv run sft --help
 
 # Pass args directly
-uv run pt --torchrun --model.name Qwen/Qwen3-8B --dist.backend FSDP --trainer.batch-size 8
+uv run pt --model.name Qwen/Qwen3-8B --trainer.batch-size 8
 
 # Load args from a toml (w/ overrides)
 uv run sft path/to/config.toml
