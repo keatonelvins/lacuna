@@ -1,8 +1,6 @@
 # TODO
 
 - Distributed/Runtime
-  - Default torchrun when `torch.cuda.device_count()>1`; infer from args/world size (no explicit flag).
-  - DDP device binding: use `device_ids=[torch.cuda.current_device()]` (LOCAL_RANK) instead of global rank.
   - DDP buckets: expose `bucket_cap_mb` for better comm/compute overlap on small models.
   - Static graph: keep `static_graph=is_compiled`; document recommended `compile_mode` per backend.
   - Validate `DDP(static_graph=...)` vs `torch.compile` interaction; document recommended modes per backend.
@@ -11,7 +9,6 @@
 - Training Loop Perf
   - Non-blocking H2D: move batches with `tensor.cuda(non_blocking=True)` when `pin_memory=True`.
   - Prefetch/pipeline: add simple double-buffering (prefetch next batch to GPU on a separate stream).
-  - Reset memory stats: call `torch.cuda.reset_peak_memory_stats()` at training start for cleaner metrics.
 
 - Optimizer/Model
   - Fused AdamW param groups: keep `fused=True` and exclude weight decay on biases/LayerNorm and embeddings.

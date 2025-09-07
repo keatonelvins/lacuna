@@ -29,6 +29,11 @@ def init_distributed() -> None:
     logger.info(f"Initialized distributed: rank {get_rank()}/{get_world_size()}")
 
 
+def get_local_rank() -> int:
+    """Get current process local rank."""
+    return torch.cuda.current_device()
+
+
 def get_rank() -> int:
     """Get current process rank."""
     return dist.get_rank() if dist.is_initialized() else 0

@@ -5,6 +5,7 @@ from collections import deque
 import torch
 from loguru import logger
 from dataclasses import dataclass
+from .distributed import get_local_rank
 
 
 @dataclass
@@ -59,21 +60,21 @@ class Redline:
         self.seq_len = seq_len
         self.world_size = world_size
         self.window_steps = window_steps
-        self.device = torch.device("cuda", torch.cuda.current_device())
+        self.device = torch.device("cuda", get_local_rank())
 
         self._tokens: deque[int] = deque(maxlen=window_steps)
         self._step_times: deque[float] = deque(maxlen=window_steps)
         self._data_load_times: deque[float] = deque(maxlen=window_steps)
+        self._last_time: float | None = None
 
         self.gpu_peak_flops = get_peak_flops(torch.cuda.get_device_name(self.device))
         self.num_params, self.flops_per_token = calculate_model_flops(model, seq_len)
-
         self.device_props = torch.cuda.get_device_properties(self.device)
         self.total_memory = self.device_props.total_memory
 
-        self._last_time: float | None = None
-
         self.state = StateTracker()
+
+        torch.cuda.reset_peak_memory_stats()
 
     def update(self, tokens: int, data_load_time: float) -> None:
         """Update tracker with tokens processed."""
