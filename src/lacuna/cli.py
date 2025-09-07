@@ -9,6 +9,7 @@ from typing import Type, TypeVar
 from pydantic_settings import BaseSettings
 
 import torch
+import psutil
 
 from lacuna.config import PretrainConfig, SFTConfig
 from lacuna.trainer import train
@@ -18,6 +19,12 @@ T = TypeVar("T", bound=BaseSettings)
 
 def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     torchrun = config.torchrun
+
+    # recommended to use physical cores / num processes
+    if "OMP_NUM_THREADS" not in os.environ:
+        physical_cores = psutil.cpu_count(logical=False)
+        optimal_threads = max(1, physical_cores // torchrun.nproc_per_node)
+        os.environ["OMP_NUM_THREADS"] = str(optimal_threads)
 
     cmd = ["torchrun", f"--nproc_per_node={torchrun.nproc_per_node}"]
 

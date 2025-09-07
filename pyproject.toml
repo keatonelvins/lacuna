@@ -16,6 +16,7 @@ dependencies = [
     "wandb>=0.21.2",
     "loguru>=0.7.3",
     "rich>=14.1.0",
+    "psutil>=7.0.0",
 ]
 
 [project.scripts]

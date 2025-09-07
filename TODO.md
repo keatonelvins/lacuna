@@ -1,8 +1,5 @@
 # TODO
 
-- Usability
-  - Hide torchrun/DDP noise: route logs through rank0 only (already using loguru); suppress torchrun banner/env chatter where possible.
-
 - Distributed/Runtime
   - Default torchrun when `torch.cuda.device_count()>1`; infer from args/world size (no explicit flag).
   - DDP device binding: use `device_ids=[torch.cuda.current_device()]` (LOCAL_RANK) instead of global rank.
