@@ -20,7 +20,7 @@ from .config import (
     SFTConfig,
 )
 from .data import setup_dataloader
-from .distributed import get_world_size, init_distributed, setup_distributed, is_master
+from .distributed import get_world_size, init_distributed, setup_distributed, is_master, destroy_distributed
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
@@ -179,3 +179,4 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             )
 
         finish(wandb_run)
+        destroy_distributed()
