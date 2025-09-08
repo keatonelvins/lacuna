@@ -11,7 +11,6 @@ dependencies = [
     "liger-kernel>=0.6.2",
     "transformers>=4.56.1",
     "kernels>=0.10.0",
-    "cut-cross-entropy[transformers]",
     "pydantic-settings>=2.10.1",
     "wandb>=0.21.2",
     "loguru>=0.7.3",
@@ -55,7 +54,6 @@ addopts = [
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128" }]
-cut-cross-entropy = { git = "https://github.com/axolotl-ai-cloud/ml-cross-entropy.git", rev = "c6a32c" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

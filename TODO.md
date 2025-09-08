@@ -5,6 +5,7 @@
   - Prefetch/pipeline: add simple double-buffering (prefetch next batch to GPU on a separate stream).
 
 - Data Pipeline
+  - Handle data StopIteration
   - Better handle buffer (python list seems suboptimal)
   - Add SegmentTree-style packing to reduce truncation for pretraining streams.
   - Auto-tune `num_workers` based on CPU cores and dataset shard count; set `persistent_workers=True`; warn and clamp as needed (currently clamps to shards).
@@ -13,7 +14,7 @@
 - Checkpointing
   - Switch to `dcp.async_save` per recipe; keep one in-flight save and await completion before starting another.
   - Add `dcp_to_hf` CLI in `cli.py` to repackage a DCP checkpoint into HF sharded weights.
-  - The following are blocked on torch 2.9.0 (release 10/15):
+  - Blocked on torch 2.9.0 (release 10/15):
       - Switch to `HuggingFaceStorageWriter` with `consolidate_safetensors_files_on_every_rank`
 
 - Eval
@@ -31,7 +32,11 @@
   - Global seeding: seed Python/Torch/CUDA and DataLoader workers.
 
 - Optimizer/Model
+  - need to handle weight-tying for small model sizes? (re: torchtitan, automodel)
   - Extract scheduler logic to `scheduler.py`; add prime-rl style schedulers while keeping current cosine/WSD.
 
 - MoE
   - Support grouped GEMM
+
+- SFT
+  - Support assistant-only loss

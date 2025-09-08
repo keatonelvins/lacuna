@@ -7,7 +7,7 @@ Seeing smaller labs use `torchtitan` for pretraining and `axolotl` for post-trai
 I want it to be tiny and hackable: `uv run count_lines` should return <3k
 
 ## Order of model builder
-Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
+Liger/Kernelize -> AC -> torch.compile -> FSDP
 - Model patches always happens first
 - Compile wrapped AC: compile already recomputes with the min-cut partitioner, so wrapping AC over a compiled region might mean multiple recomputations
     - see https://pytorch.org/blog/activation-checkpointing-techniques/ for more info
@@ -20,7 +20,7 @@ Liger/CCE/Kernelize -> AC -> torch.compile -> FSDP
 - For FSDP, we fully shard the layers individually then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
-    - For CCE, we pass in `accum_e_fp32` and `accum_c_fp32`: https://github.com/axolotl-ai-cloud/ml-cross-entropy/blob/main/cut_cross_entropy/doc.py
+- Set `OMP_NUM_THREADS` to `cpu_cores / num_gpus` (physical cores so no hyper-threads!!)
 
 ## Datasets
 - We always use IterableDatasets. This is the default type from `load_dataset` if streaming, otherwise we call to `to_iterable_dataset()`

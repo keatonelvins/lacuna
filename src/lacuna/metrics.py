@@ -33,10 +33,7 @@ def get_peak_flops(device_name: str) -> int:
 
 
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
-    """Get parameter count and FLOPs/token at seq_len.
-
-    TODO: this is not super exact, can improve later
-    """
+    """Get parameter count and FLOPs/token at seq_len."""
     config = model.config
     num_params = sum(p.numel() for p in model.parameters())
     head_dim = config.hidden_size // config.num_attention_heads

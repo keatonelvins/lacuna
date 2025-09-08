@@ -19,7 +19,6 @@ class ModelConfig(BaseModel):
     )
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for cross entropy loss")
     liger: bool = Field(False, description="Enable Liger kernels")
-    cce: bool = Field(False, description="Enable Cut Cross Entropy patch")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
     compile_mode: Optional[
         Literal[

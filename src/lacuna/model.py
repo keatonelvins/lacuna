@@ -11,7 +11,6 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from kernels import kernelize, Mode
-from cut_cross_entropy.transformers import cce_patch
 from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
 from loguru import logger
 
@@ -44,7 +43,6 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     )
 
     model = apply_liger_patches(model, config.model)
-    model = apply_cut_cross_entropy(model, config.model)
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_sdpa_kernel(model, config.model)
@@ -65,25 +63,8 @@ def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrain
         open(os.devnull, "w") as devnull,
         redirect_stdout(devnull),
         redirect_stderr(devnull),
-    ):  # silence unaesthetic liger print (lol liger print)
-        _apply_liger_kernel_to_instance(
-            model,
-            fused_linear_cross_entropy=not config.cce,  # avoid double patching
-        )
-
-    return model
-
-
-def apply_cut_cross_entropy(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Apply Cut Cross Entropy if enabled."""
-    if not config.cce:
-        return model
-
-    model = cce_patch(
-        model,
-        accum_e_fp32=config.accum_fp32,
-        accum_c_fp32=config.accum_fp32,
-    )
+    ):  # silence ugly liger print (lol liger print)
+        _apply_liger_kernel_to_instance(model)
 
     return model
 
