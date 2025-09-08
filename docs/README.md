@@ -35,5 +35,4 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 - Some references that were helpful for me while writing this:
     - [Mesh Zoo](https://blog.ezyang.com/2025/08/the-parallelism-mesh-zoo/)
     - [ND-Parallel](https://huggingface.co/blog/accelerate-nd-parallel)
-- Failed attempts:
-    - Tried to use `FileSystemWriter(serialization_format=SerializationFormat.SAFETENSORS)` but ran into isseus with tied weights
+    - [Visualizing 6D Mesh Parallelism](https://main-horse.github.io/posts/visualizing-6d/)
