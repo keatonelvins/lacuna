@@ -1,18 +1,8 @@
 # TODO
 
-- Distributed/Runtime
-  - Tune bucket_cap_mb for DDP base:
-      scale = (12 * cfg.hidden_size**2) / 1e8
-      bucket = 25 * (1 + scale)
-      bucket *= 1.5 if world_size > 32 else 1
-      return int(min(max(bucket, 10), 250))
-
 - Training Loop Perf
   - Non-blocking H2D: move batches with `tensor.cuda(non_blocking=True)` when `pin_memory=True`.
   - Prefetch/pipeline: add simple double-buffering (prefetch next batch to GPU on a separate stream).
-
-- Optimizer/Model
-  - Extract scheduler logic to `scheduler.py`; add prime-rl style schedulers while keeping current cosine/WSD.
 
 - Data Pipeline
   - Better handle buffer (python list seems suboptimal)
@@ -22,10 +12,9 @@
 
 - Checkpointing
   - Switch to `dcp.async_save` per recipe; keep one in-flight save and await completion before starting another.
-  - Clarify final save semantics: if `resumable_final_save=True`, final uses DCP (includes optimizer/scheduler/dataloader); else write HF sharded model-only. Document expected files.
-  - Fix `load_checkpoint(...)`: support restoring full trainer state from DCP; gracefully handle HF model-only final checkpoints.
   - Add `dcp_to_hf` CLI in `cli.py` to repackage a DCP checkpoint into HF sharded weights.
-  - Consider `consolidate_safetensors_files_on_every_rank` (torchtitan) to produce consolidated final shards.
+  - The following are blocked on torch 2.9.0:
+      - Switch to `HuggingFaceStorageWriter` with `consolidate_safetensors_files_on_every_rank`
 
 - Eval
   - Add eval loop with support for held-out split(s) of the same datasets.
@@ -40,6 +29,9 @@
 
 - Repro/Robustness
   - Global seeding: seed Python/Torch/CUDA and DataLoader workers.
+
+- Optimizer/Model
+  - Extract scheduler logic to `scheduler.py`; add prime-rl style schedulers while keeping current cosine/WSD.
 
 - MoE
   - Support grouped GEMM
