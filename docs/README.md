@@ -22,6 +22,7 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
 - Set `OMP_NUM_THREADS` to `cpu_cores / num_gpus` (physical cores so no hyper-threads!!)
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking during pretraining
+    - Also supported by https://arxiv.org/pdf/2503.15450!
 
 ## Datasets
 - We always use IterableDatasets. This is the default type from `load_dataset` if streaming, otherwise we call to `to_iterable_dataset()`
