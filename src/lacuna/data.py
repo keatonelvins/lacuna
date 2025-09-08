@@ -13,6 +13,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .config import PretrainConfig, SFTConfig
 from .distributed import get_rank, get_world_size
+from .utils import pack_bfd
 
 
 def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset:
@@ -41,41 +42,38 @@ class PretrainDataset(IterableDataset, Stateful):
     ):
         self.config = config
         self.tokenizer = tokenizer
+        self.seq_len = config.data.seq_len
 
         logger.info(f"Loading datasets: {config.data.datasets}")
         dataset = _get_iterable_dataset(config)
         self._data = split_dataset_by_node(dataset, get_rank(), get_world_size())
-        self._data = self._data.map(self._encode, batched=True, batch_size=1000)
+        self._data = self._data.map(self._encode, batched=True, batch_size=5000, remove_columns=["text"])
+        self._data = self._data.with_format("arrow")
+        self._data = self._data.map(self._pack, batched=True, batch_size=5000)
 
         self.num_shards = self._data.num_shards
-        self.seq_len = config.data.seq_len
-
-        self._sample_idx = 0
-        self._token_buffer = []
 
     def _encode(self, examples):
-        return self.tokenizer(examples["text"], add_special_tokens=False, truncation=False, padding=False)
+        out = self.tokenizer(examples["text"], add_special_tokens=False, truncation=False, padding=False)
+        return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in out["input_ids"]]}
+
+    def _pack(self, examples):
+        return pack_bfd(examples, seq_length=self.seq_len)
 
     def __iter__(self):
         for sample in self._data:
-            sample_tokens = sample["input_ids"] + [self.tokenizer.eos_token_id]
-            self._token_buffer.extend(sample_tokens)
-            self._sample_idx += 1
+            input_ids = torch.LongTensor(sample["input_ids"])
+            labels = input_ids.clone()
 
-            while len(self._token_buffer) > self.seq_len:
-                seq_len_tokens = torch.LongTensor(self._token_buffer[: self.seq_len + 1])
-                self._token_buffer = self._token_buffer[self.seq_len + 1 :]
-                input_ids = seq_len_tokens[:-1]
-                labels = seq_len_tokens[1:]
-                yield {"input_ids": input_ids, "labels": labels}
+            yield {
+                "input_ids": input_ids,
+                "labels": labels,
+            }
 
     def state_dict(self):
-        state_dict = {"token_buffer": self._token_buffer}
-        state_dict["data"] = self._data.state_dict()
-        return state_dict
+        return {"data": self._data.state_dict()}
 
     def load_state_dict(self, state_dict):
-        self._token_buffer = state_dict["token_buffer"]
         self._data.load_state_dict(state_dict["data"])
 
 
