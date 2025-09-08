@@ -46,7 +46,6 @@ class PretrainDataset(IterableDataset, Stateful):
         dataset = _get_iterable_dataset(config)
         self._data = split_dataset_by_node(dataset, get_rank(), get_world_size())
         self._data = self._data.map(self._encode, batched=True, batch_size=1000)
-        self._data = self._data.with_format("torch")
 
         self.num_shards = self._data.num_shards
         self.seq_len = config.data.seq_len
@@ -59,7 +58,7 @@ class PretrainDataset(IterableDataset, Stateful):
 
     def __iter__(self):
         for sample in self._data:
-            sample_tokens = sample["input_ids"].tolist() + [self.tokenizer.eos_token_id]
+            sample_tokens = sample["input_ids"] + [self.tokenizer.eos_token_id]
             self._token_buffer.extend(sample_tokens)
             self._sample_idx += 1
 

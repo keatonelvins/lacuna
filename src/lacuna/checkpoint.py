@@ -88,7 +88,7 @@ def save_checkpoint(
     tokenizer.save_pretrained(path)
 
     if not final or config.checkpoint.resumable_final_save:
-        logger.info("Saving resumable checkpoint")
+        logger.info(f"Saving resumable checkpoint to {path}")
         trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
         writer = FileSystemWriter(str(path))
         state_dict = {"trainer": trainer_state}
@@ -96,7 +96,7 @@ def save_checkpoint(
             warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
             dcp.save(state_dict, storage_writer=writer)
     else:
-        logger.info("Saving final checkpoint in HF format")
+        logger.info(f"Saving final checkpoint in HF format to {path}")
         # TODO: use HuggingFaceStorageWriter in torch 2.9.0
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="TypedStorage is deprecated", category=UserWarning)
@@ -104,7 +104,6 @@ def save_checkpoint(
 
     save_state_json(path, state)
     save_settings_json(path, config)
-    logger.info(f"Saved DCP checkpoint shards to {path}")
 
 
 def load_checkpoint(
