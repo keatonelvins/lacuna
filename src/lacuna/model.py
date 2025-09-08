@@ -1,14 +1,12 @@
 """Model setup and optimization utilities."""
 
 import os
-import functools
 from contextlib import redirect_stdout, redirect_stderr
 
 import torch
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
-from torch.nn.attention import sdpa_kernel, SDPBackend
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from kernels import kernelize, Mode
 from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
@@ -21,9 +19,7 @@ from .config import (
 )
 
 ATTN_IMPL_MAP = {
-    "EAGER": "eager",
     "FA3": "kernels-community/flash-attn3",
-    "SDPA": "sdpa",
 }
 
 
@@ -45,7 +41,6 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     model = apply_liger_patches(model, config.model)
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
-    model = apply_sdpa_kernel(model, config.model)
     model = apply_torch_compile(model, config)
 
     model = model.cuda()
@@ -88,32 +83,10 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
     return model
 
 
-def apply_sdpa_kernel(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Patch model.forward with SDPA kernel if using SDPA."""
-    if config.attention == "SDPA":
-        backends = [SDPBackend.FLASH_ATTENTION]
-        capability = torch.cuda.get_device_capability()
-        if capability[0] >= 9:  # H100 is 9.0, H200/B200 are 9.0+
-            backends.insert(0, SDPBackend.CUDNN_ATTENTION)
-
-        original_forward = model.forward
-
-        @functools.wraps(original_forward)
-        def sdpa_forward(*args, **kwargs):
-            with sdpa_kernel(backends, set_priority=True):
-                return original_forward(*args, **kwargs)
-
-        model.forward = sdpa_forward
-
-    return model
-
-
 def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     """Apply torch.compile if enabled."""
     if not config.model.compile_mode:
         return model
-
-    fullgraph = config.model.attention == "SDPA"  # don't use fullgraph for FA3
 
     torch._dynamo.config.cache_size_limit = 256
     torch._dynamo.config.suppress_errors = True
@@ -122,7 +95,7 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
     for idx, layer in enumerate(layers):
         compiled_layer = torch.compile(
             layer,
-            fullgraph=fullgraph,
+            fullgraph=False,
             mode=config.model.compile_mode,
         )
         layers[idx] = compiled_layer

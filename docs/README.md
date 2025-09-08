@@ -15,7 +15,6 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 
 ## Other considerations
 - Don't apply weight decay to embeddings/layer norms/biases (https://github.com/karpathy/minGPT/pull/24#issuecomment-679316025)
-- Only FA3 is supported for SFT w/ packing, SDPA needs some more work to get varlen attention working
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
 - For FSDP, we fully shard the layers individually then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import torch
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,10 +13,7 @@ class ModelConfig(BaseModel):
     """Model config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
-    attention: Literal["FA3", "SDPA", "EAGER"] = Field(
-        "FA3",
-        description="Attention implementation (use FA3/SDPA, eager is just for baseline)",
-    )
+    attention: Literal["FA3"] = Field("FA3", description="Attention implementation (FA3 only for now)")
     accum_fp32: bool = Field(True, description="Use fp32 accumulation for cross entropy loss")
     liger: bool = Field(False, description="Enable Liger kernels")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
@@ -200,4 +197,3 @@ class SFTConfig(LacunaConfig):
         cli_kebab_case=True,
         cli_implicit_flags=True,
     )
-
