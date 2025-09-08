@@ -18,6 +18,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
     get_state_dict,
     set_state_dict,
+    get_model_state_dict,
     StateDictOptions,
 )
 from torch.optim.lr_scheduler import LRScheduler
@@ -94,9 +95,8 @@ def save_checkpoint(
         state_dict = {"trainer": trainer_state}
     else:
         logger.info("Saving final checkpoint in HF format")
+        state_dict = get_model_state_dict(model, options=StateDictOptions(full_state_dict=True))
         writer = HuggingFaceStorageWriter(path=str(path))
-        state_dict = model.state_dict()
-    
     with warnings.catch_warnings():  # ignore warnings if on single device
         warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
         dcp.save(state_dict, storage_writer=writer)
