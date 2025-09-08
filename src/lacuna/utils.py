@@ -1,9 +1,12 @@
+import os
 import json
 from pathlib import Path
 from loguru import logger
 from rich.pretty import Pretty
 from rich.console import Console
 from dataclasses import asdict
+
+from transformers.utils.logging import disable_progress_bar
 
 from .distributed import is_master
 from .config import LacunaConfig
@@ -18,6 +21,11 @@ def setup_logger() -> None:
         level="INFO",
         filter=lambda r: is_master(),
     )
+
+
+def setup_env() -> None:
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+    disable_progress_bar()
 
 
 def display_config(config: LacunaConfig) -> None:

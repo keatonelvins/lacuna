@@ -24,7 +24,7 @@ from .distributed import get_world_size, init_distributed, setup_distributed, is
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
-from .utils import setup_logger, display_config, log_training_metrics
+from .utils import setup_logger, display_config, log_training_metrics, setup_env
 from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 
 
@@ -32,6 +32,7 @@ from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 def train(config: PretrainConfig | SFTConfig) -> None:
     """Core training function."""
     setup_logger()
+    setup_env()
 
     init_distributed()
 

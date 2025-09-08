@@ -13,7 +13,7 @@
 - Checkpointing
   - Switch to `dcp.async_save` per recipe; keep one in-flight save and await completion before starting another.
   - Add `dcp_to_hf` CLI in `cli.py` to repackage a DCP checkpoint into HF sharded weights.
-  - The following are blocked on torch 2.9.0:
+  - The following are blocked on torch 2.9.0 (release 10/15):
       - Switch to `HuggingFaceStorageWriter` with `consolidate_safetensors_files_on_every_rank`
 
 - Eval
