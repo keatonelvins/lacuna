@@ -91,6 +91,7 @@ class DistributedConfig(BaseModel):
         description="FSDP for large models, DDP for small models",
     )
     cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
+    hsdp: bool = Field(False, description="Enable HSDP (2D mesh: inter-node DDP + intra-node FSDP)")
 
 
 class TorchrunConfig(BaseModel):

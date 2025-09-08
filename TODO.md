@@ -6,7 +6,6 @@
       bucket = 25 * (1 + scale)
       bucket *= 1.5 if world_size > 32 else 1
       return int(min(max(bucket, 10), 250))
-  - Explore HSDP mesh (FSDP for blocks + DDP for data) and required wrapping order.
 
 - Training Loop Perf
   - Non-blocking H2D: move batches with `tensor.cuda(non_blocking=True)` when `pin_memory=True`.
@@ -37,6 +36,7 @@
 
 - UX/Config
   - Validation: `sampling_probs` length matches `datasets`; save_dir writeable; tokenizer/model existence checks before training starts.
+  - Figure out control surface for distributed: current dist and torchrun settings feel clunky, weird defaults now for single node HSDP
 
 - Repro/Robustness
   - Global seeding: seed Python/Torch/CUDA and DataLoader workers.
