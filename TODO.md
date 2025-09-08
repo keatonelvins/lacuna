@@ -13,7 +13,6 @@
   - Prefetch/pipeline: add simple double-buffering (prefetch next batch to GPU on a separate stream).
 
 - Optimizer/Model
-  - Fused AdamW param groups: keep `fused=True` and exclude weight decay on biases/LayerNorm and embeddings.
   - Extract scheduler logic to `scheduler.py`; add prime-rl style schedulers while keeping current cosine/WSD.
 
 - Data Pipeline
@@ -41,3 +40,6 @@
 
 - Repro/Robustness
   - Global seeding: seed Python/Torch/CUDA and DataLoader workers.
+
+- MoE
+  - Support grouped GEMM
