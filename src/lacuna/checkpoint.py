@@ -9,11 +9,11 @@ import torch
 import torch.distributed.checkpoint as dcp
 from transformers import PreTrainedTokenizerBase
 from torch.distributed.checkpoint import (
+    FileSystemReader,
     FileSystemWriter,
     HuggingFaceStorageReader,
     HuggingFaceStorageWriter,
 )
-from torch.distributed.checkpoint.filesystem import SerializationFormat
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
     get_state_dict,
@@ -28,8 +28,6 @@ from .distributed import is_master
 from .config import LacunaConfig
 from .metrics import StateTracker
 from .utils import save_state_json, save_settings_json, load_state_json
-
-SAFETENSOR = SerializationFormat.SAFETENSORS
 
 
 # ref: https://docs.pytorch.org/tutorials/recipes/distributed_async_checkpoint_recipe.html
@@ -88,7 +86,7 @@ def save_checkpoint(
     trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
     if not final or config.checkpoint.resumable_final_save:
         logger.info("Saving resumable checkpoint")
-        writer = FileSystemWriter(str(path), serialization_format=SAFETENSOR)
+        writer = FileSystemWriter(str(path))
     else:
         logger.info("Saving final checkpoint in HF format")
         writer = HuggingFaceStorageWriter(path=str(path))
@@ -108,21 +106,33 @@ def save_checkpoint(
 def load_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
-    scheduler: Any,
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
+    dataloader: StatefulDataLoader,
     path: Path,
 ) -> StateTracker:
+    """Load DCP checkpoint and restore full training state."""
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at {path}")
-    if not (path / ".metadata").exists():
-        raise ValueError(f"Checkpoint is not a DCP checkpoint at {path}")
-
+    
+    is_dcp = (path / ".metadata").exists()
     is_hf = (path / "model.safetensors.index.json").exists()
-    reader = HuggingFaceStorageReader(path=str(path)) if is_hf else None
+    
+    if not is_dcp and not is_hf:
+        raise ValueError(
+            f"Checkpoint at {path} is neither DCP nor HF format"
+        )
+    
+    if is_hf:
+        storage_reader = HuggingFaceStorageReader(path=str(path))
+    else:
+        storage_reader = FileSystemReader(str(path))
 
-    # TODO: untested, probably broken.
     dcp.load(
-        {"trainer": TrainerState(model, optimizer, scheduler)},
-        storage_reader=reader,
+        {"trainer": TrainerState(model, optimizer, scheduler, dataloader)},
+        storage_reader=storage_reader,
+        checkpoint_id=str(path),
     )
-    logger.info(f"Loaded DCP checkpoint from {path}")
+    
+    logger.info(f"Loaded {'HF' if is_hf else 'DCP'} checkpoint from {path}")
+    
     return load_state_json(path)
