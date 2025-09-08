@@ -65,13 +65,13 @@ def get_hsdp_mesh(config: LacunaConfig) -> DeviceMesh:
     if world_size == 1:
         logger.warning("HSDP requested but world_size=1, using standard FSDP")
         return None
-    
+
     if config.torchrun.nnodes > 1:
         dp_replicate = config.torchrun.nnodes
-        dp_shard = world_size // config.torchrun.nnodes   
+        dp_shard = world_size // config.torchrun.nnodes
     else:
         dp_replicate, dp_shard = 2, world_size // 2
-    
+
     logger.info(f"HSDP mesh: {dp_replicate}×{dp_shard} = {world_size} GPUs")
     mesh = init_device_mesh("cuda", [dp_replicate, dp_shard], mesh_dim_names=["dp_replicate", "dp_shard"])
     return mesh

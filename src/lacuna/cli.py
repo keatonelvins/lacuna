@@ -29,12 +29,14 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     cmd = ["torchrun", f"--nproc_per_node={torchrun.nproc_per_node}"]
 
     if torchrun.node_rank is not None:
-        cmd.extend([
-            f"--nnodes={torchrun.nnodes}",
-            f"--master_addr={torchrun.master_addr}",
-            f"--master_port={torchrun.master_port}",
-            f"--node_rank={torchrun.node_rank}"
-        ])
+        cmd.extend(
+            [
+                f"--nnodes={torchrun.nnodes}",
+                f"--master_addr={torchrun.master_addr}",
+                f"--master_port={torchrun.master_port}",
+                f"--node_rank={torchrun.node_rank}",
+            ]
+        )
     elif torchrun.nnodes > 1:
         print(f"Error: For multi-node training (nnodes={torchrun.nnodes}) must specify node_rank")
         print("Example: uv run pt configs/multi_node.toml --torchrun.node_rank 0")

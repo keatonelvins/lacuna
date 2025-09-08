@@ -18,7 +18,6 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
     get_state_dict,
     set_state_dict,
-    get_model_state_dict,
     StateDictOptions,
 )
 from torch.optim.lr_scheduler import LRScheduler
@@ -87,7 +86,7 @@ def save_checkpoint(
     unwrapped_model = model.module if hasattr(model, "module") else model
     unwrapped_model.config.save_pretrained(path)
     tokenizer.save_pretrained(path)
-    
+
     if not final or config.checkpoint.resumable_final_save:
         logger.info("Saving resumable checkpoint")
         trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
@@ -118,15 +117,13 @@ def load_checkpoint(
     """Load DCP checkpoint and restore full training state."""
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at {path}")
-    
+
     is_dcp = (path / ".metadata").exists()
     is_hf = (path / "model.safetensors.index.json").exists()
-    
+
     if not is_dcp and not is_hf:
-        raise ValueError(
-            f"Checkpoint at {path} is neither DCP nor HF format"
-        )
-    
+        raise ValueError(f"Checkpoint at {path} is neither DCP nor HF format")
+
     if is_hf:
         storage_reader = HuggingFaceStorageReader(path=str(path))
     else:
@@ -137,7 +134,7 @@ def load_checkpoint(
         storage_reader=storage_reader,
         checkpoint_id=str(path),
     )
-    
+
     logger.info(f"Loaded {'HF' if is_hf else 'DCP'} checkpoint from {path}")
-    
+
     return load_state_json(path)
