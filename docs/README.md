@@ -21,6 +21,7 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
 - Set `OMP_NUM_THREADS` to `cpu_cores / num_gpus` (physical cores so no hyper-threads!!)
+- Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking during pretraining
 
 ## Datasets
 - We always use IterableDatasets. This is the default type from `load_dataset` if streaming, otherwise we call to `to_iterable_dataset()`
@@ -36,3 +37,4 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - [Mesh Zoo](https://blog.ezyang.com/2025/08/the-parallelism-mesh-zoo/)
     - [ND-Parallel](https://huggingface.co/blog/accelerate-nd-parallel)
     - [Visualizing 6D Mesh Parallelism](https://main-horse.github.io/posts/visualizing-6d/)
+    - [llm.c](https://github.com/karpathy/llm.c)
