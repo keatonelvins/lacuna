@@ -12,7 +12,7 @@ from torch.distributed.checkpoint import (
     FileSystemReader,
     FileSystemWriter,
     HuggingFaceStorageReader,
-    HuggingFaceStorageWriter,
+    # HuggingFaceStorageWriter,
 )
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
@@ -93,17 +93,15 @@ def save_checkpoint(
         trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
         writer = FileSystemWriter(str(path))
         state_dict = {"trainer": trainer_state}
+        with warnings.catch_warnings():  # ignore warnings if on single device
+            warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
+            dcp.save(state_dict, storage_writer=writer)
     else:
         logger.info("Saving final checkpoint in HF format")
-        state_dict = get_model_state_dict(model, options=StateDictOptions(full_state_dict=True))
-        writer = HuggingFaceStorageWriter(
-            path=str(path),
-            save_distributed=True,
-            enable_consolidation=True,
-        )
-    with warnings.catch_warnings():  # ignore warnings if on single device
-        warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
-        dcp.save(state_dict, storage_writer=writer)
+        # TODO: use HuggingFaceStorageWriter in torch 2.9.0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="TypedStorage is deprecated", category=UserWarning)
+            unwrapped_model.save_pretrained(path)
 
     save_state_json(path, state)
     save_settings_json(path, config)
