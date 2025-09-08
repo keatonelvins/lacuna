@@ -96,7 +96,11 @@ def save_checkpoint(
     else:
         logger.info("Saving final checkpoint in HF format")
         state_dict = get_model_state_dict(model, options=StateDictOptions(full_state_dict=True))
-        writer = HuggingFaceStorageWriter(path=str(path))
+        writer = HuggingFaceStorageWriter(
+            path=str(path),
+            save_distributed=True,
+            enable_consolidation=True,
+        )
     with warnings.catch_warnings():  # ignore warnings if on single device
         warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
         dcp.save(state_dict, storage_writer=writer)
