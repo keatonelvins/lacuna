@@ -79,7 +79,6 @@ class SFTDataConfig(DataConfig):
     """SFT data config"""
 
     datasets: list[str] = Field(["keatone/s1K"], description="HF dataset names")
-    packing: bool = Field(True, description="Pack multiple message lists per sample")
 
 
 class DistributedConfig(BaseModel):
@@ -202,11 +201,3 @@ class SFTConfig(LacunaConfig):
         cli_implicit_flags=True,
     )
 
-    @model_validator(mode="after")
-    def validate_attention_backend(self):
-        """Validate that attention backend is compatible with data configuration."""
-        if self.data.packing and self.model.attention == "SDPA":
-            raise ValueError(
-                "SDPA backend is currently not supported for SFT w/ packing. Please use FA3 instead: --model.attention FA3"
-            )
-        return self

@@ -121,6 +121,10 @@ def load_checkpoint(
     is_dcp = (path / ".metadata").exists()
     is_hf = (path / "model.safetensors.index.json").exists()
 
+    if is_hf:
+        # TODO: remove and use HuggingFaceStorageReader in torch 2.9.0
+        raise NotImplementedError("HF checkpoint loading not implemented")
+
     if not is_dcp and not is_hf:
         raise ValueError(f"Checkpoint at {path} is neither DCP nor HF format")
 

@@ -68,7 +68,7 @@ def parse_argv(config_cls: Type[T]) -> T:
 
     config = config_cls(**toml_data, _cli_parse_args=cli_args)
 
-    # if we are not in a distributed environment, launch torchrun
+    # if multi-gpu and haven't already launched torchrun, launch it
     if torch.cuda.device_count() > 1 and "RANK" not in os.environ:
         entry_point = "pretrain" if config_cls == PretrainConfig else "sft"
         launch_torchrun(config, entry_point)
