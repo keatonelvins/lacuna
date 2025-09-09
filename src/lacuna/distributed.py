@@ -41,6 +41,11 @@ def get_local_rank() -> int:
     return torch.cuda.current_device()
 
 
+def get_device_vram() -> int:
+    """Get current device VRAM."""
+    return torch.cuda.get_device_properties(torch.cuda.current_device()).total_memory
+
+
 def get_rank() -> int:
     """Get current process rank."""
     return dist.get_rank() if dist.is_initialized() else 0

@@ -1,10 +1,8 @@
 # TODO
 
 - Data Pipeline
-  - tune batch_size for map()'s
-  - Auto-tune `num_workers` based on CPU cores and dataset shard count; set `persistent_workers=True`; warn and clamp as needed (currently clamps to shards).
-  - Strategy for poor sharding: guidance/reshard path when `dataset.num_shards != world_size`.
   - Look into how split_dataset_by_node and `dp_replicate` and `dp_shard` interact
+  - standardize around epochs
 
 - Eval
   - Add eval loop with support for held-out split(s) of the same datasets.
@@ -14,7 +12,6 @@
   - Improve FLOPs/MFU estimator (use AllenAI/veomni/prime-rl references); validate per-arch peak TFLOPs table.
 
 - UX/Config
-  - Validation: `sampling_probs` length matches `datasets`; save_dir writeable; tokenizer/model existence checks before training starts.
   - Figure out control surface for distributed: current dist and torchrun settings feel clunky, weird defaults now for single node HSDP
 
 - Repro/Robustness

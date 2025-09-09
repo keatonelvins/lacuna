@@ -3,7 +3,6 @@
 from loguru import logger
 from functools import partial
 
-import torch
 from datasets import load_dataset, interleave_datasets
 from datasets.distributed import split_dataset_by_node
 from torch.distributed.checkpoint.stateful import Stateful
@@ -12,8 +11,9 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .config import PretrainConfig, SFTConfig
-from .distributed import get_rank, get_world_size
+from .distributed import get_rank, get_world_size, get_device_vram
 from .utils import pack_bfd
+
 
 def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset:
     """Get single IterableDataset from merged hf datasets."""
@@ -45,11 +45,15 @@ class PretrainDataset(IterableDataset, Stateful):
 
         logger.info(f"Loading datasets: {config.data.datasets}")
         dataset = _get_iterable_dataset(config)
+
+        # TODO: test and tune
+        bs = get_device_vram() // (self.config.torchrun.nproc_per_node * self.seq_len * 36)
+
         self._data = split_dataset_by_node(dataset, get_rank(), get_world_size())
-        self._data = self._data.map(self._encode, batched=True, batch_size=5000, remove_columns=["text"])
+        self._data = self._data.map(self._encode, batched=True, batch_size=bs, remove_columns=["text"])
         self._data = self._data.with_format("arrow")
-        self._data = self._data.map(self._pack, batched=True, batch_size=5000)
-        self._data = self._data.shuffle(seed=42, buffer_size=5000)
+        self._data = self._data.map(self._pack, batched=True, batch_size=bs)
+        self._data = self._data.shuffle(seed=42, buffer_size=bs)
         self._data = self._data.with_format("torch")
 
         self.num_shards = self._data.num_shards
@@ -66,7 +70,7 @@ class PretrainDataset(IterableDataset, Stateful):
             yield {
                 "input_ids": sample["input_ids"],
                 "position_ids": sample["position_ids"],
-                "labels": sample["input_ids"].clone()
+                "labels": sample["input_ids"].clone(),
             }
 
     def state_dict(self):
@@ -84,17 +88,14 @@ def setup_dataloader(config: PretrainConfig | SFTConfig, micro_batch_size: int) 
     else:  # SFTConfig
         raise ValueError("SFTConfig is not supported")
 
-    workers = config.data.num_workers
-    if workers > dataset.num_shards:
-        logger.warning(f"num_workers {workers} is >= the dataset shards {dataset.num_shards}")
-        workers = dataset.num_shards
-
     dataloader = StatefulDataLoader(
         dataset,
         batch_size=micro_batch_size,
-        num_workers=workers,
+        num_workers=1,  # using 1 worker for now bc dataset is duplicated across workers
         drop_last=True,
+        pin_memory=True,
         prefetch_factor=2,
+        persistent_workers=True,
     )
 
     return dataloader, tokenizer
