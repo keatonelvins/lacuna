@@ -49,6 +49,7 @@ class PretrainDataset(IterableDataset, Stateful):
         self._data = self._data.map(self._encode, batched=True, batch_size=5000, remove_columns=["text"])
         self._data = self._data.with_format("arrow")
         self._data = self._data.map(self._pack, batched=True, batch_size=5000)
+        self._data = self._data.with_format("torch")
 
         self.num_shards = self._data.num_shards
 
@@ -60,16 +61,12 @@ class PretrainDataset(IterableDataset, Stateful):
         return pack_bfd(examples, seq_length=self.seq_len)
 
     def __iter__(self):
-        for packed_batch in self._data:
-            for i in range(packed_batch.num_rows):
-                input_ids = packed_batch["input_ids"][i].as_py()
-                position_ids = packed_batch["position_ids"][i].as_py()
-
-                yield {
-                    "input_ids": torch.tensor(input_ids, dtype=torch.long),
-                    "position_ids": torch.tensor(position_ids, dtype=torch.long),
-                    "labels": torch.tensor(input_ids, dtype=torch.long)
-                }
+        for sample in self._data:
+            yield {
+                "input_ids": sample["input_ids"],
+                "position_ids": sample["position_ids"],
+                "labels": sample["input_ids"].clone()
+            }
 
     def state_dict(self):
         return {"data": self._data.state_dict()}
