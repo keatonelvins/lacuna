@@ -18,7 +18,9 @@ from .config import (
     LacunaConfig,
 )
 
-ATTN_IMPL_MAP = {"FA3": "kernels-community/flash-attn3",}
+ATTN_IMPL_MAP = {
+    "FA3": "kernels-community/flash-attn3",
+}
 
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:
@@ -74,6 +76,7 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
     elif ac_config.mode == "partial":
         checkpoint_freq = ac_config.stride
 
+    # TODO: torch.compile has it's own AC (not stable as of 2.8.0)
     for idx, layer in enumerate(layers):
         if idx % checkpoint_freq == 0:
             layers[idx] = checkpoint_wrapper(layer, preserve_rng_state=False)

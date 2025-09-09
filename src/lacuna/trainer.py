@@ -132,7 +132,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
-            if hasattr(grad_norm, "full_tensor"):
+            if hasattr(grad_norm, "full_tensor"):  # TODO: read FSDP docs to see if this is correct
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
             scheduler.step()
