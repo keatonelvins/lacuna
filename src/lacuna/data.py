@@ -15,7 +15,6 @@ from .config import PretrainConfig, SFTConfig
 from .distributed import get_rank, get_world_size
 from .utils import pack_bfd
 
-
 def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset:
     """Get single IterableDataset from merged hf datasets."""
     loader = partial(load_dataset, split=config.data.split, streaming=config.data.stream)
@@ -61,14 +60,16 @@ class PretrainDataset(IterableDataset, Stateful):
         return pack_bfd(examples, seq_length=self.seq_len)
 
     def __iter__(self):
-        for sample in self._data:
-            input_ids = torch.LongTensor(sample["input_ids"])
-            labels = input_ids.clone()
+        for packed_batch in self._data:
+            for i in range(packed_batch.num_rows):
+                input_ids = packed_batch["input_ids"][i].as_py()
+                position_ids = packed_batch["position_ids"][i].as_py()
 
-            yield {
-                "input_ids": input_ids,
-                "labels": labels,
-            }
+                yield {
+                    "input_ids": torch.tensor(input_ids, dtype=torch.long),
+                    "position_ids": torch.tensor(position_ids, dtype=torch.long),
+                    "labels": torch.tensor(input_ids, dtype=torch.long)
+                }
 
     def state_dict(self):
         return {"data": self._data.state_dict()}

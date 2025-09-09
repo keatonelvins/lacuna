@@ -132,68 +132,77 @@ class _SegmentTree:
 
 
 def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
-    """Pack sequences in a pyarrow Table using Best Fit Decreasing strategy."""
-    columns = []
-    list_column_idx = None
-    for idx, column in enumerate(examples.columns):
-        if pa.types.is_list(column.type) or pa.types.is_large_list(column.type):
-            column = pc.list_slice(column, 0, seq_length)
-            if list_column_idx is None:
-                list_column_idx = idx
-        columns.append(column)
-    examples = pa.Table.from_arrays(columns, names=examples.column_names)
+    """
+    Pack `input_ids` examples into fixed-length bins (Best-Fit Decreasing) and
+    return only two columns: `input_ids` (packed) and `position_ids`.
 
-    ids = np.arange(len(examples))
-    assert list_column_idx is not None
-    lengths = pc.list_value_length(examples[list_column_idx]).combine_chunks()
-    examples = examples.append_column("seq_lengths", lengths)  # Allows us to later construct `position_ids`
-    lengths = pc.make_struct(lengths, ids)
-    lengths = lengths.sort("descending", by=0)
+    - Truncates each example to `seq_length`.
+    - Concatenates multiple examples into each packed row up to `seq_length`.
+    - `position_ids` reset to 0 at each original example boundary.
+    """
+    # Hardcoded to our single use case: a table with list column `input_ids`.
+    input_ids_col = pc.list_slice(examples["input_ids"], 0, seq_length)
 
+    # Compute lengths and sort ids by decreasing length
+    lengths_np = pc.list_value_length(input_ids_col).to_numpy()
+    ids_np = np.arange(len(lengths_np))
+    order_desc = np.argsort(-lengths_np)
+
+    # Best-Fit Decreasing using a segment tree for efficiency
     segment_tree = _SegmentTree(seq_length)
-    segment_tree.add(seq_length)  # the max, `seq_length` bin is always available
+    segment_tree.add(seq_length)  # the max-capacity bin is always available
     space_to_bin = defaultdict(deque)
+    bins: list[dict] = []  # each bin: {"ids": list[int], "length": int}
 
-    # Bin is represented as a dict (of example ids and sum of their lengths) to allow in-place updates
-    bins: list[dict] = []
-    for length, idx in zip(lengths.field(0).to_numpy(), lengths.field(1).to_numpy()):
+    for idx in order_desc:
+        length = int(lengths_np[idx])
+        if length == 0:
+            continue
+
         space = segment_tree.search(length)
-
         if space < seq_length:
-            # Use existing bin with exactly this amount of space
-            bin = space_to_bin[space].popleft()
+            binref = space_to_bin[space].popleft()
         else:
-            # Create a new bin
-            bin = {"ids": [], "length": 0}
-            bins.append(bin)
+            binref = {"ids": [], "length": 0}
+            bins.append(binref)
 
-        bin["ids"].append(idx)
-        bin["length"] += length
+        binref["ids"].append(int(ids_np[idx]))
+        binref["length"] += length
+
         if space < seq_length and not space_to_bin[space]:
             segment_tree.remove(space)
 
-        space = space - length
-        space_to_bin[space].append(bin)
-        if space > 0:
-            segment_tree.add(space)
+        new_space = space - length
+        space_to_bin[new_space].append(binref)
+        if new_space > 0:
+            segment_tree.add(new_space)
 
-    examples = pc.take(examples, [id_ for bin in bins for id_ in bin["ids"]])
-    offsets = np.array([0] + [bin["length"] for bin in bins])
-    offsets = np.cumsum(offsets)
+    # Reorder examples by packed-bin grouping, then rebuild a single list per bin
+    reorder = [eid for b in bins for eid in b["ids"]]
+    taken = pc.take(input_ids_col, pa.array(reorder, type=pa.int64()))
+    list_arr = taken.chunks[0]  # take() yields a single chunk
 
-    assert all(
-        column.num_chunks == 1 for column in examples.columns
-    )  # `pc.take` returns a ChunkedArray with a single chunk
+    # Build packed offsets: one list per bin
+    bin_token_counts = [b["length"] for b in bins]
+    offsets_dtype = list_arr.offsets.type.to_pandas_dtype()
+    packed_offsets = np.cumsum([0] + bin_token_counts, dtype=offsets_dtype)
 
-    lengths = examples["seq_lengths"].chunks[0]
-    examples = examples.drop_columns("seq_lengths")
-    lengths = pa.ListArray.from_arrays(np.cumsum([0] + [len(bin["ids"]) for bin in bins], dtype=np.int32), lengths)
+    list_array_cls = type(list_arr)
+    packed_input_ids = list_array_cls.from_arrays(packed_offsets, list_arr.values)
 
-    columns = []
-    for column in examples.columns:
-        column = column.chunks[0]
-        if pa.types.is_list(column.type) or pa.types.is_large_list(column.type):
-            dtype = column.offsets.type.to_pandas_dtype()
-            column = type(column).from_arrays(offsets.astype(dtype), column.values)
-        columns.append(column)
-    return pa.Table.from_arrays(columns + [lengths], names=examples.column_names + ["seq_lengths"])
+    # Build position_ids: 0..len-1 for each original example, grouped per packed row
+    doc_lengths_ordered = lengths_np[reorder]
+    total_tokens = int(packed_offsets[-1]) if len(packed_offsets) > 0 else 0
+    if total_tokens > 0:
+        pos_vals = np.ones(total_tokens, dtype=np.int64)
+        pos_vals[0] = 0
+        if len(doc_lengths_ordered) > 1:
+            ends = doc_lengths_ordered[:-1].cumsum()
+            pos_vals[ends] = -(doc_lengths_ordered[:-1] - 1)
+        pos_vals = pos_vals.cumsum()
+    else:
+        pos_vals = np.array([], dtype=np.int64)
+
+    position_ids = list_array_cls.from_arrays(packed_offsets, pa.array(pos_vals, type=pa.int64()))
+
+    return pa.Table.from_arrays([packed_input_ids, position_ids], names=["input_ids", "position_ids"])
