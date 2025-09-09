@@ -49,6 +49,7 @@ class PretrainDataset(IterableDataset, Stateful):
         self._data = self._data.map(self._encode, batched=True, batch_size=5000, remove_columns=["text"])
         self._data = self._data.with_format("arrow")
         self._data = self._data.map(self._pack, batched=True, batch_size=5000)
+        self._data = self._data.shuffle(seed=42, buffer_size=5000)
         self._data = self._data.with_format("torch")
 
         self.num_shards = self._data.num_shards
@@ -93,7 +94,6 @@ def setup_dataloader(config: PretrainConfig | SFTConfig, micro_batch_size: int) 
         batch_size=micro_batch_size,
         num_workers=workers,
         drop_last=True,
-        pin_memory=True,
         prefetch_factor=2,
     )
 

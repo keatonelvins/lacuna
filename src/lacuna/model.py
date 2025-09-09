@@ -18,9 +18,7 @@ from .config import (
     LacunaConfig,
 )
 
-ATTN_IMPL_MAP = {
-    "FA3": "kernels-community/flash-attn3",
-}
+ATTN_IMPL_MAP = {"FA3": "kernels-community/flash-attn3",}
 
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:
