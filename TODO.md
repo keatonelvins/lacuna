@@ -1,8 +1,8 @@
 # TODO
 
 - Data Pipeline
-  - standardize around epochs: always save dataset to disk and stream with iterable, rebuild at epoch
-  - micro_batch_size is wrong everywhere now?
+  - tune bs to get_device_vram() // (self.config.torchrun.nproc_per_node * self.seq_len * 36)
+  - look into hard caching with cache_file_name in .map()
 
 - Eval
   - Add eval loop with support for held-out split(s) of the same datasets.

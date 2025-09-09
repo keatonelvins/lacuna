@@ -1,101 +1,111 @@
 """Data loading, tokenization, and packing for training."""
 
-from loguru import logger
-from functools import partial
-
-from datasets import load_dataset, interleave_datasets
+from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from datasets.distributed import split_dataset_by_node
-from torch.distributed.checkpoint.stateful import Stateful
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader, DistributedSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .config import PretrainConfig, SFTConfig
-from .distributed import get_rank, get_world_size, get_device_vram
+from .distributed import get_rank, get_world_size
 from .utils import pack_bfd
 
 
-def _get_iterable_dataset(config: PretrainConfig | SFTConfig) -> IterableDataset:
-    """Get single IterableDataset from merged hf datasets."""
-    loader = partial(load_dataset, split=config.data.split, streaming=config.data.stream)
-    datasets = [loader(name) for name in config.data.datasets]
+class LacunaDataset:
+    """Unified dataset wrapper for both iterable and map-style pipelines."""
 
-    if not config.data.stream:
-        datasets = [dataset.to_iterable_dataset(num_shards=get_world_size()) for dataset in datasets]
-
-    dataset = interleave_datasets(datasets, stopping_strategy="all_exhausted", probabilities=config.data.sampling_probs)
-
-    if dataset.num_shards != get_world_size():
-        logger.warning(f"Dataset has {dataset.num_shards} shards, but world size is {get_world_size()}")
-
-    return dataset
-
-
-class PretrainDataset(IterableDataset, Stateful):
-    """Stateful pretraining dataset w/ packing."""
-
-    def __init__(
-        self,
-        config: PretrainConfig,
-        tokenizer: PreTrainedTokenizerBase,
-    ):
+    def __init__(self, config: PretrainConfig | SFTConfig, tokenizer: PreTrainedTokenizerBase):
         self.config = config
         self.tokenizer = tokenizer
-        self.seq_len = config.data.seq_len
+        self.dp_world, self.dp_rank = get_world_size(), get_rank()
+        self.split = config.data.split
 
-        logger.info(f"Loading datasets: {config.data.datasets}")
-        dataset = _get_iterable_dataset(config)
-
-        # TODO: test and tune
-        bs = get_device_vram() // (self.config.torchrun.nproc_per_node * self.seq_len * 36)
-
-        self._data = split_dataset_by_node(dataset, get_rank(), get_world_size())
-        self._data = self._data.map(self._encode, batched=True, batch_size=bs, remove_columns=["text"])
-        self._data = self._data.with_format("arrow")
-        self._data = self._data.map(self._pack, batched=True, batch_size=bs)
-        self._data = self._data.shuffle(seed=42, buffer_size=bs)
-        self._data = self._data.with_format("torch")
-
-        self.num_shards = self._data.num_shards
+        if config.data.iterable:
+            self._dataset = self._build_iterable()
+            self.sampler = None
+        else:
+            self._dataset = self._build_mapstyle()
+            self.sampler = DistributedSampler(
+                self._dataset, num_replicas=self.dp_world, rank=self.dp_rank, shuffle=True, drop_last=True
+            )
 
     def _encode(self, examples):
         out = self.tokenizer(examples["text"], add_special_tokens=False, truncation=False, padding=False)
         return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in out["input_ids"]]}
 
     def _pack(self, examples):
-        return pack_bfd(examples, seq_length=self.seq_len)
+        return pack_bfd(examples, seq_length=self.config.data.seq_len * self.config.trainer.batch_size)
 
-    def __iter__(self):
-        for sample in self._data:
-            yield {
-                "input_ids": sample["input_ids"],
-                "position_ids": sample["position_ids"],
-                "labels": sample["input_ids"].clone(),
-            }
+    def _build_iterable(self):
+        if self.config.data.stream:
+            raw = [load_dataset(name, split=self.split, streaming=True) for name in self.config.data.datasets]
+        else:
+            raw = [load_dataset(name, split=self.split).to_iterable_dataset() for name in self.config.data.datasets]
 
-    def state_dict(self):
-        return {"data": self._data.state_dict()}
+        ds = interleave_datasets(
+            raw,
+            probabilities=self.config.data.sampling_probs,
+            stopping_strategy="first_exhausted",
+            seed=self.config.data.seed,
+        )
 
-    def load_state_dict(self, state_dict):
-        self._data.load_state_dict(state_dict["data"])
+        ds = ds.shuffle(seed=self.config.data.seed, buffer_size=self.config.data.shuffle_buffer)
+        ds = split_dataset_by_node(ds, rank=self.dp_rank, world_size=self.dp_world)
+        ds = ds.map(self._encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=["text"])
+        ds = ds.with_format("arrow").map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
+        ds = ds.with_format("torch")
+
+        return ds
+
+    def _build_mapstyle(self):
+        raw = [load_dataset(name, split=self.split) for name in self.config.data.datasets]
+        ds = concatenate_datasets(raw)
+        ds = ds.map(self._encode, batched=True, remove_columns=["text"])
+        ds = ds.map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
+        ds = ds.with_format("torch")
+
+        return ds
+
+    def set_epoch(self, epoch: int):
+        """Set epoch for proper shuffling across epochs."""
+        if self.config.data.iterable:
+            # TODO: can do self._dataset.set_epoch(epoch) if we catch StopIteration with infinite loop
+            # but this won't work with current lr scheduler ratios, should revisit
+            raise ValueError("Epoch reseeding is not supported for iterable datasets")
+        else:
+            self.sampler.set_epoch(epoch)
+
+    def create_dataloader(self, micro_batch_size: int) -> DataLoader:
+        """Create the appropriate dataloader for this dataset."""
+        if self.config.data.iterable:
+            self._dataloader = StatefulDataLoader(
+                self._dataset, num_workers=self.config.data.num_workers, drop_last=True, pin_memory=True, persistent_workers=True
+            )
+        else:
+            self._dataloader = DataLoader(
+                self._dataset,
+                sampler=self.sampler,
+                num_workers=self.config.data.num_workers,
+                drop_last=True,
+                pin_memory=True,
+                persistent_workers=True,
+            )
+
+        return self._dataloader
+
+    @property
+    def length(self) -> int | None:
+        """Return length per epoch of the dataset."""
+        if not self.config.data.iterable and self._dataloader:
+            return len(self._dataloader)
+        return None
 
 
-def setup_dataloader(config: PretrainConfig | SFTConfig, micro_batch_size: int) -> tuple[DataLoader, PreTrainedTokenizerBase]:
+def setup_dataloader(
+    config: PretrainConfig | SFTConfig, micro_batch_size: int
+) -> tuple[DataLoader, PreTrainedTokenizerBase, LacunaDataset]:
+    """Setup data pipeline and return dataloader, tokenizer, and dataset."""
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-
-    if isinstance(config, PretrainConfig):
-        dataset = PretrainDataset(config, tokenizer)
-    else:  # SFTConfig
-        raise ValueError("SFTConfig is not supported")
-
-    dataloader = StatefulDataLoader(
-        dataset,
-        batch_size=micro_batch_size,
-        num_workers=1,  # using 1 worker for now bc dataset is duplicated across workers
-        drop_last=True,
-        pin_memory=True,
-        prefetch_factor=2,
-        persistent_workers=True,
-    )
-
-    return dataloader, tokenizer
+    dataset = LacunaDataset(config, tokenizer)
+    dataloader = dataset.create_dataloader(micro_batch_size)
+    return dataloader, tokenizer, dataset

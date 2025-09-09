@@ -49,8 +49,8 @@ class WSDSchedulerConfig(BaseModel):
     """WSD scheduler config"""
 
     type: Literal["wsd"] = "wsd"
-    warmup_steps: int = Field(100, ge=0, description="Warmup steps")
-    decay_steps: int = Field(100, ge=0, description="Decay steps")
+    warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio")
+    decay_ratio: float = Field(0.05, ge=0, le=1, description="Decay ratio")
     min_lr_ratio: float = Field(0, ge=0, le=1, description="Minimum LR as ratio of max LR")
     decay_type: Literal["linear", "cosine"] = "linear"
 
@@ -63,6 +63,12 @@ class DataConfig(BaseModel):
     seq_len: int = Field(512, ge=1, description="Sequence length")
     stream: bool = Field(False, description="Stream in the datasets")
     sampling_probs: list[float] = Field(default=None, description="Sampling probabilities for each dataset")
+    seed: int = Field(42, description="Global seed")
+    shuffle_buffer: int = Field(10_000, description="Streaming shuffle buffer")
+    map_batch_size: int = Field(1024, description="Batch size for tokenize map")
+    pack_batch_size: int = Field(1024, description="Batch size for pack map")
+    num_workers: int = Field(4, description="DataLoader workers")
+    iterable: bool = Field(False, description="Choose iterable pipeline")
 
 
 class PretrainDataConfig(DataConfig):
@@ -104,6 +110,9 @@ class TrainerConfig(BaseModel):
     """Training loop config"""
 
     batch_size: int = Field(1, ge=1, description="Global training batch size")
+    epochs: int = Field(1, gt=0, description="Number of epochs")
+    steps: Optional[int] = Field(None, gt=0, description="Maximum training steps (overrides epochs)")
+    eval_every: float = Field(None, gt=0, le=1, description="Evaluation frequency as ratio of epoch")
 
 
 class MetricsConfig(BaseModel):
@@ -143,20 +152,6 @@ class CheckpointConfig(BaseModel):
             shutil.rmtree(self.save_dir, ignore_errors=True)
 
 
-class PretrainTrainerConfig(TrainerConfig):
-    """Pretraining trainer config"""
-
-    steps: int = Field(10000, gt=0, description="Maximum training steps")
-    eval_every: int = Field(1000, gt=0, description="Steps between evaluations")
-
-
-class SFTTrainerConfig(TrainerConfig):
-    """SFT trainer config"""
-
-    epochs: int = Field(3, gt=0, description="Number of epochs")
-    eval_every: int = Field(1, gt=0, description="Epochs between evaluations")
-
-
 class LacunaConfig(BaseSettings):
     """Shared base loader for pretraining and SFT"""
 
@@ -174,7 +169,7 @@ class PretrainConfig(LacunaConfig):
     """Pretraining config loader"""
 
     data: PretrainDataConfig = PretrainDataConfig()
-    trainer: PretrainTrainerConfig = PretrainTrainerConfig()
+    trainer: TrainerConfig = TrainerConfig()
     scheduler: WSDSchedulerConfig = WSDSchedulerConfig()
 
     model_config = SettingsConfigDict(
@@ -188,7 +183,7 @@ class SFTConfig(LacunaConfig):
     """SFT config loader"""
 
     data: SFTDataConfig = SFTDataConfig()
-    trainer: SFTTrainerConfig = SFTTrainerConfig()
+    trainer: TrainerConfig = TrainerConfig()
     scheduler: CosineSchedulerConfig = CosineSchedulerConfig()
 
     model_config = SettingsConfigDict(

@@ -62,12 +62,12 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     optimizer = setup_optimizer(model, config)
 
     logger.info("Setting up dataloader")
-    dataloader, tokenizer = setup_dataloader(config, micro_batch_size)
+    dataloader, tokenizer, dataset = setup_dataloader(config, micro_batch_size)
 
-    if isinstance(config, PretrainConfig):
-        max_steps = config.trainer.steps
-    else:  # SFTConfig
-        raise ValueError("SFTConfig is not supported")
+    if config.trainer.steps:
+        total_steps = config.trainer.steps
+    else:  # must be map-style
+        total_steps = dataset.length * config.trainer.epochs
 
     redline = Redline(
         model=model,
@@ -78,16 +78,16 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     if isinstance(config.scheduler, CosineSchedulerConfig):
         scheduler = get_cosine_with_min_lr_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=config.scheduler.warmup_ratio * max_steps,
-            num_training_steps=max_steps,
+            num_warmup_steps=int(config.scheduler.warmup_ratio * total_steps),
+            num_training_steps=total_steps,
             min_lr_ratio=config.scheduler.min_lr_ratio,
         )
     elif isinstance(config.scheduler, WSDSchedulerConfig):
         scheduler = get_wsd_schedule(
             optimizer,
-            num_warmup_steps=config.scheduler.warmup_steps,
-            num_decay_steps=config.scheduler.decay_steps,
-            num_training_steps=max_steps,
+            num_warmup_steps=int(config.scheduler.warmup_ratio * total_steps),
+            num_decay_steps=int(config.scheduler.decay_ratio * total_steps),
+            num_training_steps=total_steps,
             min_lr_ratio=config.scheduler.min_lr_ratio,
             decay_type=config.scheduler.decay_type,
         )
@@ -106,13 +106,20 @@ def train(config: PretrainConfig | SFTConfig) -> None:
         )
         logger.info(f"Resumed from checkpoint: {config.checkpoint.resume_from}")
 
-    logger.info(f"Starting training: {max_steps} steps")
+    logger.info(f"Starting training: {total_steps} steps")
 
     try:
         dataloader_iter = iter(dataloader)
         start_step = redline.state.step
+        current_epoch = 0
 
-        for step in range(start_step, max_steps):
+        for step in range(start_step, total_steps):
+            if dataset.length and config.trainer.epochs > 1:
+                epoch = step // dataset.length
+                if epoch > current_epoch:
+                    current_epoch = epoch
+                    dataset.set_epoch(epoch)
+                    dataloader_iter = iter(dataloader)
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
@@ -122,6 +129,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
                 torch.compiler.cudagraph_mark_step_begin()
 
+            batch["labels"] = batch["input_ids"].clone()
             model_inputs = {k: v.cuda() for k, v in batch.items()}
             model_inputs["accum_dtype"] = accum_dtype  # only used for Liger FLCE
 
