@@ -180,7 +180,11 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
     # Reorder examples by packed-bin grouping, then rebuild a single list per bin
     reorder = [eid for b in bins for eid in b["ids"]]
     taken = pc.take(input_ids_col, pa.array(reorder, type=pa.int64()))
-    list_arr = taken.chunks[0]  # take() yields a single chunk
+    # Ensure we have a single contiguous array regardless of chunking
+    if isinstance(taken, pa.ChunkedArray):
+        list_arr = taken.combine_chunks()
+    else:
+        list_arr = taken
 
     # Build packed offsets: one list per bin
     bin_token_counts = [b["length"] for b in bins]

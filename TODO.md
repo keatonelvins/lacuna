@@ -7,10 +7,8 @@
 - Data Pipeline
   - Better handle buffer (python list seems suboptimal)
   - need to call .shuffle() and use epochs()
-  - Add SegmentTree-style packing to reduce truncation for pretraining streams.
   - Auto-tune `num_workers` based on CPU cores and dataset shard count; set `persistent_workers=True`; warn and clamp as needed (currently clamps to shards).
   - Strategy for poor sharding: guidance/reshard path when `dataset.num_shards != world_size`.
-  - Support intra-document masking (https://huggingface.co/blog/smollm3, https://arxiv.org/pdf/2404.10830)
 
 - Checkpointing
   - Switch to `dcp.async_save` per recipe; keep one in-flight save and await completion before starting another.
