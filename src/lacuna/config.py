@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import torch
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +59,7 @@ class DataConfig(BaseModel):
     """Base config for data loading"""
 
     datasets: list[str] = Field(description="HF dataset names")
+    files: dict = Field(default_factory=dict, description="Mapping of dataset to files spec")
     split: str = Field("train", description="Split for all datasets")
     seq_len: int = Field(512, ge=1, description="Sequence length")
     stream: bool = Field(False, description="Stream in the datasets")
@@ -69,6 +70,13 @@ class DataConfig(BaseModel):
     pack_batch_size: int = Field(1024, description="Batch size for pack map")
     num_workers: int = Field(4, description="DataLoader workers")
     iterable: bool = Field(False, description="Choose iterable pipeline")
+
+    @model_validator(mode="after")
+    def set_files(self):
+        for dataset in self.datasets:
+            if dataset.startswith("s3://") and dataset not in self.files:
+                self.files[dataset] = {self.split: dataset.rstrip("/") + f"/{self.split}/*.parquet"}
+        return self
 
 
 class PretrainDataConfig(DataConfig):

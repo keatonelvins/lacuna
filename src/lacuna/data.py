@@ -36,11 +36,21 @@ class LacunaDataset:
     def _pack(self, examples):
         return pack_bfd(examples, seq_length=self.config.data.seq_len * self.config.trainer.batch_size)
 
+    def _load_datasets(self, split: str, stream: bool):
+        datasets = []
+        for name in self.config.data.datasets:
+            if name.startswith("s3://"):
+                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split, streaming=stream)
+            else:
+                ds = load_dataset(name, split=split, streaming=stream)
+
+            datasets.append(ds)
+        return datasets
+
     def _build_iterable(self):
-        if self.config.data.stream:
-            raw = [load_dataset(name, split=self.split, streaming=True) for name in self.config.data.datasets]
-        else:
-            raw = [load_dataset(name, split=self.split).to_iterable_dataset() for name in self.config.data.datasets]
+        raw = self._load_datasets(self.split, self.config.data.stream)
+        if not self.config.data.stream:
+            raw = [ds.to_iterable_dataset() for ds in raw]
 
         ds = interleave_datasets(
             raw,
@@ -58,7 +68,7 @@ class LacunaDataset:
         return ds
 
     def _build_mapstyle(self):
-        raw = [load_dataset(name, split=self.split) for name in self.config.data.datasets]
+        raw = self._load_datasets(self.split, self.config.data.stream)
         ds = concatenate_datasets(raw)
         ds = ds.map(self._encode, batched=True, remove_columns=["text"])
         ds = ds.map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
