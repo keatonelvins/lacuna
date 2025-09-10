@@ -4,9 +4,6 @@
   - Add eval loop with support for held-out split(s) of the same datasets.
   - Add support for verifiers envs as eval targets.
 
-- UX/Config
-  - Do dp_replicate/dp_shard instead of ddp/fsdp and additional hsdp flag
-
 - Repro/Robustness
   - Global seeding: seed Python/Torch/CUDA and DataLoader workers.
 

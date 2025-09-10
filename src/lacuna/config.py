@@ -115,12 +115,9 @@ class TorchrunConfig(BaseModel):
 class DistributedConfig(BaseModel):
     """Distributed training config"""
 
-    backend: Literal["FSDP", "DDP"] = Field(
-        "FSDP",
-        description="FSDP for large models, DDP for small models",
-    )
+    dp_replicate: int = Field(None, ge=1, description="Number of replicated DP groups (defaults to nnodes)")
+    dp_shard: int = Field(None, ge=1, description="Number of shards per replica (defaults to nproc_per_node)")
     cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
-    hsdp: bool = Field(False, description="Enable HSDP (2D mesh: inter-node DDP + intra-node FSDP)")
 
 
 class ActivationCheckpointConfig(BaseModel):

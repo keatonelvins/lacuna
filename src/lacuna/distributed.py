@@ -61,55 +61,54 @@ def is_master() -> bool:
     return get_rank() == 0
 
 
-def get_hsdp_mesh(config: LacunaConfig) -> DeviceMesh:
-    """Create 2D device mesh for HSDP."""
+def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
     world_size = get_world_size()
-
-    if not config.dist.hsdp:
-        return None
     if world_size == 1:
-        logger.warning("HSDP requested but world_size=1, using standard FSDP")
         return None
 
-    if config.torchrun.nnodes > 1:
-        dp_replicate = config.torchrun.nnodes
-        dp_shard = world_size // config.torchrun.nnodes
-    else:
-        dp_replicate, dp_shard = 2, world_size // 2
+    rep = config.dist.dp_replicate or config.torchrun.nnodes
+    shard = config.dist.dp_shard or config.torchrun.nproc_per_node
 
-    logger.info(f"HSDP mesh: {dp_replicate}×{dp_shard} = {world_size} GPUs")
-    mesh = init_device_mesh("cuda", [dp_replicate, dp_shard], mesh_dim_names=["dp_replicate", "dp_shard"])
+    if rep * shard != world_size:
+        raise ValueError(f"dp_replicate×dp_shard={rep}×{shard} ≠ world_size={world_size}")
+
+    if rep > 1 and shard > 1:
+        mode = "HSDP"
+        mesh = init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
+    elif rep > 1:
+        mode = "DDP"
+        mesh = None
+    elif shard > 1:
+        mode = "FSDP"
+        mesh = init_device_mesh("cuda", [shard], mesh_dim_names=["dp_shard"])
+    else:
+        raise ValueError(f"Invalid config: dp_replicate=1, dp_shard=1 but world_size={world_size}")
+
+    logger.info(f"{mode} mesh: replicate={rep}, shard={shard}, world={world_size}")
     return mesh
 
 
 def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
-    """Setup distributed training based on backend configuration."""
-
     world_size = get_world_size()
-
     if world_size == 1:
-        logger.info("Single GPU training - no distributed wrapping")
+        logger.info("Single GPU training")
         return model
-    elif config.dist.backend == "DDP":
+
+    mesh = get_dp_mesh(config)
+
+    if mesh:
+        return setup_fsdp2(model, config, mesh)
+    else:
         return setup_ddp(model, config)
-    else:  # fsdp
-        return setup_fsdp2(model, config)
 
 
-def setup_fsdp2(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
-    """Setup FSDP2 with per-block wrapping and optimizations."""
-
-    if not dist.is_initialized():
-        return model
-
-    mesh = get_hsdp_mesh(config)
+def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
     cpu_offload_policy = CPUOffloadPolicy(pin_memory=True) if config.dist.cpu_offload else None
 
     for i, block in enumerate(model.model.layers):
         # Last block: don't reshard since FSDP prefetches
         reshard = i < len(model.model.layers) - 1
-
         fully_shard(
             block,
             mesh=mesh,
@@ -126,7 +125,7 @@ def setup_fsdp2(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel
         reshard_after_forward=False,
     )
 
-    logger.info(f"{'HSDP' if config.dist.hsdp else 'FSDP2'} setup complete (cpu_offload={config.dist.cpu_offload})")
+    logger.info(f"Model sharding complete (cpu_offload={config.dist.cpu_offload})")
     return model
 
 
