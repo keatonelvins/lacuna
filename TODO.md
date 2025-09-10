@@ -11,10 +11,11 @@
   - Support assistant-only loss, load from chat template
 
 - After v1: 
+  - bump liger kernel for DFT loss: https://arxiv.org/pdf/2508.05629
   - Improve FLOPs/MFU estimator (use AllenAI/veomni/prime-rl references).
   - Make a dataset config with name, split, etc so it's contained
   - Look into hard map dataset caching with cache_file_name in .map()
-  - Support grouped GEMM for MoE(?), options are: kernels hub, torchtitan dependency, manual patch
+  - Support grouped GEMM for MoE(?), options are: kernels hub, torchtitan dependency/axolotl moe-kernels-v2
   - Switch to `dcp.async_save` per recipe; keep one in-flight save and await completion before starting another.
   - Add `dcp_to_hf` CLI in `cli.py` to repackage a DCP checkpoint into HF sharded weights.
   - Tune ugly `pack_bfd`, maybe rewrite in torch and see if performance hit is tolerable
