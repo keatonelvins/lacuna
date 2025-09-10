@@ -24,7 +24,6 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - Also supported by https://arxiv.org/pdf/2503.15450!
 
 ## Datasets
-- We always use IterableDatasets. This is the default type from `load_dataset` if streaming, otherwise we call to `to_iterable_dataset()`
 - If streaming, the number of dataset shards will match the number of remote parquets. Otherwise we manually set `num_shards` to your world size.
     - Having `num_shards == world_size` maximizes throughput using `split_dataset_by_node` as the dataset is split evenly across workers.
 - Helpful docs

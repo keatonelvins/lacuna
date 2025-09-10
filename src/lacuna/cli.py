@@ -20,7 +20,6 @@ T = TypeVar("T", bound=BaseSettings)
 def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
     torchrun = config.torchrun
 
-    # recommended to use physical cores / num processes
     if "OMP_NUM_THREADS" not in os.environ:
         physical_cores = psutil.cpu_count(logical=False)
         optimal_threads = max(1, physical_cores // torchrun.nproc_per_node)

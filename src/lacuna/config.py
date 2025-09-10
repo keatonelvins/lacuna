@@ -69,7 +69,6 @@ class DataConfig(BaseModel):
     map_batch_size: int = Field(1024, description="Batch size for tokenize map")
     pack_batch_size: int = Field(1024, description="Batch size for pack map")
     num_workers: int = Field(4, description="DataLoader workers")
-    iterable: bool = Field(False, description="Choose iterable pipeline")
 
     @model_validator(mode="after")
     def set_files(self):

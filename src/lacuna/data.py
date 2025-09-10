@@ -12,7 +12,7 @@ from .utils import pack_bfd
 
 
 class LacunaDataset:
-    """Unified dataset wrapper for both iterable and map-style pipelines."""
+    """Dataset wrapper that supports streaming (iterable) or cached (map-style) datasets."""
 
     def __init__(self, config: PretrainConfig | SFTConfig, tokenizer: PreTrainedTokenizerBase):
         self.config = config
@@ -20,11 +20,10 @@ class LacunaDataset:
         self.dp_world, self.dp_rank = get_world_size(), get_rank()
         self.split = config.data.split
 
-        if config.data.iterable:
-            self._dataset = self._build_iterable()
+        self._dataset = self._build_dataset()
+        if config.data.stream:
             self.sampler = None
         else:
-            self._dataset = self._build_mapstyle()
             self.sampler = DistributedSampler(
                 self._dataset, num_replicas=self.dp_world, rank=self.dp_rank, shuffle=True, drop_last=True
             )
@@ -47,38 +46,29 @@ class LacunaDataset:
             datasets.append(ds)
         return datasets
 
-    def _build_iterable(self):
+    def _build_dataset(self):
         raw = self._load_datasets(self.split, self.config.data.stream)
-        if not self.config.data.stream:
-            raw = [ds.to_iterable_dataset() for ds in raw]
+        if self.config.data.stream:
+            ds = interleave_datasets(
+                raw,
+                probabilities=self.config.data.sampling_probs,
+                stopping_strategy="first_exhausted",
+                seed=self.config.data.seed,
+            ).shuffle(seed=self.config.data.seed, buffer_size=self.config.data.shuffle_buffer)
+            ds = split_dataset_by_node(ds, rank=self.dp_rank, world_size=self.dp_world)
 
-        ds = interleave_datasets(
-            raw,
-            probabilities=self.config.data.sampling_probs,
-            stopping_strategy="first_exhausted",
-            seed=self.config.data.seed,
-        )
+        else:
+            ds = concatenate_datasets(raw)
 
-        ds = ds.shuffle(seed=self.config.data.seed, buffer_size=self.config.data.shuffle_buffer)
-        ds = split_dataset_by_node(ds, rank=self.dp_rank, world_size=self.dp_world)
         ds = ds.map(self._encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=["text"])
         ds = ds.with_format("arrow").map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
         ds = ds.with_format("torch")
 
         return ds
 
-    def _build_mapstyle(self):
-        raw = self._load_datasets(self.split, self.config.data.stream)
-        ds = concatenate_datasets(raw)
-        ds = ds.map(self._encode, batched=True, remove_columns=["text"])
-        ds = ds.map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
-        ds = ds.with_format("torch")
-
-        return ds
-
     def set_epoch(self, epoch: int):
         """Set epoch for proper shuffling across epochs."""
-        if self.config.data.iterable:
+        if self.config.data.stream:
             # TODO: can do self._dataset.set_epoch(epoch) if we catch StopIteration with infinite loop
             # but this won't work with current lr scheduler ratios, should revisit
             raise ValueError("Epoch reseeding is not supported for iterable datasets")
@@ -87,7 +77,7 @@ class LacunaDataset:
 
     def create_dataloader(self, micro_batch_size: int) -> DataLoader:
         """Create the appropriate dataloader for this dataset."""
-        if self.config.data.iterable:
+        if self.config.data.stream:
             self._dataloader = StatefulDataLoader(
                 self._dataset, num_workers=self.config.data.num_workers, drop_last=True, pin_memory=True, persistent_workers=True
             )
@@ -106,7 +96,7 @@ class LacunaDataset:
     @property
     def length(self) -> int | None:
         """Return length per epoch of the dataset."""
-        if not self.config.data.iterable and self._dataloader:
+        if not self.config.data.stream and self._dataloader:
             return len(self._dataloader)
         return None
 
