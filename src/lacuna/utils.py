@@ -7,6 +7,7 @@ from rich.console import Console
 from dataclasses import asdict
 from collections import defaultdict, deque
 
+import torch
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -39,6 +40,9 @@ def setup_logger() -> None:
 
 
 def setup_env() -> None:
+    # high -> TF32, highest -> FP32
+    torch.set_float32_matmul_precision("high")
+
     os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
     disable_progress_bar()
 

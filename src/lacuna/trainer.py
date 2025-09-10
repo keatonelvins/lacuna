@@ -23,25 +23,19 @@ from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 @logger.catch(reraise=True)
 def train(config: LacunaConfig) -> None:
     """Core training function."""
-    setup_logger()
     setup_env()
-
+    setup_logger()
     init_distributed()
     display_config(config)
-
-    # high -> TF32, highest -> FP32
-    torch.set_float32_matmul_precision("high")
 
     wandb_run = init_wandb(config)
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
 
     world_size = get_world_size()
-
     if not config.trainer.batch_size % world_size == 0:
         raise ValueError(f"Batch size {config.trainer.batch_size} must be divisible by world_size {world_size}")
 
     micro_batch_size = config.trainer.batch_size // world_size
-
     logger.info(f"GPU setup: {world_size} GPUs, batch_size={config.trainer.batch_size} ({micro_batch_size} per GPU)")
 
     logger.info("Setting up model")
@@ -56,19 +50,9 @@ def train(config: LacunaConfig) -> None:
     else:  # must be map-style
         total_steps = dataset.length * config.trainer.epochs
 
-    logger.info("Setting up optimizer and scheduler")
     optimizer = setup_optimizer(model, config)
-    scheduler = setup_scheduler(
-        optimizer,
-        config.scheduler,
-        total_steps=total_steps,
-    )
-
-    redline = Redline(
-        model=model,
-        seq_len=config.trainer.seq_len,
-        world_size=world_size,
-    )
+    scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
+    redline = Redline(model=model, seq_len=config.trainer.seq_len, world_size=world_size)
 
     accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
@@ -83,6 +67,7 @@ def train(config: LacunaConfig) -> None:
         logger.info(f"Resumed from checkpoint: {config.checkpoint.resume_from}")
 
     logger.info(f"Starting training: {total_steps} steps")
+    train_interrupted = False
 
     try:
         dataloader_iter = iter(dataloader)
@@ -116,13 +101,12 @@ def train(config: LacunaConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
-            if hasattr(grad_norm, "full_tensor"):  # TODO: read FSDP docs to see if this is correct
+            if hasattr(grad_norm, "full_tensor"):  # TODO: check FSDP docs to see if this is correct
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
             scheduler.step()
 
-            step_tokens = batch["input_ids"].shape[1]
-            redline.update(step_tokens, data_load_time)
+            redline.update(batch["input_ids"].shape[1], data_load_time)
 
             if step % config.metrics.steps_per_log == 0:
                 current_lr = scheduler.get_last_lr()[0]
@@ -148,10 +132,10 @@ def train(config: LacunaConfig) -> None:
                 )
 
     except KeyboardInterrupt:
-        logger.info("Training interrupted!!!")
-
+        logger.info("Training interrupted :(")
+        train_interrupted = True
     finally:
-        if redline.state.step > start_step:  # don't save if training insta-crashed
+        if not train_interrupted and redline.state.step > start_step:  # don't save if training insta-crashed or interrupted
             save_checkpoint(
                 model=model,
                 optimizer=optimizer,
@@ -162,6 +146,5 @@ def train(config: LacunaConfig) -> None:
                 tokenizer=tokenizer,
                 final=True,
             )
-
         finish(wandb_run)
         destroy_distributed()
