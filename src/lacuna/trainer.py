@@ -1,25 +1,17 @@
-"""Core training loop for pretraining and SFT."""
+"""Core training loop."""
 
 import time
 import torch
 from loguru import logger
 from torch.amp import autocast
-from transformers.optimization import (
-    get_cosine_with_min_lr_schedule_with_warmup,
-    get_wsd_schedule,
-)
 
 from .checkpoint import (
     load_checkpoint,
     save_checkpoint,
 )
-from .config import (
-    CosineSchedulerConfig,
-    WSDSchedulerConfig,
-    PretrainConfig,
-    SFTConfig,
-)
+from .config import LacunaConfig
 from .data import setup_dataloader
+from .scheduler import setup_scheduler
 from .distributed import get_world_size, init_distributed, setup_distributed, is_master, destroy_distributed
 from .metrics import Redline
 from .model import setup_model
@@ -29,7 +21,7 @@ from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 
 
 @logger.catch(reraise=True)
-def train(config: PretrainConfig | SFTConfig) -> None:
+def train(config: LacunaConfig) -> None:
     """Core training function."""
     setup_logger()
     setup_env()
@@ -58,9 +50,6 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     model = setup_model(config)
     model = setup_distributed(model, config)
 
-    logger.info("Setting up optimizer and scheduler")
-    optimizer = setup_optimizer(model, config)
-
     logger.info("Setting up dataloader")
     dataloader, tokenizer, dataset = setup_dataloader(config, micro_batch_size)
 
@@ -69,30 +58,19 @@ def train(config: PretrainConfig | SFTConfig) -> None:
     else:  # must be map-style
         total_steps = dataset.length * config.trainer.epochs
 
-    redline = Redline(
-        model=model,
-        seq_len=config.data.seq_len,
-        world_size=world_size,
+    logger.info("Setting up optimizer and scheduler")
+    optimizer = setup_optimizer(model, config)
+    scheduler = setup_scheduler(
+        optimizer,
+        config.scheduler,
+        total_steps=total_steps,
     )
 
-    if isinstance(config.scheduler, CosineSchedulerConfig):
-        scheduler = get_cosine_with_min_lr_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=int(config.scheduler.warmup_ratio * total_steps),
-            num_training_steps=total_steps,
-            min_lr_ratio=config.scheduler.min_lr_ratio,
-        )
-    elif isinstance(config.scheduler, WSDSchedulerConfig):
-        scheduler = get_wsd_schedule(
-            optimizer,
-            num_warmup_steps=int(config.scheduler.warmup_ratio * total_steps),
-            num_decay_steps=int(config.scheduler.decay_ratio * total_steps),
-            num_training_steps=total_steps,
-            min_lr_ratio=config.scheduler.min_lr_ratio,
-            decay_type=config.scheduler.decay_type,
-        )
-    else:
-        raise ValueError(f"Unsupported scheduler type: {config.scheduler.type}")
+    redline = Redline(
+        model=model,
+        seq_len=config.trainer.seq_len,
+        world_size=world_size,
+    )
 
     accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
@@ -145,7 +123,7 @@ def train(config: PretrainConfig | SFTConfig) -> None:
             optimizer.step()
             scheduler.step()
 
-            step_tokens = config.trainer.batch_size * config.data.seq_len
+            step_tokens = batch["input_ids"].shape[1]
             redline.update(step_tokens, data_load_time)
 
             if step % config.metrics.log_every == 0:

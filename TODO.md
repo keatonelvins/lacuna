@@ -13,9 +13,6 @@
 - Metrics
   - Improve FLOPs/MFU estimator (use AllenAI/veomni/prime-rl references).
 
-- Optimizer/Model
-  - Extract scheduler logic to `scheduler.py`; unify into warmup (if any), stable (if any), decay (if any)
-
 - SFT
   - Support assistant-only loss, load from chat template
 

@@ -1,6 +1,5 @@
 import os
 import json
-from typing import Any
 from pathlib import Path
 from loguru import logger
 from rich.pretty import Pretty
@@ -131,17 +130,17 @@ class _SegmentTree:
         return self.tree[i]
 
 
-def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
+def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
     """
     Pack `input_ids` examples into fixed-length bins (Best-Fit Decreasing) and
     return only two columns: `input_ids` (packed) and `position_ids`.
 
-    - Truncates each example to `seq_length`.
-    - Concatenates multiple examples into each packed row up to `seq_length`.
+    - Truncates each example to `seq_len`.
+    - Concatenates multiple examples into each packed row up to `seq_len`.
     - `position_ids` reset to 0 at each original example boundary.
     """
     # Hardcoded to our single use case: a table with list column `input_ids`.
-    input_ids_col = pc.list_slice(examples["input_ids"], 0, seq_length)
+    input_ids_col = pc.list_slice(examples["input_ids"], 0, seq_len)
 
     # Compute lengths and sort ids by decreasing length
     lengths_np = pc.list_value_length(input_ids_col).to_numpy()
@@ -149,8 +148,8 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
     order_desc = np.argsort(-lengths_np)
 
     # Best-Fit Decreasing using a segment tree for efficiency
-    segment_tree = _SegmentTree(seq_length)
-    segment_tree.add(seq_length)  # the max-capacity bin is always available
+    segment_tree = _SegmentTree(seq_len)
+    segment_tree.add(seq_len)  # the max-capacity bin is always available
     space_to_bin = defaultdict(deque)
     bins: list[dict] = []  # each bin: {"ids": list[int], "length": int}
 
@@ -160,7 +159,7 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
             continue
 
         space = segment_tree.search(length)
-        if space < seq_length:
+        if space < seq_len:
             binref = space_to_bin[space].popleft()
         else:
             binref = {"ids": [], "length": 0}
@@ -169,7 +168,7 @@ def pack_bfd(examples: pa.Table, seq_length: int) -> pa.Table:
         binref["ids"].append(int(ids_np[idx]))
         binref["length"] += length
 
-        if space < seq_length and not space_to_bin[space]:
+        if space < seq_len and not space_to_bin[space]:
             segment_tree.remove(space)
 
         new_space = space - length

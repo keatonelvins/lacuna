@@ -11,13 +11,13 @@ from pydantic_settings import BaseSettings
 import torch
 import psutil
 
-from lacuna.config import PretrainConfig, SFTConfig
+from lacuna.config import LacunaConfig
 from lacuna.trainer import train
 
 T = TypeVar("T", bound=BaseSettings)
 
 
-def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
+def launch_torchrun(config: BaseSettings) -> None:
     torchrun = config.torchrun
 
     if "OMP_NUM_THREADS" not in os.environ:
@@ -38,10 +38,10 @@ def launch_torchrun(config: BaseSettings, entry_point: str) -> None:
         )
     elif torchrun.nnodes > 1:
         print(f"Error: For multi-node training (nnodes={torchrun.nnodes}) must specify node_rank")
-        print("Example: uv run pt configs/multi_node.toml --torchrun.node_rank 0")
+        print("Example: uv run lacuna configs/multi_node.toml --torchrun.node_rank 0")
         sys.exit(1)
 
-    cmd.extend(["-m", "lacuna.cli", entry_point])
+    cmd.extend(["-m", "lacuna.cli", "lacuna"])
     cmd.extend(sys.argv[1:])
 
     print(f"Launching: {' '.join(cmd)}")
@@ -69,21 +69,14 @@ def parse_argv(config_cls: Type[T]) -> T:
 
     # if multi-gpu and haven't already launched torchrun, launch it
     if torch.cuda.device_count() > 1 and "RANK" not in os.environ:
-        entry_point = "pretrain" if config_cls == PretrainConfig else "sft"
-        launch_torchrun(config, entry_point)
+        launch_torchrun(config)
 
     return config
 
 
-def pretrain():
-    """Entry point for pretraining."""
-    config = parse_argv(PretrainConfig)
-    train(config)
-
-
-def sft():
-    """Entry point for SFT."""
-    config = parse_argv(SFTConfig)
+def lacuna():
+    """Entry point for training."""
+    config = parse_argv(LacunaConfig)
     train(config)
 
 
@@ -103,14 +96,12 @@ def count_lines():
 def main():
     """Torchrun entry point."""
     if len(sys.argv) < 2:
-        print("Usage: uv run python -m lacuna.cli [pretrain|sft]")
+        print("Usage: uv run python -m lacuna.cli train")
         sys.exit(1)
     cmd = sys.argv[1]
     sys.argv = [sys.argv[0]] + sys.argv[2:]
-    if cmd == "pretrain":
-        pretrain()
-    elif cmd == "sft":
-        sft()
+    if cmd == "lacuna":
+        lacuna()
     else:
         print(f"Unknown command: {cmd}")
         sys.exit(1)

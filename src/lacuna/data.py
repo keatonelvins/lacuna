@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
-from .config import PretrainConfig, SFTConfig
+from .config import LacunaConfig
 from .distributed import get_rank, get_world_size
 from .utils import pack_bfd
 
@@ -14,7 +14,7 @@ from .utils import pack_bfd
 class LacunaDataset:
     """Dataset wrapper that supports streaming (iterable) or cached (map-style) datasets."""
 
-    def __init__(self, config: PretrainConfig | SFTConfig, tokenizer: PreTrainedTokenizerBase):
+    def __init__(self, config: LacunaConfig, tokenizer: PreTrainedTokenizerBase):
         self.config = config
         self.tokenizer = tokenizer
         self.dp_world, self.dp_rank = get_world_size(), get_rank()
@@ -33,7 +33,7 @@ class LacunaDataset:
         return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in out["input_ids"]]}
 
     def _pack(self, examples):
-        return pack_bfd(examples, seq_length=self.config.data.seq_len * self.config.trainer.batch_size)
+        return pack_bfd(examples, seq_len=self.config.trainer.seq_len * self.config.trainer.batch_size)
 
     def _load_datasets(self, split: str, stream: bool):
         datasets = []
@@ -101,9 +101,7 @@ class LacunaDataset:
         return None
 
 
-def setup_dataloader(
-    config: PretrainConfig | SFTConfig, micro_batch_size: int
-) -> tuple[DataLoader, PreTrainedTokenizerBase, LacunaDataset]:
+def setup_dataloader(config: LacunaConfig, micro_batch_size: int) -> tuple[DataLoader, PreTrainedTokenizerBase, LacunaDataset]:
     """Setup data pipeline and return dataloader, tokenizer, and dataset."""
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
     dataset = LacunaDataset(config, tokenizer)
