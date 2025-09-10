@@ -53,8 +53,8 @@ class LacunaDataset:
                 raw,
                 probabilities=self.config.data.sampling_probs,
                 stopping_strategy="first_exhausted",
-                seed=self.config.data.seed,
-            ).shuffle(seed=self.config.data.seed, buffer_size=self.config.data.shuffle_buffer)
+                seed=self.config.trainer.seed,
+            ).shuffle(seed=self.config.trainer.seed, buffer_size=self.config.data.shuffle_buffer)
             ds = split_dataset_by_node(ds, rank=self.dp_rank, world_size=self.dp_world)
 
         else:

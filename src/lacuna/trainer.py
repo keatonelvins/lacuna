@@ -126,7 +126,7 @@ def train(config: LacunaConfig) -> None:
             step_tokens = batch["input_ids"].shape[1]
             redline.update(step_tokens, data_load_time)
 
-            if step % config.metrics.log_every == 0:
+            if step % config.metrics.steps_per_log == 0:
                 current_lr = scheduler.get_last_lr()[0]
                 metrics = redline.read()
 
