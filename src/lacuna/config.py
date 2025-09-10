@@ -47,10 +47,10 @@ class DataConfig(BaseModel):
     stream: bool = Field(False, description="Enable streaming the datasets (e.g. if it's too big to fit on disk)")
     sampling_probs: list[float] = Field(default=None, description="If streaming multiple datasets, how to sample from them")
     shuffle_buffer: int = Field(
-        10_000, description="If streaming, the num samples shuffled at a time (for disk we shuffle the entire dataset)"
+        50000, description="If streaming, the num samples shuffled at a time (for disk we shuffle the entire dataset)"
     )
-    map_batch_size: int = Field(1024, description="Batch size to use when tokenizing the dataset")
-    pack_batch_size: int = Field(1024, description="Batch size to use when packing the dataset")
+    map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
+    pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
     num_workers: int = Field(4, description="The number of workers to use for data loading")
 
     @model_validator(mode="after")
@@ -83,7 +83,7 @@ class SchedulerConfig(BaseModel):
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
-    save_every: int = Field(None, description="Epochs between checkpoint saves (default no checkpointing)")
+    save_every: float = Field(None, description="Epochs between checkpoint saves (default no checkpointing)")
     save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
     resumable_final_save: bool = Field(False, description="Make the final save resumable by storing optimizer state")

@@ -16,16 +16,17 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 ## Other considerations
 - Don't apply weight decay to embeddings/layer norms/biases (https://github.com/karpathy/minGPT/pull/24#issuecomment-679316025)
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
-- For FSDP, we fully shard the layers individually then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
+- For FSDP, we fully shard the layers individually, then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
-- Set `OMP_NUM_THREADS` to `cpu_cores / num_gpus` (physical cores so no hyper-threads!!)
-- Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking during pretraining
+- Set `OMP_NUM_THREADS` to `cpu_cores / num_gpus` for torchrun (physical cores so no hyper-threads!!)
+- Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking
+    - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!
 
 ## Datasets
-- If streaming, the number of dataset shards will match the number of remote parquets. Otherwise we manually set `num_shards` to your world size.
-    - Having `num_shards == world_size` maximizes throughput using `split_dataset_by_node` as the dataset is split evenly across workers.
+- If streaming, the number of dataset shards will match the number of remote parquet files.
+    - Having `num_shards %= world_size` maximizes throughput using `split_dataset_by_node` as the dataset is split evenly across workers.
 - Helpful docs
     - https://huggingface.co/docs/datasets/en/stream
     - https://huggingface.co/docs/datasets/en/use_with_pytorch

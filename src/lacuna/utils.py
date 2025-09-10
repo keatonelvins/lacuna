@@ -17,6 +17,17 @@ from .config import LacunaConfig
 from .metrics import StateTracker
 
 
+def master_only(fn):
+    """Decorator to run a function only on the master process."""
+
+    def wrapper(*args, **kwargs):
+        if not is_master():
+            return
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 def setup_logger() -> None:
     logger.remove()  # Remove default handler
     logger.add(
@@ -39,17 +50,15 @@ def display_config(config: LacunaConfig) -> None:
     logger.info("Starting training with config:\n" + capture.get().strip())
 
 
+@master_only
 def save_state_json(path: Path, state: StateTracker) -> None:
-    if not is_master():
-        return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "state.json").open("w") as f:
         f.write(json.dumps(asdict(state), indent=4))
 
 
+@master_only
 def save_settings_json(path: Path, config: LacunaConfig) -> None:
-    if not is_master():
-        return
     path.mkdir(parents=True, exist_ok=True)
     with (path / "settings.json").open("w") as f:
         f.write(config.model_dump_json(indent=4))

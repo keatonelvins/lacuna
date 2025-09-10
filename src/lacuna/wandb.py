@@ -3,12 +3,13 @@ from typing import Any
 import wandb
 
 from .config import LacunaConfig
-from .distributed import is_master
 from .metrics import StateTracker
+from .utils import master_only
 
 
+@master_only
 def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
-    if not config.wandb.enabled or not is_master():
+    if not config.wandb.enabled:
         return None
 
     config_dict = config.model_dump(mode="json")

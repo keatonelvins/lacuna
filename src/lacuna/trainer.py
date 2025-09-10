@@ -12,7 +12,7 @@ from .checkpoint import (
 from .config import LacunaConfig
 from .data import setup_dataloader
 from .scheduler import setup_scheduler
-from .distributed import get_world_size, init_distributed, setup_distributed, is_master, destroy_distributed
+from .distributed import get_world_size, init_distributed, setup_distributed, destroy_distributed
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
@@ -27,9 +27,7 @@ def train(config: LacunaConfig) -> None:
     setup_env()
 
     init_distributed()
-
-    if is_master():
-        display_config(config)
+    display_config(config)
 
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
@@ -136,7 +134,7 @@ def train(config: LacunaConfig) -> None:
                     wandb_metrics = prepare_wandb_metrics(loss.item(), grad_norm, current_lr, metrics, redline.state)
                     log_metrics(wandb_metrics, step, wandb_run)
 
-            if step > 0 and config.checkpoint.save_every and step % config.checkpoint.save_every == 0:
+            if current_epoch > 0 and step % int(config.checkpoint.save_every * dataset.length) == 0:
                 logger.info(f"Saving checkpoint at step {step}")
                 save_checkpoint(
                     model=model,

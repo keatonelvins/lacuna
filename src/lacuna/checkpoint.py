@@ -24,7 +24,6 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from .distributed import is_master
 from .config import LacunaConfig
 from .metrics import StateTracker
 from .utils import save_state_json, save_settings_json, load_state_json
@@ -80,8 +79,6 @@ def save_checkpoint(
     """Save DCP shards or final HF sharded weights."""
     ckpt_name = "final" if final else f"step_{state.step}"
     path = config.checkpoint.save_dir / ckpt_name
-    if is_master():
-        path.mkdir(parents=True, exist_ok=True)
 
     unwrapped_model = model.module if hasattr(model, "module") else model
     unwrapped_model.config.save_pretrained(path)
