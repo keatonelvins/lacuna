@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import torch
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +45,7 @@ class DataConfig(BaseModel):
     files: dict = Field(default_factory=dict, description="Mapping of dataset to regex for fs matching")
     split: str = Field("train", description="Split to use for all the datasets")
     column: str = Field("text", description="Dataset column to use ('text' or 'messages')")
+    chat_template: str = Field(None, description="Chat template to use for the dataset (either a string or a path to a file)")
     stream: bool = Field(False, description="Enable streaming the datasets (e.g. if it's too big to fit on disk)")
     sampling_probs: list[float] = Field(default=None, description="If streaming multiple datasets, how to sample from them")
     shuffle_buffer: int = Field(
@@ -60,6 +61,19 @@ class DataConfig(BaseModel):
             if dataset.startswith("s3://") and dataset not in self.files:
                 self.files[dataset] = {self.split: dataset.rstrip("/") + f"/{self.split}/*.parquet"}
         return self
+
+    @field_validator("chat_template", mode="after")
+    @classmethod
+    def validate_chat_template(cls, chat_template: str | None) -> str:
+        """If chat_template is a file path, read the template from the file."""
+        if chat_template:
+            try:
+                maybe_template_path = Path(chat_template)
+                if maybe_template_path.exists() and maybe_template_path.is_file():
+                    return maybe_template_path.read_text()
+            except Exception:
+                pass
+        return chat_template
 
 
 class OptimizerConfig(BaseModel):

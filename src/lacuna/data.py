@@ -34,6 +34,7 @@ class LacunaDataset:
             for messages in examples["messages"]:
                 processed = self.tokenizer.apply_chat_template(
                     messages,
+                    chat_template=self.config.data.chat_template,
                     return_dict=True,
                     return_assistant_tokens_mask=True,
                 )
