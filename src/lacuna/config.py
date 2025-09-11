@@ -46,6 +46,7 @@ class DataConfig(BaseModel):
     split: str = Field("train", description="Split to use for all the datasets")
     column: str = Field("text", description="Dataset column to use ('text' or 'messages')")
     chat_template: str = Field(None, description="Chat template to use for the dataset (either a string or a path to a file)")
+    eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
     stream: bool = Field(False, description="Enable streaming the datasets (e.g. if it's too big to fit on disk)")
     sampling_probs: list[float] = Field(default=None, description="If streaming multiple datasets, how to sample from them")
     shuffle_buffer: int = Field(

@@ -43,7 +43,7 @@ def train(config: LacunaConfig) -> None:
     model = setup_distributed(model, config)
 
     logger.info("Setting up dataloader")
-    dataloader, tokenizer, dataset = setup_dataloader(config, micro_batch_size)
+    dataloader, dataset = setup_dataloader(config, micro_batch_size)
 
     if config.trainer.steps:
         total_steps = config.trainer.steps
@@ -131,7 +131,6 @@ def train(config: LacunaConfig) -> None:
                     optimizer=optimizer,
                     scheduler=scheduler,
                     dataloader=dataloader,
-                    tokenizer=tokenizer,
                 )
 
     except KeyboardInterrupt:
@@ -146,7 +145,6 @@ def train(config: LacunaConfig) -> None:
                 optimizer=optimizer,
                 scheduler=scheduler,
                 dataloader=dataloader,
-                tokenizer=tokenizer,
                 final=True,
             )
         finish(wandb_run)

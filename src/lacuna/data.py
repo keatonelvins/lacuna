@@ -1,22 +1,35 @@
 """Data loading, tokenization, and packing for training."""
 
+from loguru import logger
 from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from datasets.distributed import split_dataset_by_node
 from torch.utils.data import DataLoader, DistributedSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
+from .utils import pack_bfd
 from .config import LacunaConfig
 from .distributed import get_rank, get_world_size
-from .utils import pack_bfd
+
+
+def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
+    tokenizer = AutoTokenizer.from_pretrained(config.model.name)
+    if config.data.chat_template:
+        tokenizer.chat_template = config.data.chat_template
+    if config.data.eos_token:
+        added = tokenizer.add_special_tokens({"eos_token": config.data.eos_token})
+        if added > 0:  # TODO: if not in vocab already, need to resize token embeddings
+            logger.error(f"{config.data.eos_token} was not already a special token!")
+
+    return tokenizer
 
 
 class LacunaDataset:
     """Dataset wrapper that supports streaming (iterable) or cached (map-style) datasets."""
 
-    def __init__(self, config: LacunaConfig, tokenizer: PreTrainedTokenizerBase):
+    def __init__(self, config: LacunaConfig):
         self.config = config
-        self.tokenizer = tokenizer
+        self.tokenizer = get_tokenizer(config)
         self.dp_world, self.dp_rank = get_world_size(), get_rank()
         self.split = config.data.split
 
@@ -39,7 +52,6 @@ class LacunaDataset:
             for messages in examples["messages"]:
                 processed = self.tokenizer.apply_chat_template(
                     messages,
-                    chat_template=self.config.data.chat_template,
                     return_dict=True,
                     return_assistant_tokens_mask=True,
                 )
@@ -47,7 +59,8 @@ class LacunaDataset:
                 results["assistant_masks"].append(processed["assistant_masks"])
             return results
         else:
-            return {"input_ids": self.tokenizer(examples[self.config.data.column]).input_ids}
+            input_ids = self.tokenizer(examples[self.config.data.column]).input_ids
+            return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in input_ids]}
 
     def _pack(self, examples):
         return pack_bfd(examples, seq_len=self.config.trainer.seq_len * self.config.trainer.batch_size)
@@ -120,9 +133,8 @@ class LacunaDataset:
         return None
 
 
-def setup_dataloader(config: LacunaConfig, micro_batch_size: int) -> tuple[DataLoader, PreTrainedTokenizerBase, LacunaDataset]:
-    """Setup data pipeline and return dataloader, tokenizer, and dataset."""
-    tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-    dataset = LacunaDataset(config, tokenizer)
+def setup_dataloader(config: LacunaConfig, micro_batch_size: int) -> tuple[DataLoader, LacunaDataset]:
+    """Setup data pipeline and return dataloader, and dataset."""
+    dataset = LacunaDataset(config)
     dataloader = dataset.create_dataloader(micro_batch_size)
-    return dataloader, tokenizer, dataset
+    return dataloader, dataset

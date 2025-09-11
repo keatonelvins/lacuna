@@ -27,7 +27,6 @@ count_lines = "lacuna.cli:count_lines"
 dev = [
     "pre-commit>=4.3.0",
     "pytest>=8.4.1",
-    "pytest-cov>=6.2.1",
     "ruff>=0.12.11",
     "ty>=0.0.1a19",
 ]
@@ -48,8 +47,6 @@ addopts = [
     "--tb=short",
     "--disable-warnings",
     "-ra",
-    "--cov=lacuna",
-    "--cov-report=term-missing",
 ]
 
 [tool.uv.sources]

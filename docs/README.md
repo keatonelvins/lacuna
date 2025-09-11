@@ -32,6 +32,10 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - https://huggingface.co/docs/datasets/en/use_with_pytorch
     - https://docs.pytorch.org/docs/stable/data.html
 
+## Tokenization
+- HF tokenization is littered with footguns, highly recommend Quentin's post on this:
+    - https://huggingface.co/blog/qgallouedec/gotchas-in-tokenizer-behavior
+
 ## Misc
 - Some references that were helpful for me while writing this:
     - [Mesh Zoo](https://blog.ezyang.com/2025/08/the-parallelism-mesh-zoo/)

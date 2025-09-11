@@ -7,7 +7,6 @@ import warnings
 
 import torch
 import torch.distributed.checkpoint as dcp
-from transformers import PreTrainedTokenizerBase
 from torch.distributed.checkpoint import (
     FileSystemReader,
     FileSystemWriter,
@@ -26,6 +25,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 
 from .config import LacunaConfig
 from .metrics import StateTracker
+from .data import get_tokenizer
 from .utils import save_state_json, save_settings_json, load_state_json
 
 
@@ -73,7 +73,6 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     dataloader: StatefulDataLoader,
-    tokenizer: PreTrainedTokenizerBase,
     final: bool = False,
 ) -> None:
     """Save DCP shards or final HF sharded weights."""
@@ -82,6 +81,7 @@ def save_checkpoint(
 
     unwrapped_model = model.module if hasattr(model, "module") else model
     unwrapped_model.config.save_pretrained(path)
+    tokenizer = get_tokenizer(config)
     tokenizer.save_pretrained(path)
 
     if not final or config.checkpoint.resumable_final_save:
