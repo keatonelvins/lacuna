@@ -1,5 +1,8 @@
 # TODO
 
+- Packing
+  - Take truncated part and fold back into corpus
+
 - Eval
   - Add eval loop with support for held-out split(s) of the same datasets.
   - Add support for verifiers envs as eval targets.
