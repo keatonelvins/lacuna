@@ -29,8 +29,19 @@ class LacunaDataset:
             )
 
     def _encode(self, examples):
-        out = self.tokenizer(examples["text"], add_special_tokens=False, truncation=False, padding=False)
-        return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in out["input_ids"]]}
+        if self.config.data.column == "messages":
+            results = {"input_ids": [], "assistant_masks": []}
+            for messages in examples["messages"]:
+                processed = self.tokenizer.apply_chat_template(
+                    messages,
+                    return_dict=True,
+                    return_assistant_tokens_mask=True,
+                )
+                results["input_ids"].append(processed["input_ids"])
+                results["assistant_masks"].append(processed["assistant_masks"])
+            return results
+        else:
+            return {"input_ids": self.tokenizer(examples[self.config.data.column]).input_ids}
 
     def _pack(self, examples):
         return pack_bfd(examples, seq_len=self.config.trainer.seq_len * self.config.trainer.batch_size)
@@ -60,7 +71,9 @@ class LacunaDataset:
         else:
             ds = concatenate_datasets(raw)
 
-        ds = ds.map(self._encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=["text"])
+        ds = ds.map(
+            self._encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
+        )
         ds = ds.with_format("arrow").map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
         ds = ds.with_format("torch")
 

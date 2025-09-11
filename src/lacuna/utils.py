@@ -146,14 +146,20 @@ class _SegmentTree:
 def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
     """
     Pack `input_ids` examples into fixed-length bins (Best-Fit Decreasing) and
-    return only two columns: `input_ids` (packed) and `position_ids`.
+    return columns: `input_ids` (packed), `position_ids`, and optionally `assistant_masks`.
 
     - Truncates each example to `seq_len`.
     - Concatenates multiple examples into each packed row up to `seq_len`.
     - `position_ids` reset to 0 at each original example boundary.
+    - `assistant_masks` preserved if present in input.
     """
     # Hardcoded to our single use case: a table with list column `input_ids`.
     input_ids_col = pc.list_slice(examples["input_ids"], 0, seq_len)
+
+    # Check if assistant_masks column exists
+    has_assistant_masks = "assistant_masks" in examples.column_names
+    if has_assistant_masks:
+        assistant_masks_col = pc.list_slice(examples["assistant_masks"], 0, seq_len)
 
     # Compute lengths and sort ids by decreasing length
     lengths_np = pc.list_value_length(input_ids_col).to_numpy()
@@ -198,6 +204,14 @@ def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
     else:
         list_arr = taken
 
+    # Handle assistant_masks if present
+    if has_assistant_masks:
+        taken_masks = pc.take(assistant_masks_col, pa.array(reorder, type=pa.int64()))
+        if isinstance(taken_masks, pa.ChunkedArray):
+            masks_arr = taken_masks.combine_chunks()
+        else:
+            masks_arr = taken_masks
+
     # Build packed offsets: one list per bin
     bin_token_counts = [b["length"] for b in bins]
     offsets_dtype = list_arr.offsets.type.to_pandas_dtype()
@@ -221,4 +235,11 @@ def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
 
     position_ids = list_array_cls.from_arrays(packed_offsets, pa.array(pos_vals, type=pa.int64()))
 
-    return pa.Table.from_arrays([packed_input_ids, position_ids], names=["input_ids", "position_ids"])
+    # Build result table with optional assistant_masks
+    if has_assistant_masks:
+        packed_assistant_masks = list_array_cls.from_arrays(packed_offsets, masks_arr.values)
+        return pa.Table.from_arrays(
+            [packed_input_ids, position_ids, packed_assistant_masks], names=["input_ids", "position_ids", "assistant_masks"]
+        )
+    else:
+        return pa.Table.from_arrays([packed_input_ids, position_ids], names=["input_ids", "position_ids"])

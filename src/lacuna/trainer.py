@@ -91,6 +91,10 @@ def train(config: LacunaConfig) -> None:
                 torch.compiler.cudagraph_mark_step_begin()
 
             batch["labels"] = batch["input_ids"].clone()
+
+            if "assistant_masks" in batch:
+                batch["labels"][batch["assistant_masks"] == 0] = -100
+
             model_inputs = {k: v.cuda() for k, v in batch.items()}
             model_inputs["accum_dtype"] = accum_dtype  # only used for Liger FLCE
 

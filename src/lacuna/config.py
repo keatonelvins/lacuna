@@ -44,6 +44,7 @@ class DataConfig(BaseModel):
     datasets: list[str] = Field(["keatone/TinierStories"], description="HF dataset names")
     files: dict = Field(default_factory=dict, description="Mapping of dataset to regex for fs matching")
     split: str = Field("train", description="Split to use for all the datasets")
+    column: str = Field("text", description="Dataset column to use ('text' or 'messages')")
     stream: bool = Field(False, description="Enable streaming the datasets (e.g. if it's too big to fit on disk)")
     sampling_probs: list[float] = Field(default=None, description="If streaming multiple datasets, how to sample from them")
     shuffle_buffer: int = Field(
