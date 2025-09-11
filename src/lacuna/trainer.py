@@ -2,6 +2,7 @@
 
 import time
 import torch
+import warnings
 from loguru import logger
 from torch.amp import autocast
 
@@ -110,7 +111,10 @@ def train(config: LacunaConfig) -> None:
             if hasattr(grad_norm, "full_tensor"):  # TODO: check FSDP docs to see if this is correct
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
-            scheduler.step()
+
+            with warnings.catch_warnings():  # TODO: remove after bumping torch to 2.9.0
+                warnings.filterwarnings("ignore", message=".*epoch parameter in.*", category=UserWarning)
+                scheduler.step()
 
             redline.update(batch["input_ids"].shape[1], data_load_time)
 

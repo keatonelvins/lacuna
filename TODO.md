@@ -5,6 +5,7 @@
   - Add support for verifiers envs as eval targets.
 
 - After v1: 
+  - Try out spawn for torch mp and create separate tokenizer instances per dataloader worker
   - bump liger kernel for DFT loss: https://arxiv.org/pdf/2508.05629
   - Improve FLOPs/MFU estimator (use AllenAI/veomni/prime-rl references).
   - Make a dataset config with name, split, etc so it's contained

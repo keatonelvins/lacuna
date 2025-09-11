@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 from loguru import logger
@@ -11,7 +12,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from huggingface_hub import hide_hub_bars
+from huggingface_hub.utils import disable_progress_bars as hide_hub_bars
 from transformers.utils.logging import disable_progress_bar as hide_transformers_bars
 from datasets.utils.logging import disable_progress_bar as hide_datasets_bars
 
@@ -44,6 +45,7 @@ def setup_logger() -> None:
 def setup_env() -> None:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     hide_hub_bars()
     hide_transformers_bars()
