@@ -1,7 +1,9 @@
 """FSDP2 and DDP distributed training utilities."""
 
 import os
+import random
 
+import numpy as np
 import torch
 import torch.distributed as dist
 from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
@@ -59,6 +61,22 @@ def get_world_size() -> int:
 def is_master() -> bool:
     """Check if current process is master (rank 0)."""
     return get_rank() == 0
+
+
+def set_seed(seed: int) -> int:
+    """Set seeds for reproducibility across all RNGs."""
+    if dist.is_initialized():
+        seed_tensor = torch.tensor(seed, dtype=torch.long, device="cuda")
+        dist.broadcast(seed_tensor, src=0)
+        seed = int(seed_tensor.item())
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+    return seed
 
 
 def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:

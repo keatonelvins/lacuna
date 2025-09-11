@@ -4,12 +4,6 @@
   - Add eval loop with support for held-out split(s) of the same datasets.
   - Add support for verifiers envs as eval targets.
 
-- Repro/Robustness
-  - Global seeding: seed Python/Torch/CUDA and DataLoader workers.
-
-- SFT
-  - Support assistant-only loss, load from chat template
-
 - After v1: 
   - bump liger kernel for DFT loss: https://arxiv.org/pdf/2508.05629
   - Improve FLOPs/MFU estimator (use AllenAI/veomni/prime-rl references).

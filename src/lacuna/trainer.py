@@ -12,7 +12,7 @@ from .checkpoint import (
 from .config import LacunaConfig
 from .data import setup_dataloader
 from .scheduler import setup_scheduler
-from .distributed import get_world_size, init_distributed, setup_distributed, destroy_distributed
+from .distributed import get_world_size, init_distributed, setup_distributed, destroy_distributed, set_seed
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
@@ -26,6 +26,8 @@ def train(config: LacunaConfig) -> None:
     setup_env()
     setup_logger()
     init_distributed()
+    set_seed(config.trainer.seed)
+
     display_config(config)
 
     wandb_run = init_wandb(config)

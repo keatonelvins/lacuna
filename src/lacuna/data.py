@@ -25,7 +25,12 @@ class LacunaDataset:
             self.sampler = None
         else:
             self.sampler = DistributedSampler(
-                self._dataset, num_replicas=self.dp_world, rank=self.dp_rank, shuffle=True, drop_last=True
+                self._dataset,
+                num_replicas=self.dp_world,
+                rank=self.dp_rank,
+                shuffle=True,
+                drop_last=True,
+                seed=config.trainer.seed,
             )
 
     def _encode(self, examples):
