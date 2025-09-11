@@ -27,7 +27,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     """Load and fully configure model for training."""
     model_path = config.model.name
 
-    if config.checkpoint.resume_from and (config.checkpoint.resume_from / "config.json").exists():
+    if config.checkpoint.resume_from:
         model_path = config.checkpoint.resume_from
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
@@ -69,17 +69,11 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
     if ac_config.mode == "none":
         return model
 
-    layers = model.model.layers
+    checkpoint_freq = 1 if ac_config.mode == "full" else ac_config.stride
 
-    if ac_config.mode == "full":
-        checkpoint_freq = 1
-    elif ac_config.mode == "partial":
-        checkpoint_freq = ac_config.stride
-
-    # TODO: torch.compile has it's own AC (not stable as of 2.8.0)
-    for idx, layer in enumerate(layers):
+    for idx, layer in enumerate(model.model.layers):
         if idx % checkpoint_freq == 0:
-            layers[idx] = checkpoint_wrapper(layer, preserve_rng_state=False)
+            model.model.layers[idx] = checkpoint_wrapper(layer)
 
     return model
 
@@ -92,14 +86,13 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
     torch._dynamo.config.cache_size_limit = 256
     torch._dynamo.config.suppress_errors = True
 
-    layers = model.model.layers
-    for idx, layer in enumerate(layers):
+    for idx, layer in enumerate(model.model.layers):
         compiled_layer = torch.compile(
             layer,
             fullgraph=False,
             mode=config.model.compile_mode,
         )
-        layers[idx] = compiled_layer
+        model.model.layers[idx] = compiled_layer
 
     return model
 

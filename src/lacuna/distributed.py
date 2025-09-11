@@ -43,11 +43,6 @@ def get_local_rank() -> int:
     return torch.cuda.current_device()
 
 
-def get_device_vram() -> int:
-    """Get current device VRAM."""
-    return torch.cuda.get_device_properties(torch.cuda.current_device()).total_memory
-
-
 def get_rank() -> int:
     """Get current process rank."""
     return dist.get_rank() if dist.is_initialized() else 0
@@ -91,14 +86,11 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
         raise ValueError(f"dp_replicate×dp_shard={rep}×{shard} ≠ world_size={world_size}")
 
     if rep > 1 and shard > 1:
-        mode = "HSDP"
-        mesh = init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
+        mode, mesh = "HSDP", init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
     elif rep > 1:
-        mode = "DDP"
-        mesh = None
+        mode, mesh = "DDP", None
     elif shard > 1:
-        mode = "FSDP"
-        mesh = init_device_mesh("cuda", [shard], mesh_dim_names=["dp_shard"])
+        mode, mesh = "FSDP", init_device_mesh("cuda", [shard], mesh_dim_names=["dp_shard"])
     else:
         raise ValueError(f"Invalid config: dp_replicate=1, dp_shard=1 but world_size={world_size}")
 
@@ -109,7 +101,6 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
 def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     world_size = get_world_size()
     if world_size == 1:
-        logger.info("Single GPU training")
         return model
 
     mesh = get_dp_mesh(config)
@@ -148,14 +139,6 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
 
 
 def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
-    """Setup DDP for small model distributed training."""
-
-    if not dist.is_initialized():
-        logger.info("DDP disabled - single GPU training")
-        return model
-
-    logger.info("Setting up DDP...")
-
     # TODO: document flags and values
     scale = (12 * model.config.hidden_size**2) / 1e8
     bucket = 25 * (1 + scale)

@@ -172,3 +172,10 @@ class LacunaConfig(BaseSettings):
         cli_kebab_case=True,
         cli_implicit_flags=True,
     )
+
+    @model_validator(mode="after")
+    def validate_batch_size(self):
+        world_size = self.torchrun.nproc_per_node * self.torchrun.nnodes
+        if self.trainer.batch_size % world_size != 0:
+            raise ValueError(f"Batch size {self.trainer.batch_size} must be divisible by world_size {world_size}")
+        return self

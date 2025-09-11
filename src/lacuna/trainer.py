@@ -23,7 +23,6 @@ from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
 
 @logger.catch(reraise=True)
 def train(config: LacunaConfig) -> None:
-    """Core training function."""
     setup_env()
     setup_logger()
     init_distributed()
@@ -35,8 +34,6 @@ def train(config: LacunaConfig) -> None:
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
 
     world_size = get_world_size()
-    if not config.trainer.batch_size % world_size == 0:
-        raise ValueError(f"Batch size {config.trainer.batch_size} must be divisible by world_size {world_size}")
 
     micro_batch_size = config.trainer.batch_size // world_size
     logger.info(f"GPU setup: {world_size} GPUs, batch_size={config.trainer.batch_size} ({micro_batch_size} per GPU)")
@@ -67,7 +64,6 @@ def train(config: LacunaConfig) -> None:
             scheduler=scheduler,
             path=config.checkpoint.resume_from,
         )
-        logger.info(f"Resumed from checkpoint: {config.checkpoint.resume_from}")
 
     logger.info(f"Starting training: {total_steps} steps")
     train_interrupted = False
@@ -108,7 +104,7 @@ def train(config: LacunaConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
-            if hasattr(grad_norm, "full_tensor"):  # TODO: check FSDP docs to see if this is correct
+            if hasattr(grad_norm, "full_tensor"):
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
 
@@ -123,21 +119,18 @@ def train(config: LacunaConfig) -> None:
                 metrics = redline.read()
 
                 log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics)
-
-                if wandb_run:
-                    wandb_metrics = prepare_wandb_metrics(loss.item(), grad_norm, current_lr, metrics, redline.state)
-                    log_metrics(wandb_metrics, step, wandb_run)
+                wandb_metrics = prepare_wandb_metrics(loss.item(), grad_norm, current_lr, metrics, redline.state)
+                log_metrics(wandb_metrics, step, wandb_run)
 
             if current_epoch > 0 and step % int(config.checkpoint.save_every * dataset.length) == 0:
                 logger.info(f"Saving checkpoint at step {step}")
                 save_checkpoint(
                     model=model,
+                    config=config,
+                    state=redline.state,
                     optimizer=optimizer,
                     scheduler=scheduler,
-                    state=redline.state,
-                    config=config,
                     dataloader=dataloader,
-                    final=False,
                     tokenizer=tokenizer,
                 )
 
@@ -148,10 +141,10 @@ def train(config: LacunaConfig) -> None:
         if not train_interrupted and redline.state.step > start_step:  # don't save if training insta-crashed or interrupted
             save_checkpoint(
                 model=model,
-                optimizer=optimizer,
-                scheduler=scheduler,
                 config=config,
                 state=redline.state,
+                optimizer=optimizer,
+                scheduler=scheduler,
                 dataloader=dataloader,
                 tokenizer=tokenizer,
                 final=True,

@@ -103,11 +103,6 @@ class Redline:
         actual_flops = self.flops_per_token * tps
         metrics["mfu_pct"] = 100 * actual_flops / self.gpu_peak_flops
         metrics["tflops"] = actual_flops / 1e12
-
-        avg_step_time = total_step_time / len(self._step_times)
-        metrics["latency_ms"] = avg_step_time * 1000
-        metrics["steps_per_s"] = 1.0 / avg_step_time
-
         metrics["data_pct"] = 100 * total_data_time / total_step_time
 
         metrics.update(self._get_memory())
