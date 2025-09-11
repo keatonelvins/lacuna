@@ -44,6 +44,56 @@ def test_bfd_packing():
     assert packed["assistant_masks"].to_pylist() == expected_packed_masks
 
 
+def test_encode_text():
+    """Test _encode method with text column appends eos token."""
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
+
+    mock_config = SimpleNamespace(
+        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
+        data=SimpleNamespace(column="text", chat_template=None, eos_token=None),
+    )
+
+    dataset = object.__new__(LacunaDataset)
+    dataset.config = mock_config
+    dataset.tokenizer = get_tokenizer(mock_config)
+
+    text = "And then black night. That blackness was sublime. I felt distributed through space and time"
+
+    results = dataset._encode({"text": [text]})
+    maybe_eos_token = results["input_ids"][0][-1]
+    assert maybe_eos_token == tokenizer.eos_token_id
+
+
+def test_add_eos_token():
+    """Test if adding a new eos token configures the tokenizer correctly."""
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
+    assert tokenizer.eos_token == "<|endoftext|>"
+    assert tokenizer.eos_token_id == 151643
+
+    mock_config = SimpleNamespace(
+        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
+        data=SimpleNamespace(column="text", chat_template=None, eos_token="<|im_end|>"),
+    )
+
+    dataset = object.__new__(LacunaDataset)
+    dataset.config = mock_config
+    dataset.tokenizer = get_tokenizer(mock_config)
+
+    assert dataset.tokenizer.eos_token == "<|im_end|>"
+    assert dataset.tokenizer.eos_token_id == 151645
+
+    text = """And blood-black nothingness began to spin
+A system of cells interlinked within
+Cells interlinked within cells interlinked
+Within one stem. And dreadfully distinct
+Against the dark, a tall white fountain played."""
+
+    results = dataset._encode({"text": [text]})
+    maybe_eos_token = results["input_ids"][0][-1]
+
+    assert maybe_eos_token == dataset.tokenizer.eos_token_id
+
+
 def test_encode_messages():
     """Test _encode method with messages column."""
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
@@ -89,57 +139,3 @@ Within cells interlinked<|im_end|>
     expected_masks = user_tokens + assistant_tokens + trailing_newline
 
     assert assistant_masks == expected_masks
-
-
-def test_encode_text():
-    """Test _encode method with text column appends eos token."""
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
-
-    mock_config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
-        data=SimpleNamespace(column="text", chat_template=None, eos_token=None),
-    )
-
-    dataset = object.__new__(LacunaDataset)
-    dataset.config = mock_config
-    dataset.tokenizer = get_tokenizer(mock_config)
-
-    text = """And blood-black nothingness began to spin
-A system of cells interlinked within
-Cells interlinked within cells interlinked
-Within one stem. And dreadfully distinct
-Against the dark, a tall white fountain played."""
-
-    results = dataset._encode({"text": [text]})
-    maybe_eos_token = results["input_ids"][0][-1]
-    assert maybe_eos_token == tokenizer.eos_token_id
-
-
-def test_add_eos_token():
-    """Test if adding a new eos token configures the tokenizer correctly."""
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
-    assert tokenizer.eos_token == "<|endoftext|>"
-    assert tokenizer.eos_token_id == 151643
-
-    mock_config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
-        data=SimpleNamespace(column="text", chat_template=None, eos_token="<|im_end|>"),
-    )
-
-    dataset = object.__new__(LacunaDataset)
-    dataset.config = mock_config
-    dataset.tokenizer = get_tokenizer(mock_config)
-
-    assert dataset.tokenizer.eos_token == "<|im_end|>"
-    assert dataset.tokenizer.eos_token_id == 151645
-
-    text = """And blood-black nothingness began to spin
-A system of cells interlinked within
-Cells interlinked within cells interlinked
-Within one stem. And dreadfully distinct
-Against the dark, a tall white fountain played."""
-
-    results = dataset._encode({"text": [text]})
-    maybe_eos_token = results["input_ids"][0][-1]
-
-    assert maybe_eos_token == dataset.tokenizer.eos_token_id
