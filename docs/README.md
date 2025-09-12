@@ -36,6 +36,8 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 ## Tokenization
 - HF tokenization is littered with footguns, highly recommend Quentin's post on this:
     - https://huggingface.co/blog/qgallouedec/gotchas-in-tokenizer-behavior
+- To support assistant-only loss, we require the assistant completions be wrapped in `{% generation %}` tags (similar to TRL)
+    - This lets us use the hf-native `return_assistant_tokens_mask` and avoid manually building.
 
 ## Misc
 - Some references that were helpful for me while writing this:
