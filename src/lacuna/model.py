@@ -43,7 +43,6 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config)
 
-    model = model.cuda()
     model.train()
 
     return model

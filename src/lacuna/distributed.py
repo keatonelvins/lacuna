@@ -101,13 +101,14 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
 def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     world_size = get_world_size()
     if world_size == 1:
-        return model
+        return model.cuda()
 
     mesh = get_dp_mesh(config)
 
     if mesh:
         return setup_fsdp2(model, config, mesh)
     else:
+        model = model.cuda(get_local_rank())
         return setup_ddp(model, config)
 
 
@@ -147,7 +148,7 @@ def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     is_compiled = config.model.compile_mode is not None
     model = DDP(
         model,
-        device_ids=[get_rank()],
+        device_ids=[get_local_rank()],
         broadcast_buffers=False,
         gradient_as_bucket_view=True,
         static_graph=is_compiled,  # only use static graph if model is compiled

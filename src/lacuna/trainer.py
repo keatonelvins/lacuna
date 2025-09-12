@@ -89,11 +89,13 @@ def train(config: LacunaConfig) -> None:
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
                 torch.compiler.cudagraph_mark_step_begin()
 
-            batch["labels"] = batch["input_ids"].clone()
+            labels = batch["input_ids"].clone()
+            labels[batch["position_ids"] == 0] = -100
 
             if "assistant_masks" in batch:
-                batch["labels"][batch["assistant_masks"] == 0] = -100
+                labels[batch["assistant_masks"] == 0] = -100
 
+            batch["labels"] = labels
             model_inputs = {k: v.cuda() for k, v in batch.items()}
             model_inputs["accum_dtype"] = accum_dtype  # only used for Liger FLCE
 
@@ -122,7 +124,11 @@ def train(config: LacunaConfig) -> None:
                 wandb_metrics = prepare_wandb_metrics(loss.item(), grad_norm, current_lr, metrics, redline.state)
                 log_metrics(wandb_metrics, step, wandb_run)
 
-            if current_epoch > 0 and step % int(config.checkpoint.save_every * dataset.length) == 0:
+            if (
+                config.checkpoint.save_every
+                and current_epoch > 0
+                and step + 1 % int(config.checkpoint.save_every * dataset.length) == 0
+            ):
                 logger.info(f"Saving checkpoint at step {step}")
                 save_checkpoint(
                     model=model,

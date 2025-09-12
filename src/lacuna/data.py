@@ -3,7 +3,7 @@
 from loguru import logger
 from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from datasets.distributed import split_dataset_by_node
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DistributedSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
@@ -31,6 +31,7 @@ class LacunaDataset:
         self.config = config
         self.tokenizer = get_tokenizer(config)
         self.dp_world, self.dp_rank = get_world_size(), get_rank()
+        self.micro_batch_size = config.trainer.batch_size // self.dp_world
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
@@ -63,7 +64,7 @@ class LacunaDataset:
             return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in input_ids]}
 
     def _pack(self, examples):
-        return pack_bfd(examples, seq_len=self.config.trainer.seq_len * self.config.trainer.batch_size)
+        return pack_bfd(examples, seq_len=self.config.trainer.seq_len * self.micro_batch_size)
 
     def _load_datasets(self, split: str, stream: bool):
         datasets = []
@@ -101,19 +102,18 @@ class LacunaDataset:
     def set_epoch(self, epoch: int):
         """Set epoch for proper shuffling across epochs."""
         if self.config.data.stream:
-            # TODO: can do self._dataset.set_epoch(epoch) if we catch StopIteration with infinite loop
-            raise ValueError("Epoch reseeding is not supported for iterable datasets")
+            self._dataset.set_epoch(epoch)
         else:
             self.sampler.set_epoch(epoch)
 
-    def create_dataloader(self, micro_batch_size: int) -> DataLoader:
+    def create_dataloader(self, micro_batch_size: int) -> StatefulDataLoader:
         """Create the appropriate dataloader for this dataset."""
         if self.config.data.stream:
             self._dataloader = StatefulDataLoader(
                 self._dataset, num_workers=self.config.data.num_workers, drop_last=True, pin_memory=True, persistent_workers=True
             )
         else:
-            self._dataloader = DataLoader(
+            self._dataloader = StatefulDataLoader(
                 self._dataset,
                 sampler=self.sampler,
                 num_workers=self.config.data.num_workers,
@@ -125,14 +125,14 @@ class LacunaDataset:
         return self._dataloader
 
     @property
-    def length(self) -> int | None:
+    def length(self) -> int:
         """Return length per epoch of the dataset."""
-        if not self.config.data.stream and self._dataloader:
-            return len(self._dataloader)
-        return None
+        if self.config.data.stream:
+            return self.config.trainer.steps
+        return len(self._dataloader) if self._dataloader else 1
 
 
-def setup_dataloader(config: LacunaConfig, micro_batch_size: int) -> tuple[DataLoader, LacunaDataset]:
+def setup_dataloader(config: LacunaConfig, micro_batch_size: int) -> tuple[StatefulDataLoader, LacunaDataset]:
     """Setup data pipeline and return dataloader, and dataset."""
     dataset = LacunaDataset(config)
     dataloader = dataset.create_dataloader(micro_batch_size)

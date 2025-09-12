@@ -121,7 +121,7 @@ class Redline:
         total_tokens = sum(self._tokens)
         total_time = sum(self._step_times)
 
-        return total_tokens / total_time / self.world_size
+        return total_tokens / total_time
 
     def _get_memory(self) -> dict[str, float]:
         """Get memory statistics in GB and percentage."""

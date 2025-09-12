@@ -23,6 +23,7 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking
     - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!
+    - On top of intra-document masking, we also mask the first token on the boundary (TODO: run ablation)
 
 ## Datasets
 - If streaming, the number of dataset shards will match the number of remote parquet files.
