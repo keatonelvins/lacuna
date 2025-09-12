@@ -42,14 +42,17 @@ def setup_logger() -> None:
     )
 
 
-def setup_env() -> None:
+def setup_env(config: LacunaConfig) -> None:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false" # TODO: can remove if we handle DataLoader workers properly
 
     hide_hub_bars()
     hide_transformers_bars()
     hide_datasets_bars()
+
+    setup_logger()
+    config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
 
 
 def display_config(config: LacunaConfig) -> None:
@@ -74,9 +77,9 @@ def save_settings_json(path: Path, config: LacunaConfig) -> None:
 
 
 def load_state_json(path: Path) -> StateTracker:
-    ts_path = path / "state.json"
-    if ts_path.exists():
-        with ts_path.open("r") as f:
+    tracker_path = path / "state.json"
+    if tracker_path.exists():
+        with tracker_path.open("r") as f:
             return StateTracker(**json.load(f))
     return StateTracker()
 
@@ -88,7 +91,6 @@ def log_training_metrics(
     lr: float,
     metrics: dict[str, float],
 ) -> None:
-    """Log training metrics in a colorful format."""
     log_parts = [
         f"\033[91mStep {step:>6}\033[0m",
         f"\033[92mLoss: {loss:7.4f}\033[0m",
@@ -98,7 +100,6 @@ def log_training_metrics(
         f"\033[92mMFU: {metrics.get('mfu_pct', 0.0):5.1f}%\033[0m",
         f"\033[33mData: {metrics.get('data_pct', 0.0):5.1f}%\033[0m",
     ]
-
     logger.info(" | ".join(log_parts))
 
 

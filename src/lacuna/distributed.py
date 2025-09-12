@@ -19,8 +19,10 @@ from loguru import logger
 from .config import LacunaConfig
 
 
-def init_distributed() -> None:
+def init_distributed(config: LacunaConfig) -> None:
     """Initialize distributed process group."""
+    set_seed(config.trainer.seed)
+
     if not dist.is_available():
         return
 

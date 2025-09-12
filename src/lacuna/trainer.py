@@ -17,22 +17,17 @@ from .distributed import get_world_size, init_distributed, setup_distributed, de
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
-from .utils import setup_logger, display_config, log_training_metrics, setup_env
-from .wandb import init_wandb, log_metrics, prepare_wandb_metrics, finish
+from .utils import display_config, log_training_metrics, setup_env
+from .wandb import init_wandb, log_wandb_metrics, finish
 
 
 @logger.catch(reraise=True)
 def train(config: LacunaConfig) -> None:
-    setup_env()
-    setup_logger()
-    init_distributed()
-    set_seed(config.trainer.seed)
-
+    setup_env(config)
+    init_distributed(config)
     display_config(config)
 
     wandb_run = init_wandb(config)
-    config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
-
     world_size = get_world_size()
 
     micro_batch_size = config.trainer.batch_size // world_size
@@ -90,10 +85,10 @@ def train(config: LacunaConfig) -> None:
                 torch.compiler.cudagraph_mark_step_begin()
 
             labels = batch["input_ids"].clone()
-            labels[batch["position_ids"] == 0] = -100
+            labels[batch["position_ids"] == 0] = -100  # mask document boundaries
 
             if "assistant_masks" in batch:
-                labels[batch["assistant_masks"] == 0] = -100
+                labels[batch["assistant_masks"] == 0] = -100  # mask non-assistant tokens
 
             batch["labels"] = labels
             model_inputs = {k: v.cuda() for k, v in batch.items()}
@@ -106,7 +101,7 @@ def train(config: LacunaConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
-            if hasattr(grad_norm, "full_tensor"):
+            if hasattr(grad_norm, "full_tensor"): # needed for FSDP
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
 
@@ -121,8 +116,7 @@ def train(config: LacunaConfig) -> None:
                 metrics = redline.read()
 
                 log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics)
-                wandb_metrics = prepare_wandb_metrics(loss.item(), grad_norm, current_lr, metrics, redline.state)
-                log_metrics(wandb_metrics, step, wandb_run)
+                log_wandb_metrics(loss.item(), current_lr, grad_norm, redline.state, metrics, wandb_run)
 
             if (
                 config.checkpoint.save_every
@@ -143,7 +137,7 @@ def train(config: LacunaConfig) -> None:
         logger.info("Training interrupted :(")
         train_interrupted = True
     finally:
-        if not train_interrupted and redline.state.step > start_step:  # don't save if training insta-crashed or interrupted
+        if not train_interrupted and redline.state.step > start_step:
             save_checkpoint(
                 model=model,
                 config=config,
