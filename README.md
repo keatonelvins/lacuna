@@ -1,6 +1,6 @@
 # lacuna
 
-Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
+Tiny, memory-efficient trainer for continued prelacunaing and finetuning of popular HF models.
 
 Seeing how far we can push HF modeling code!
 
@@ -9,17 +9,17 @@ Seeing how far we can push HF modeling code!
 ```bash
 # Install (or clone + `uv sync`) and test (requires ~5GB VRAM)
 curl -sSL https://raw.githubusercontent.com/keatonelvins/lacuna/main/scripts/install.sh | bash
-uv run train
+uv run lacuna
 
 # See all config options
-uv run train --help
+uv run lacuna --help
 
 # Pass args directly
-uv run train --model.name Qwen/Qwen3-8B --trainer.batch-size 8
+uv run lacuna --model.name Qwen/Qwen3-8B --trainer.batch-size 8
 
 # Load args from a toml (w/ overrides)
-uv run train path/to/config.toml
-uv run train path/to/config.toml --optimizer.lr 1e-5
+uv run lacuna path/to/config.toml
+uv run lacuna path/to/config.toml --optimizer.lr 1e-5
 
 # Log runs + access gated repos
 uv run wandb login
