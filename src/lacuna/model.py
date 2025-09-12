@@ -37,6 +37,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
         dtype=torch.bfloat16,
         attn_implementation=ATTN_IMPL_MAP[config.model.attention],
     )
+    model.config.use_cache = False  # needed for ac to work
 
     model = apply_liger_patches(model, config.model)
     model = apply_kernelize(model, config.model)

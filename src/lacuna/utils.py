@@ -40,6 +40,14 @@ def setup_logger() -> None:
         level="INFO",
         filter=lambda r: is_master(),
     )
+    # Also log to file for debugging
+    logger.add(
+        "runs.log",
+        format="{time:HH:mm:ss} | {level} | {message}",
+        level="INFO",
+        filter=lambda r: is_master(),
+        rotation="1 MB"
+    )
 
 
 def setup_env(config: LacunaConfig) -> None:
