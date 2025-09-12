@@ -102,7 +102,6 @@ class LacunaDataset:
         """Set epoch for proper shuffling across epochs."""
         if self.config.data.stream:
             # TODO: can do self._dataset.set_epoch(epoch) if we catch StopIteration with infinite loop
-            # but this won't work with current lr scheduler ratios, should revisit
             raise ValueError("Epoch reseeding is not supported for iterable datasets")
         else:
             self.sampler.set_epoch(epoch)
