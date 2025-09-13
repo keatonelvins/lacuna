@@ -32,7 +32,7 @@ def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
         tokenizer.chat_template = config.data.chat_template
     if config.data.eos_token:
         added = tokenizer.add_special_tokens({"eos_token": config.data.eos_token})
-        if added > 0:  # TODO: if not in vocab already, need to resize token embeddings
+        if added > 0:  # TODO: if not in vocab already, need to resize token embeddings (to multiple of 32)
             logger.error(f"{config.data.eos_token} was not already a special token!")
 
     return tokenizer
