@@ -13,7 +13,7 @@ from .checkpoint import (
 from .config import LacunaConfig
 from .data import setup_dataloader
 from .scheduler import setup_scheduler
-from .distributed import get_world_size, init_distributed, setup_distributed, destroy_distributed, set_seed
+from .distributed import get_world_size, init_distributed, setup_distributed, destroy_distributed
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
@@ -100,7 +100,7 @@ def train(config: LacunaConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.grad_clip)
-            if hasattr(grad_norm, "full_tensor"): # needed for FSDP
+            if hasattr(grad_norm, "full_tensor"):  # needed for FSDP
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
 
@@ -120,7 +120,7 @@ def train(config: LacunaConfig) -> None:
             if (
                 config.checkpoint.save_every
                 and current_epoch > 0
-                and step + 1 % int(config.checkpoint.save_every * dataset.length) == 0
+                and step % int(config.checkpoint.save_every * dataset.length) == 0
             ):
                 logger.info(f"Saving checkpoint at step {step}")
                 save_checkpoint(
