@@ -86,17 +86,12 @@ class LacunaDataset:
         else:
             ds = concatenate_datasets(raw)
 
-        ds = ds.map(
-            partial(_encode, tokenizer=self.tokenizer, column=self.config.data.column),
-            batched=True,
-            batch_size=self.config.data.map_batch_size,
-            remove_columns=[self.config.data.column],
-        )
-        ds = ds.with_format("arrow").map(
-            partial(pack_bfd, seq_len=self.config.trainer.seq_len * self.micro_batch_size),
-            batched=True,
-            batch_size=self.config.data.pack_batch_size,
-        )
+        encode = partial(_encode, tokenizer=self.tokenizer, column=self.config.data.column)
+        pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len * self.micro_batch_size)
+
+        # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
+        ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
+        ds = ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
         ds = ds.with_format("torch")
 
         return ds
