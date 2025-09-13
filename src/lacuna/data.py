@@ -1,6 +1,7 @@
 """Data loading, tokenization, and packing for training."""
 
 from loguru import logger
+from functools import partial
 from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from datasets.distributed import split_dataset_by_node
 from torch.utils.data import DistributedSampler
@@ -10,6 +11,19 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 from .utils import pack_bfd
 from .config import LacunaConfig
 from .distributed import get_rank, get_world_size
+
+
+def _encode_fn(examples, tokenizer, column):
+    if column == "messages":
+        results = {"input_ids": [], "assistant_masks": []}
+        for messages in examples["messages"]:
+            processed = tokenizer.apply_chat_template(messages, return_dict=True, return_assistant_tokens_mask=True)
+            results["input_ids"].append(processed["input_ids"])
+            results["assistant_masks"].append(processed["assistant_masks"])
+        return results
+    else:
+        input_ids = tokenizer(examples[column]).input_ids
+        return {"input_ids": [ids + [tokenizer.eos_token_id] for ids in input_ids]}
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
@@ -47,25 +61,6 @@ class LacunaDataset:
                 seed=config.trainer.seed,
             )
 
-    def _encode(self, examples):
-        if self.config.data.column == "messages":
-            results = {"input_ids": [], "assistant_masks": []}
-            for messages in examples["messages"]:
-                processed = self.tokenizer.apply_chat_template(
-                    messages,
-                    return_dict=True,
-                    return_assistant_tokens_mask=True,
-                )
-                results["input_ids"].append(processed["input_ids"])
-                results["assistant_masks"].append(processed["assistant_masks"])
-            return results
-        else:
-            input_ids = self.tokenizer(examples[self.config.data.column]).input_ids
-            return {"input_ids": [ids + [self.tokenizer.eos_token_id] for ids in input_ids]}
-
-    def _pack(self, examples):
-        return pack_bfd(examples, seq_len=self.config.trainer.seq_len * self.micro_batch_size)
-
     def _load_datasets(self, split: str, stream: bool):
         datasets = []
         for name in self.config.data.datasets:
@@ -92,9 +87,13 @@ class LacunaDataset:
             ds = concatenate_datasets(raw)
 
         ds = ds.map(
-            self._encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
+            partial(_encode_fn, tokenizer=self.tokenizer, column=self.config.data.column), 
+            batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
         )
-        ds = ds.with_format("arrow").map(self._pack, batched=True, batch_size=self.config.data.pack_batch_size)
+        ds = ds.with_format("arrow").map(
+            partial(pack_bfd, seq_len=self.config.trainer.seq_len * self.micro_batch_size),
+            batched=True, batch_size=self.config.data.pack_batch_size
+        )
         ds = ds.with_format("torch")
 
         return ds

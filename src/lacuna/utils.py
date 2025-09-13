@@ -54,6 +54,7 @@ def setup_env(config: LacunaConfig) -> None:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
     os.environ["TOKENIZERS_PARALLELISM"] = "false" # TODO: can remove if we handle DataLoader workers properly
+    os.environ['GLOO_LOG_LEVEL'] = 'WARNING' # silence annoying gloo logging
 
     hide_hub_bars()
     hide_transformers_bars()
