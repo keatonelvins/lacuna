@@ -82,7 +82,6 @@ class LacunaDataset:
                 seed=self.config.trainer.seed,
             ).shuffle(seed=self.config.trainer.seed, buffer_size=self.config.data.shuffle_buffer)
             ds = split_dataset_by_node(ds, rank=self.dp_rank, world_size=self.dp_world)
-
         else:
             ds = concatenate_datasets(raw)
 
