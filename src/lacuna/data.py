@@ -13,14 +13,14 @@ from .config import LacunaConfig
 from .distributed import get_rank, get_world_size
 
 
-def _encode_fn(examples, tokenizer, column):
+def _encode(examples, tokenizer, column):
     if column == "messages":
-        results = {"input_ids": [], "assistant_masks": []}
-        for messages in examples["messages"]:
-            processed = tokenizer.apply_chat_template(messages, return_dict=True, return_assistant_tokens_mask=True)
-            results["input_ids"].append(processed["input_ids"])
-            results["assistant_masks"].append(processed["assistant_masks"])
-        return results
+        out = tokenizer.apply_chat_template(
+            examples["messages"],
+            return_dict=True,
+            return_assistant_tokens_mask=True,
+        )
+        return {"input_ids": out["input_ids"], "assistant_masks": out["assistant_masks"]}
     else:
         input_ids = tokenizer(examples[column]).input_ids
         return {"input_ids": [ids + [tokenizer.eos_token_id] for ids in input_ids]}
@@ -87,12 +87,15 @@ class LacunaDataset:
             ds = concatenate_datasets(raw)
 
         ds = ds.map(
-            partial(_encode_fn, tokenizer=self.tokenizer, column=self.config.data.column), 
-            batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
+            partial(_encode, tokenizer=self.tokenizer, column=self.config.data.column),
+            batched=True,
+            batch_size=self.config.data.map_batch_size,
+            remove_columns=[self.config.data.column],
         )
         ds = ds.with_format("arrow").map(
             partial(pack_bfd, seq_len=self.config.trainer.seq_len * self.micro_batch_size),
-            batched=True, batch_size=self.config.data.pack_batch_size
+            batched=True,
+            batch_size=self.config.data.pack_batch_size,
         )
         ds = ds.with_format("torch")
 
