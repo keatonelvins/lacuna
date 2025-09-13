@@ -33,37 +33,36 @@ def train(config: LacunaConfig) -> None:
     micro_batch_size = config.trainer.batch_size // world_size
     logger.info(f"GPU setup: {world_size} GPUs, batch_size={config.trainer.batch_size} ({micro_batch_size} per GPU)")
 
-    logger.info("Setting up model")
-    model = setup_model(config)
-    model = setup_distributed(model, config)
-
-    logger.info("Setting up dataloader")
-    dataloader, dataset = setup_dataloader(config, micro_batch_size)
-
-    if config.trainer.steps:
-        total_steps = config.trainer.steps
-    else:  # must be map-style
-        total_steps = dataset.length * config.trainer.epochs
-
-    optimizer = setup_optimizer(model, config)
-    scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
-    redline = Redline(model=model, seq_len=config.trainer.seq_len, world_size=world_size)
-
-    accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
-
-    if config.checkpoint.resume_from is not None:
-        logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
-        redline.state = load_checkpoint(
-            model=model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            path=config.checkpoint.resume_from,
-        )
-
-    logger.info(f"Starting training: {total_steps} steps")
-    train_interrupted = False
-
     try:
+        logger.info("Setting up model")
+        model = setup_model(config)
+        model = setup_distributed(model, config)
+
+        logger.info("Setting up dataloader")
+        dataloader, dataset = setup_dataloader(config, micro_batch_size)
+
+        if config.trainer.steps:
+            total_steps = config.trainer.steps
+        else:  # must be map-style
+            total_steps = dataset.length * config.trainer.epochs
+
+        optimizer = setup_optimizer(model, config)
+        scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
+        redline = Redline(model=model, seq_len=config.trainer.seq_len, world_size=world_size)
+
+        accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
+
+        if config.checkpoint.resume_from is not None:
+            logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
+            redline.state = load_checkpoint(
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                path=config.checkpoint.resume_from,
+            )
+
+        logger.info(f"Starting training: {total_steps} steps")
+
         dataloader_iter = iter(dataloader)
         start_step = redline.state.step
         current_epoch = 0
@@ -133,19 +132,17 @@ def train(config: LacunaConfig) -> None:
                     dataloader=dataloader,
                 )
 
+        save_checkpoint(
+            model=model,
+            config=config,
+            state=redline.state,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            dataloader=dataloader,
+            final=True,
+        )
     except KeyboardInterrupt:
         logger.info("Training interrupted :(")
-        train_interrupted = True
     finally:
-        if not train_interrupted and redline.state.step > start_step:
-            save_checkpoint(
-                model=model,
-                config=config,
-                state=redline.state,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                dataloader=dataloader,
-                final=True,
-            )
         finish(wandb_run)
         destroy_distributed()
