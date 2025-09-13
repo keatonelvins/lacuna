@@ -163,3 +163,4 @@ TODO.md
 # Artifacts
 weights/
 wandb/
+configs/
