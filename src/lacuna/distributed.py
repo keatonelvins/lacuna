@@ -31,7 +31,7 @@ def init_distributed(config: LacunaConfig) -> None:
 
     backend = "nccl"
     if config.dist.cpu_offload:
-        backend = "cuda:nccl,cpu:gloo" # nccl on cuda, gloo on cpu
+        backend = "cuda:nccl,cpu:gloo"  # nccl on cuda, gloo on cpu
 
     dist.init_process_group(backend=backend)
     torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
@@ -120,7 +120,7 @@ def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTraine
 
 def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
-    cpu_offload_policy = CPUOffloadPolicy(pin_memory=True) if config.dist.cpu_offload else None
+    cpu_offload_policy = CPUOffloadPolicy() if config.dist.cpu_offload else None
 
     for i, block in enumerate(model.model.layers):
         # Last block: don't reshard since FSDP prefetches

@@ -1,5 +1,3 @@
-from typing import Any
-
 import wandb
 
 from .config import LacunaConfig
