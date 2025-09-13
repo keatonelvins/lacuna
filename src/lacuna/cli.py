@@ -83,7 +83,7 @@ def lacuna():
 def count_lines():
     """Check the total repo line count."""
     result = subprocess.run(
-        "git ls-files '*.py' | xargs cat | wc -l",
+        "git ls-files 'src/lacuna/*.py' | xargs cat | wc -l",
         shell=True,
         text=True,
         stdout=subprocess.PIPE,
