@@ -61,7 +61,7 @@ def train(config: LacunaConfig) -> None:
                 path=config.checkpoint.resume_from,
             )
 
-        logger.info(f"Starting training: {total_steps} steps")
+        logger.info(f"Starting training!")
 
         start_step = redline.state.step
         current_epoch = 0
@@ -101,10 +101,7 @@ def train(config: LacunaConfig) -> None:
             if hasattr(grad_norm, "full_tensor"):  # needed for FSDP
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
-
-            with warnings.catch_warnings():  # TODO: remove after bumping torch to 2.9.0
-                warnings.filterwarnings("ignore", message=".*epoch parameter in.*", category=UserWarning)
-                scheduler.step()
+            scheduler.step()
 
             redline.update(batch["input_ids"].shape[1], data_load_time)
 
