@@ -11,10 +11,6 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
-from huggingface_hub.utils import disable_progress_bars as hide_hub_bars
-from transformers.utils.logging import disable_progress_bar as hide_transformers_bars
-from datasets.utils.logging import disable_progress_bar as hide_datasets_bars
-
 from .distributed import is_master
 from .config import LacunaConfig
 from .metrics import StateTracker
@@ -48,10 +44,6 @@ def setup_logger() -> None:
 def setup_env(config: LacunaConfig) -> None:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
-
-    hide_hub_bars()
-    hide_transformers_bars()
-    hide_datasets_bars()
 
     setup_logger()
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
