@@ -26,6 +26,8 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - On top of intra-document masking, we also mask the first token on the boundary (TODO: run ablation)
 
 ## Datasets
+- In non-streaming mode, we will tokenize and pack using `.map()` from `datasets` which automatically fingerprints and caches the final dataset/
+    - This means you only need to tokenize and pack once! Subsequent runs will stream directly from the cache under `HF_HOME`.
 - If streaming, the number of dataset shards will match the number of remote parquet files.
     - Having `num_shards %= world_size` maximizes throughput using `split_dataset_by_node` as the dataset is split evenly across workers.
 - Helpful docs
