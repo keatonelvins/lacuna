@@ -17,12 +17,12 @@ dependencies = [
     "rich>=14.1.0",
     "psutil>=7.0.0",
     "s3fs>=2025.3.0",
-    "textual-dev>=1.7.0",
 ]
 
 [project.scripts]
 lacuna = "lacuna.cli:lacuna"
 count_lines = "lacuna.cli:count_lines"
+tui = "ui:app"
 
 [dependency-groups]
 dev = [
