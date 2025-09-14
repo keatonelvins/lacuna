@@ -1,4 +1,3 @@
-import os
 import json
 from pathlib import Path
 from loguru import logger
@@ -42,18 +41,13 @@ def setup_logger() -> None:
     )
     # Also log to file for debugging
     logger.add(
-        "runs.log",
-        format="{time:HH:mm:ss} | {level} | {message}",
-        level="INFO",
-        filter=lambda r: is_master(),
-        rotation="1 MB"
+        "runs.log", format="{time:HH:mm:ss} | {level} | {message}", level="INFO", filter=lambda r: is_master(), rotation="1 MB"
     )
 
 
 def setup_env(config: LacunaConfig) -> None:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
-    os.environ["TOKENIZERS_PARALLELISM"] = "false" # TODO: can remove if we handle DataLoader workers properly
 
     hide_hub_bars()
     hide_transformers_bars()

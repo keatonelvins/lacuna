@@ -1,6 +1,7 @@
 """Data loading, tokenization, and packing for training."""
 
 from loguru import logger
+import multiprocessing as mp
 from functools import partial
 from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from datasets.distributed import split_dataset_by_node
@@ -43,7 +44,6 @@ class LacunaDataset:
 
     def __init__(self, config: LacunaConfig):
         self.config = config
-        self.tokenizer = get_tokenizer(config)
         self.dp_world, self.dp_rank = get_world_size(), get_rank()
         self.micro_batch_size = config.trainer.batch_size // self.dp_world
         self.split = config.data.split
@@ -86,7 +86,7 @@ class LacunaDataset:
         else:
             ds = concatenate_datasets(raw)
 
-        encode = partial(_encode, tokenizer=self.tokenizer, column=self.config.data.column)
+        encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len * self.micro_batch_size)
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
@@ -110,6 +110,7 @@ class LacunaDataset:
             "drop_last": True,
             "pin_memory": True,
             "persistent_workers": True,
+            "multiprocessing_context": mp.get_context("spawn"),
         }
         if not self.config.data.stream:
             dataloader_kwargs["sampler"] = self.sampler
