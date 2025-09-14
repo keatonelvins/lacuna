@@ -105,149 +105,88 @@ def log_training_metrics(
     logger.info(" | ".join(log_parts))
 
 
-# ref: https://github.com/huggingface/trl/blob/main/trl/data_utils.py
-class _SegmentTree:
-    """
-    A segment tree data structure that, when initialized as `_SegmentTree(maxval)`, efficiently finds the next larger
-    value for a given input within the range [1, maxval].
-
-    See [Fewer Truncations Improve Language Modeling](https://arxiv.org/abs/2404.10830) for more details.
-    """
+# some gpt-5 code for bfd packing
+class IntSucc:
+    __slots__ = ("N", "bits")
 
     def __init__(self, maxval: int):
-        self.maxval = maxval
-        # For non-power-of-2 values, we need to round up to the next power of 2 for the tree size
-        self.tree_size = 1 << (maxval - 1).bit_length()
-        self.tree = [0] * (2 * self.tree_size)
+        assert maxval >= 1
+        self.N, self.bits = maxval, 0
 
-    def add(self, val):
-        assert 0 < val <= self.maxval
-        i = self.tree_size + val - 1
-        self.tree[i] = val
-        while i > 1:
-            i >>= 1
-            left, right = self.tree[i << 1], self.tree[(i << 1) + 1]
-            # Compare the values using if-else otherwise repeated calls to `builtins.max` become the bottleneck
-            self.tree[i] = left if left >= right else right
+    def add(self, i: int):
+        self.bits |= 1 << (i - 1)
 
-    def remove(self, val):
-        assert 0 < val <= self.maxval
-        i = self.tree_size + val - 1
-        self.tree[i] = 0
-        while i > 1:
-            i >>= 1
-            left, right = self.tree[i << 1], self.tree[(i << 1) + 1]
-            # Compare the values using if-else otherwise repeated calls to `builtins.max` become the bottleneck
-            self.tree[i] = left if left >= right else right
+    def discard(self, i: int):
+        self.bits &= ~(1 << (i - 1))
 
-    def search(self, val):
-        assert 0 < val <= self.maxval
-        i = 1
-        while i < self.tree_size:
-            if self.tree[i << 1] >= val:
-                i = i << 1
-            else:
-                i = (i << 1) + 1
-        return self.tree[i]
+    def next_geq(self, x: int) -> int:
+        y = self.bits >> (x - 1)
+        assert y, "no successor present (missing sentinel?)"
+        return x + ((y & -y).bit_length() - 1)
+
+
+def _take(arr, idx):
+    out = pc.take(arr, pa.array(idx, type=pa.int64()))
+    return out.combine_chunks() if isinstance(out, pa.ChunkedArray) else out
 
 
 def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
-    """
-    Pack `input_ids` examples into fixed-length bins (Best-Fit Decreasing) and
-    return columns: `input_ids` (packed), `position_ids`, and optionally `assistant_masks`.
+    ids = pc.list_slice(examples["input_ids"], 0, seq_len)
+    has_masks = "assistant_masks" in examples.column_names
+    masks = pc.list_slice(examples["assistant_masks"], 0, seq_len) if has_masks else None
 
-    - Truncates each example to `seq_len`.
-    - Concatenates multiple examples into each packed row up to `seq_len`.
-    - `position_ids` reset to 0 at each original example boundary.
-    - `assistant_masks` preserved if present in input.
-    """
-    # Hardcoded to our single use case: a table with list column `input_ids`.
-    input_ids_col = pc.list_slice(examples["input_ids"], 0, seq_len)
+    lens = pc.list_value_length(ids).to_numpy()
+    order = np.argsort(-lens)
 
-    # Check if assistant_masks column exists
-    has_assistant_masks = "assistant_masks" in examples.column_names
-    if has_assistant_masks:
-        assistant_masks_col = pc.list_slice(examples["assistant_masks"], 0, seq_len)
+    succ = IntSucc(seq_len)
+    succ.add(seq_len)  # sentinel enables new bins
+    by_space = defaultdict(deque)  # space -> deque[bins]
+    bins = []  # each: {"ids": [...], "len": int}
 
-    # Compute lengths and sort ids by decreasing length
-    lengths_np = pc.list_value_length(input_ids_col).to_numpy()
-    ids_np = np.arange(len(lengths_np))
-    order_desc = np.argsort(-lengths_np)
-
-    # Best-Fit Decreasing using a segment tree for efficiency
-    segment_tree = _SegmentTree(seq_len)
-    segment_tree.add(seq_len)  # the max-capacity bin is always available
-    space_to_bin = defaultdict(deque)
-    bins: list[dict] = []  # each bin: {"ids": list[int], "length": int}
-
-    for idx in order_desc:
-        length = int(lengths_np[idx])
-        if length == 0:
+    for i in order:
+        L = int(lens[i])
+        if not L:
             continue
+        s = succ.next_geq(L)
+        b = by_space[s].popleft() if s < seq_len else {"ids": [], "len": 0}
+        if s < seq_len and not by_space[s]:
+            succ.discard(s)
+        b["ids"].append(int(i))
+        b["len"] += L
+        if s == seq_len:
+            bins.append(b)
+        ns = s - L
+        by_space[ns].append(b)
+        if ns:
+            succ.add(ns)
 
-        space = segment_tree.search(length)
-        if space < seq_len:
-            binref = space_to_bin[space].popleft()
-        else:
-            binref = {"ids": [], "length": 0}
-            bins.append(binref)
+    reorder = [j for b in bins for j in b["ids"]]
+    ids_taken = _take(ids, reorder)
+    if has_masks:
+        masks_taken = _take(masks, reorder)
 
-        binref["ids"].append(int(ids_np[idx]))
-        binref["length"] += length
+    # offsets (match ListArray vs LargeListArray via dtype)
+    tok_counts = [b["len"] for b in bins]
+    odtype = ids_taken.offsets.type.to_pandas_dtype()
+    offs = np.cumsum([0] + tok_counts, dtype=odtype)
 
-        if space < seq_len and not space_to_bin[space]:
-            segment_tree.remove(space)
+    LA = type(ids_taken)
+    packed_ids = LA.from_arrays(offs, ids_taken.values)
 
-        new_space = space - length
-        space_to_bin[new_space].append(binref)
-        if new_space > 0:
-            segment_tree.add(new_space)
+    # position_ids: reset to 0 at each original example boundary
+    dl = lens[reorder]
+    T = int(offs[-1])
+    pos = np.ones(T, dtype=np.int64)
+    pos[0] = 0
+    if dl.size > 1:
+        cut = dl[:-1].cumsum()
+        pos[cut] = -(dl[:-1] - 1)
+    pos = pos.cumsum()
+    position_ids = LA.from_arrays(offs, pa.array(pos, type=pa.int64()))
 
-    # Reorder examples by packed-bin grouping, then rebuild a single list per bin
-    reorder = [eid for b in bins for eid in b["ids"]]
-    taken = pc.take(input_ids_col, pa.array(reorder, type=pa.int64()))
-    # Ensure we have a single contiguous array regardless of chunking
-    if isinstance(taken, pa.ChunkedArray):
-        list_arr = taken.combine_chunks()
-    else:
-        list_arr = taken
-
-    # Handle assistant_masks if present
-    if has_assistant_masks:
-        taken_masks = pc.take(assistant_masks_col, pa.array(reorder, type=pa.int64()))
-        if isinstance(taken_masks, pa.ChunkedArray):
-            masks_arr = taken_masks.combine_chunks()
-        else:
-            masks_arr = taken_masks
-
-    # Build packed offsets: one list per bin
-    bin_token_counts = [b["length"] for b in bins]
-    offsets_dtype = list_arr.offsets.type.to_pandas_dtype()
-    packed_offsets = np.cumsum([0] + bin_token_counts, dtype=offsets_dtype)
-
-    list_array_cls = type(list_arr)
-    packed_input_ids = list_array_cls.from_arrays(packed_offsets, list_arr.values)
-
-    # Build position_ids: 0..len-1 for each original example, grouped per packed row
-    doc_lengths_ordered = lengths_np[reorder]
-    total_tokens = int(packed_offsets[-1]) if len(packed_offsets) > 0 else 0
-    if total_tokens > 0:
-        pos_vals = np.ones(total_tokens, dtype=np.int64)
-        pos_vals[0] = 0
-        if len(doc_lengths_ordered) > 1:
-            ends = doc_lengths_ordered[:-1].cumsum()
-            pos_vals[ends] = -(doc_lengths_ordered[:-1] - 1)
-        pos_vals = pos_vals.cumsum()
-    else:
-        pos_vals = np.array([], dtype=np.int64)
-
-    position_ids = list_array_cls.from_arrays(packed_offsets, pa.array(pos_vals, type=pa.int64()))
-
-    # Build result table with optional assistant_masks
-    if has_assistant_masks:
-        packed_assistant_masks = list_array_cls.from_arrays(packed_offsets, masks_arr.values)
+    if has_masks:
+        packed_masks = LA.from_arrays(offs, masks_taken.values)
         return pa.Table.from_arrays(
-            [packed_input_ids, position_ids, packed_assistant_masks], names=["input_ids", "position_ids", "assistant_masks"]
+            [packed_ids, position_ids, packed_masks], names=["input_ids", "position_ids", "assistant_masks"]
         )
-    else:
-        return pa.Table.from_arrays([packed_input_ids, position_ids], names=["input_ids", "position_ids"])
+    return pa.Table.from_arrays([packed_ids, position_ids], names=["input_ids", "position_ids"])
