@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from transformers import AutoTokenizer
 
 from lacuna.utils import pack_bfd
-from lacuna.data import LacunaDataset, get_tokenizer
+from lacuna.data import LacunaDataset, get_tokenizer, _encode
 
 
 def test_bfd_packing():
@@ -58,13 +58,11 @@ def test_encode_text():
         data=SimpleNamespace(column="text", chat_template=None, eos_token=None),
     )
 
-    dataset = object.__new__(LacunaDataset)
-    dataset.config = mock_config
-    dataset.tokenizer = get_tokenizer(mock_config)
+    tokenizer = get_tokenizer(mock_config)
 
     text = "And then black night. That blackness was sublime. I felt distributed through space and time"
 
-    results = dataset._encode({"text": [text]})
+    results = _encode({"text": [text]}, tokenizer, "text")
     maybe_eos_token = results["input_ids"][0][-1]
     assert maybe_eos_token == tokenizer.eos_token_id
 
@@ -80,12 +78,10 @@ def test_add_eos_token():
         data=SimpleNamespace(column="text", chat_template=None, eos_token="<|im_end|>"),
     )
 
-    dataset = object.__new__(LacunaDataset)
-    dataset.config = mock_config
-    dataset.tokenizer = get_tokenizer(mock_config)
+    tokenizer = get_tokenizer(mock_config)
 
-    assert dataset.tokenizer.eos_token == "<|im_end|>"
-    assert dataset.tokenizer.eos_token_id == 151645
+    assert tokenizer.eos_token == "<|im_end|>"
+    assert tokenizer.eos_token_id == 151645
 
     text = """And blood-black nothingness began to spin
 A system of cells interlinked within
@@ -93,23 +89,21 @@ Cells interlinked within cells interlinked
 Within one stem. And dreadfully distinct
 Against the dark, a tall white fountain played."""
 
-    results = dataset._encode({"text": [text]})
+    results = _encode({"text": [text]}, tokenizer, "text")
     maybe_eos_token = results["input_ids"][0][-1]
 
-    assert maybe_eos_token == dataset.tokenizer.eos_token_id
+    assert maybe_eos_token == tokenizer.eos_token_id
 
 
 def test_encode_messages():
-    """Test _encode method with messages column."""
+    """Test _encode function with messages column."""
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
     mock_config = SimpleNamespace(
         model=SimpleNamespace(name="Qwen/Qwen3-0.6B"),
         data=SimpleNamespace(column="messages", chat_template=Path("tests/test.jinja").read_text(), eos_token=None),
     )
 
-    dataset = object.__new__(LacunaDataset)
-    dataset.config = mock_config
-    dataset.tokenizer = get_tokenizer(mock_config)
+    tokenizer = get_tokenizer(mock_config)
 
     messages = [
         {"role": "user", "content": "What's it like to hold the hand of someone you love?"},
@@ -122,7 +116,7 @@ What's it like to hold the hand of someone you love?<|im_end|>
 Within cells interlinked<|im_end|>
 """
 
-    results = dataset._encode({"messages": [messages]})
+    results = _encode({"messages": [messages]}, tokenizer, "messages")
 
     input_ids = results["input_ids"][0]
     assistant_masks = results["assistant_masks"][0]
@@ -144,3 +138,37 @@ Within cells interlinked<|im_end|>
     expected_masks = user_tokens + assistant_tokens + trailing_newline
 
     assert assistant_masks == expected_masks
+
+
+def test_dataset_cache_reuse():
+    """Test that LacunaDataset reuses cache when built with same config."""
+    config = SimpleNamespace(
+        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
+        data=SimpleNamespace(
+            datasets=["keatone/TinierStories"],
+            split="train[:10]",
+            column="text",
+            chat_template=None,
+            eos_token=None,
+            stream=False,
+            map_batch_size=4,
+            pack_batch_size=10,
+        ),
+    )
+    config.trainer = SimpleNamespace(
+        batch_size=4,
+        seq_len=128,
+        seed=42,
+    )
+
+    dataset1 = LacunaDataset(config)
+    dataset2 = LacunaDataset(config)
+
+    assert dataset1.fingerprint == dataset2.fingerprint
+    assert len(dataset1._dataset) == len(dataset2._dataset)
+
+    config.trainer.seq_len = 256
+    dataset3 = LacunaDataset(config)
+
+    assert dataset3.fingerprint != dataset1.fingerprint
+    assert len(dataset3._dataset) != len(dataset1._dataset)

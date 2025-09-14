@@ -19,7 +19,7 @@ from loguru import logger
 from .config import LacunaConfig
 
 
-def init_distributed(config: LacunaConfig) -> None:
+def init_dist(config: LacunaConfig) -> None:
     """Initialize distributed process group."""
     set_seed(config.trainer.seed)
 
@@ -38,7 +38,7 @@ def init_distributed(config: LacunaConfig) -> None:
     logger.info(f"Initialized distributed: rank {get_rank()}/{get_world_size()}")
 
 
-def destroy_distributed() -> None:
+def destroy_dist() -> None:
     """Destroy distributed process group."""
     if dist.is_initialized():
         dist.destroy_process_group()
@@ -104,7 +104,7 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
     return mesh
 
 
-def setup_distributed(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
+def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     world_size = get_world_size()
     if world_size == 1:
         return model.cuda()

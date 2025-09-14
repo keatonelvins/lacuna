@@ -13,18 +13,18 @@ from .checkpoint import (
 from .config import LacunaConfig
 from .data import setup_dataloader
 from .scheduler import setup_scheduler
-from .distributed import get_world_size, init_distributed, setup_distributed, destroy_distributed
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
 from .utils import display_config, log_training_metrics, setup_env
 from .wandb import init_wandb, log_wandb_metrics, finish
+from .distributed import get_world_size, init_dist, setup_dist, destroy_dist
 
 
 @logger.catch(reraise=True)
 def train(config: LacunaConfig) -> None:
     setup_env(config)
-    init_distributed(config)
+    init_dist(config)
     display_config(config)
 
     wandb_run = init_wandb(config)
@@ -36,10 +36,10 @@ def train(config: LacunaConfig) -> None:
     try:
         logger.info("Setting up model")
         model = setup_model(config)
-        model = setup_distributed(model, config)
+        model = setup_dist(model, config)
 
         logger.info("Setting up dataloader")
-        dataloader, dataset = setup_dataloader(config, micro_batch_size)
+        dataloader, dataset = setup_dataloader(config)
 
         if config.trainer.steps:
             total_steps = config.trainer.steps
@@ -145,4 +145,4 @@ def train(config: LacunaConfig) -> None:
         logger.info("Training interrupted :(")
     finally:
         finish(wandb_run)
-        destroy_distributed()
+        destroy_dist()

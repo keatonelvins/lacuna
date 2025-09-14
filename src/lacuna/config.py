@@ -55,6 +55,7 @@ class DataConfig(BaseModel):
     map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
     num_workers: int = Field(4, description="The number of workers to use for data loading")
+    fingerprint: str = Field(None, description="Fingerprint of the dataset")
 
     @model_validator(mode="after")
     def set_files(self):

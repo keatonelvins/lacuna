@@ -49,6 +49,7 @@ class LacunaDataset:
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
+        self.config.data.fingerprint = self._dataset._fingerprint
         if config.data.stream:
             self.sampler = None
         else:
@@ -102,21 +103,18 @@ class LacunaDataset:
         else:
             self.sampler.set_epoch(epoch)
 
-    def create_dataloader(self, micro_batch_size: int) -> StatefulDataLoader:
+    def create_dataloader(self) -> StatefulDataLoader:
         """Create the appropriate dataloader for this dataset."""
-        if self.config.data.stream:
-            self._dataloader = StatefulDataLoader(
-                self._dataset, num_workers=self.config.data.num_workers, drop_last=True, pin_memory=True, persistent_workers=True
-            )
-        else:
-            self._dataloader = StatefulDataLoader(
-                self._dataset,
-                sampler=self.sampler,
-                num_workers=self.config.data.num_workers,
-                drop_last=True,
-                pin_memory=True,
-                persistent_workers=True,
-            )
+        dataloader_kwargs = {
+            "num_workers": self.config.data.num_workers,
+            "drop_last": True,
+            "pin_memory": True,
+            "persistent_workers": True,
+        }
+        if not self.config.data.stream:
+            dataloader_kwargs["sampler"] = self.sampler
+
+        self._dataloader = StatefulDataLoader(self._dataset, **dataloader_kwargs)
 
         return self._dataloader
 
@@ -128,8 +126,8 @@ class LacunaDataset:
         return len(self._dataloader) if self._dataloader else 1
 
 
-def setup_dataloader(config: LacunaConfig, micro_batch_size: int) -> tuple[StatefulDataLoader, LacunaDataset]:
+def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
     """Setup data pipeline and return dataloader, and dataset."""
     dataset = LacunaDataset(config)
-    dataloader = dataset.create_dataloader(micro_batch_size)
+    dataloader = dataset.create_dataloader()
     return dataloader, dataset
