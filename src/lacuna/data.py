@@ -50,17 +50,24 @@ class LacunaDataset:
 
         self._dataset = self._build_dataset()
         self.config.data.fingerprint = self._dataset._fingerprint
-        if config.data.stream:
-            self.sampler = None
-        else:
-            self.sampler = DistributedSampler(
-                self._dataset,
-                num_replicas=self.dp_world,
-                rank=self.dp_rank,
-                shuffle=True,
-                drop_last=True,
-                seed=config.trainer.seed,
-            )
+        self.sampler = DistributedSampler(
+            self._dataset,
+            num_replicas=self.dp_world,
+            rank=self.dp_rank,
+            shuffle=True,
+            drop_last=True,
+            seed=config.trainer.seed,
+        ) if config.data.stream else None
+
+        self.dataloader = StatefulDataLoader(
+            self._dataset, 
+            num_workers=self.config.data.num_workers,
+            drop_last=True,
+            pin_memory=True,
+            persistent_workers=True,
+            multiprocessing_context=mp.get_context("spawn"),
+            sampler=self.sampler,
+        )
 
     def _load_datasets(self, split: str, stream: bool):
         datasets = []
@@ -103,32 +110,14 @@ class LacunaDataset:
         else:
             self.sampler.set_epoch(epoch)
 
-    def create_dataloader(self) -> StatefulDataLoader:
-        """Create the appropriate dataloader for this dataset."""
-        dataloader_kwargs = {
-            "num_workers": self.config.data.num_workers,
-            "drop_last": True,
-            "pin_memory": True,
-            "persistent_workers": True,
-            "multiprocessing_context": mp.get_context("spawn"),
-        }
-        if not self.config.data.stream:
-            dataloader_kwargs["sampler"] = self.sampler
-
-        self._dataloader = StatefulDataLoader(self._dataset, **dataloader_kwargs)
-
-        return self._dataloader
-
     @property
     def length(self) -> int:
         """Return length per epoch of the dataset."""
         if self.config.data.stream:
             return self.config.trainer.steps
-        return len(self._dataloader) if self._dataloader else 1
+        return len(self.dataloader) if self.dataloader else 1
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
-    """Setup data pipeline and return dataloader, and dataset."""
     dataset = LacunaDataset(config)
-    dataloader = dataset.create_dataloader()
-    return dataloader, dataset
+    return dataset.dataloader, dataset

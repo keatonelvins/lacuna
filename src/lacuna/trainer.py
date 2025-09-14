@@ -63,7 +63,6 @@ def train(config: LacunaConfig) -> None:
 
         logger.info(f"Starting training: {total_steps} steps")
 
-        dataloader_iter = iter(dataloader)
         start_step = redline.state.step
         current_epoch = 0
 
@@ -73,11 +72,10 @@ def train(config: LacunaConfig) -> None:
                 if epoch > current_epoch:
                     current_epoch = epoch
                     dataset.set_epoch(epoch)
-                    dataloader_iter = iter(dataloader)
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
-            batch = next(dataloader_iter)
+            batch = next(dataloader)
             data_load_time = time.perf_counter() - data_load_start
 
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
