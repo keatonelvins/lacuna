@@ -148,9 +148,8 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
 def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     # TODO: document flags and values
     scale = (12 * model.config.hidden_size**2) / 1e8
-    bucket = 25 * (1 + scale)
-    bucket *= 1.5 if get_world_size() > 32 else 1
-    clipped_cap = int(min(max(bucket, 10), 250))
+    bucket = 25 * (1 + scale) * (1.5 if get_world_size() > 32 else 1)
+    bucket_cap_guess = int(min(max(bucket, 10), 250))
     is_compiled = config.model.compile_mode is not None
     model = DDP(
         model,
@@ -159,7 +158,7 @@ def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
         gradient_as_bucket_view=True,
         static_graph=is_compiled,  # only use static graph if model is compiled
         find_unused_parameters=False,
-        bucket_cap_mb=clipped_cap,
+        bucket_cap_mb=bucket_cap_guess,
     )
 
     logger.info(f"DDP setup complete (static_graph={is_compiled})")
