@@ -69,7 +69,13 @@ class LacunaDataset:
             multiprocessing_context=mp.get_context("spawn"),
             sampler=self.sampler,
         )
-        self.data_iter = self.infinite_dataloader()
+        self.data_iter = self._infinite_dataloader()
+
+    def _infinite_dataloader(self):
+        """Yield batches from the dataloader indefinitely."""
+        while True:
+            for batch in self.dataloader:
+                yield batch
 
     def __next__(self):
         return next(self.data_iter)
@@ -121,12 +127,6 @@ class LacunaDataset:
         if self.config.data.stream:
             return self.config.trainer.steps
         return len(self.dataloader) if self.dataloader else 1
-
-    def infinite_dataloader(self):
-        """Infinite dataset generator."""
-        while True:
-            for batch in self.dataloader:
-                yield batch
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
