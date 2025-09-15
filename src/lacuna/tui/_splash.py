@@ -7,7 +7,6 @@ from textual.widgets import Static
 
 
 class SplashScreen(ModalScreen):
-    """A splash screen with animated ASCII art."""
 
     class DismissScreen(Message):
         """Message to dismiss the splash screen."""

@@ -17,6 +17,7 @@ dependencies = [
     "rich>=14.1.0",
     "psutil>=7.0.0",
     "s3fs>=2025.3.0",
+    "textual>=6.1.0",
 ]
 
 [project.scripts]
