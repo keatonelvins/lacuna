@@ -72,7 +72,6 @@ class LacunaDataset:
         self.data_iter = self._infinite_dataloader()
 
     def _infinite_dataloader(self):
-        """Yield batches from the dataloader indefinitely."""
         while True:
             for batch in self.dataloader:
                 yield batch
