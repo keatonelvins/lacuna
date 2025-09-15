@@ -1,9 +1,8 @@
 import json
 from pathlib import Path
 from textual.app import ComposeResult
-from textual.containers import Grid
 from textual.screen import ModalScreen
-from textual.widgets import Static
+from textual.widgets import Tree
 
 
 class ConfigScreen(ModalScreen):
@@ -14,34 +13,50 @@ class ConfigScreen(ModalScreen):
 
     CSS = """
     ConfigScreen {
-        background: $panel-lighten-1 80%;
+        background: $panel-darken-2 90%;
+        border: heavy $accent;
     }
 
-    Grid {
-        grid-size: 3;
-        grid-gutter: 1;
-        height: auto;
-        padding: 2;
-    }
-
-    .config-section {
-        border: solid;
+    Tree {
+        background: $panel-darken-1;
+        border: round $primary;
+        height: 1fr;
+        margin: 1;
         padding: 1;
-        height: auto;
+    }
+
+    Tree:focus {
+        border: heavy $accent;
+        background: $panel-darken-1 90%;
+    }
+
+    TreeNode {
+        color: $text;
+    }
+
+    TreeNode.-expanded {
+        color: $accent;
+        text-style: bold;
+    }
+
+    TreeNode.-highlighted {
+        background: $accent 20%;
+        color: $accent;
+        text-style: bold;
     }
     """
 
     def compose(self) -> ComposeResult:
         config = self._load_config()
-        sections = []
+        tree: Tree[str] = Tree("config")
+        tree.root.expand()
 
         for section_name, section_data in config.items():
-            content = f"[bold]{section_name.upper()}[/bold]\n\n"
+            section_node = tree.root.add(f"{section_name}", expand=True)
             for key, value in section_data.items():
-                content += f"{key}: {value}\n"
-            sections.append(Static(content.strip(), classes="config-section"))
+                section_node.add_leaf(f"[dim]•[/] [bold cyan]{key}[/]: [white]{value}[/]")
 
-        yield Grid(*sections)
+        yield tree
 
     def _load_config(self) -> dict:
         cache_dir = Path.cwd() / ".lacuna_cache" / "active_run"
