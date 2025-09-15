@@ -45,7 +45,6 @@ class LacunaDataset:
     def __init__(self, config: LacunaConfig):
         self.config = config
         self.dp_world, self.dp_rank = get_world_size(), get_rank()
-        self.micro_batch_size = config.trainer.batch_size // self.dp_world
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
@@ -104,7 +103,7 @@ class LacunaDataset:
             ds = concatenate_datasets(raw)
 
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
-        pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len * self.micro_batch_size)
+        pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
         ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])

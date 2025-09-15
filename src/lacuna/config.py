@@ -34,7 +34,6 @@ class TrainerConfig(BaseModel):
     epochs: int = Field(1, gt=0, description="Number of epochs")
     steps: Optional[int] = Field(None, gt=0, description="Max training steps (will override epochs if set)")
     seq_len: int = Field(512, ge=1, description="Sequence length")
-    batch_size: int = Field(1, ge=1, description="Global training batch size across all GPUs")
     eval_every: float = Field(None, gt=0, le=1, description="Eval frequency in epochs, can be fractional (default no eval)")
 
 
@@ -174,10 +173,3 @@ class LacunaConfig(BaseSettings):
         cli_kebab_case=True,
         cli_implicit_flags=True,
     )
-
-    @model_validator(mode="after")
-    def validate_batch_size(self):
-        world_size = self.torchrun.nproc_per_node * self.torchrun.nnodes
-        if self.trainer.batch_size % world_size != 0:
-            raise ValueError(f"Batch size {self.trainer.batch_size} must be divisible by world_size {world_size}")
-        return self

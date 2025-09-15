@@ -26,8 +26,7 @@ def train(config: LacunaConfig) -> None:
     wandb_run = init_wandb(config)
     world_size = get_world_size()
 
-    micro_batch_size = config.trainer.batch_size // world_size
-    logger.info(f"GPU setup: {world_size} GPUs, batch_size={config.trainer.batch_size} ({micro_batch_size} per GPU)")
+    logger.info(f"GPU setup: {world_size} GPUs")
 
     try:
         logger.info("Setting up model")

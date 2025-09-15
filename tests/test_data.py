@@ -157,7 +157,6 @@ def test_dataset_cache_reuse():
         ),
     )
     config.trainer = SimpleNamespace(
-        batch_size=4,
         seq_len=128,
         seed=42,
     )
