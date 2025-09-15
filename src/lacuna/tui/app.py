@@ -2,6 +2,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid
 
+from ._config import ConfigScreen
 from ._curves import CurvesWidget
 from ._data import DataWidget
 from ._i_o import IOWidget
@@ -10,7 +11,10 @@ from ._splash import SplashScreen
 
 
 class Lacuna(App):
-    BINDINGS = [Binding("ctrl+c", "quit", "Quit")]
+    BINDINGS = [
+        Binding("ctrl+c", "quit", "Quit"),
+        Binding("c", "show_config", "Config"),
+    ]
 
     CSS = """
     Grid {
@@ -53,6 +57,13 @@ class Lacuna(App):
     def on_mount(self) -> None:
         """Show splash screen on app startup."""
         self.push_screen(SplashScreen())
+
+    def action_show_config(self) -> None:
+        """Toggle config screen."""
+        if isinstance(self.screen, ConfigScreen):
+            self.pop_screen()
+        else:
+            self.push_screen(ConfigScreen())
 
 
 def main():

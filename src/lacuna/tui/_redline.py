@@ -22,7 +22,9 @@ class RedlineWidget(Static):
                 f"MFU: {latest['mfu_pct']:.1f}%",
                 f"TFLOPS: {latest['tflops']:.1f}",
                 f"Tok/s: {latest['tps']:.0f}",
-                f"Memory: {latest['max_reserved_gb']:.1f}GB"
+                f"Memory: {latest['max_reserved_gb']:.1f}GB ({latest['max_reserved_pct']:.1f}%)",
+                f"Data Load: {latest['data_pct']:.1f}%",
+                f"Step: {latest['step']}",
             ])
         else:
             content_lines.append("No active run")

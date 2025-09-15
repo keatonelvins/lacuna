@@ -12,15 +12,15 @@ from .scheduler import setup_scheduler
 from .metrics import Redline
 from .model import setup_model
 from .optim import setup_optimizer
-from .utils import display_config, log_training_metrics, setup_env
+from .utils import display_config, log_training_metrics, setup_env, save_batch_json
 from .wandb import init_wandb, log_wandb_metrics, finish
 from .distributed import get_world_size, init_dist, setup_dist, destroy_dist
 
 
 @logger.catch(reraise=True)
 def train(config: LacunaConfig) -> None:
-    run_dir = setup_env(config)
     init_dist(config)
+    run_dir = setup_env(config)
     display_config(config)
 
     wandb_run = init_wandb(config)
@@ -108,6 +108,7 @@ def train(config: LacunaConfig) -> None:
 
                 log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics, run_dir)
                 log_wandb_metrics(loss.item(), current_lr, grad_norm, step, metrics, wandb_run)
+                save_batch_json(run_dir, step, batch)
 
             if (
                 config.checkpoint.save_every
