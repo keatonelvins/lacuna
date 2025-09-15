@@ -68,15 +68,16 @@ class LacunaDataset:
             multiprocessing_context=mp.get_context("spawn"),
             sampler=self.sampler,
         )
-        self.data_iter = self._infinite_dataloader()
-
-    def _infinite_dataloader(self):
-        while True:
-            for batch in self.dataloader:
-                yield batch
+        self._current_iter = None
 
     def __next__(self):
-        return next(self.data_iter)
+        if self._current_iter is None:
+            self._current_iter = iter(self.dataloader)
+        try:
+            return next(self._current_iter)
+        except StopIteration:
+            self._current_iter = iter(self.dataloader)
+            return next(self._current_iter)
 
     def _load_datasets(self, split: str, stream: bool):
         datasets = []
