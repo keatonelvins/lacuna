@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 from textual.widgets import Static
 from .utils import get_latest_metrics
 
@@ -9,6 +7,9 @@ class CurvesWidget(Static):
         super().__init__()
         self.border_title = "_curves"
         self.update_content()
+
+    def on_mount(self) -> None:
+        self.set_interval(1, self.update_content)
 
     def update_content(self) -> None:
         latest = get_latest_metrics()

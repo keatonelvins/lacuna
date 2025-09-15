@@ -15,7 +15,7 @@ uv run train
 uv run train --help
 
 # Pass args directly
-uv run train --model.name Qwen/Qwen3-8B --trainer.batch-size 8
+uv run train --model.name Qwen/Qwen3-8B --trainer.steps 100
 
 # Load args from a toml (w/ overrides)
 uv run train path/to/config.toml

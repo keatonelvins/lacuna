@@ -121,9 +121,9 @@ def log_training_metrics(
         f"Loss: {loss:7.4f}",
         f"Grad: {grad_norm:8.4f}",
         f"LR: {lr:9.2e}",
-        f"Mem: {metrics.get('max_reserved_gb', 0.0):5.1f}GB ({metrics.get('max_reserved_pct', 0.0):3.0f}%)",
-        f"MFU: {metrics.get('mfu_pct', 0.0):5.1f}%",
-        f"Data: {metrics.get('data_pct', 0.0):5.1f}%",
+        f"Mem: {metrics['max_reserved_gb']:5.1f}GB ({metrics['max_reserved_pct']:3.0f}%)",
+        f"MFU: {metrics['mfu_pct']:5.1f}%",
+        f"Data: {metrics['data_pct']:5.1f}%",
     ]
     logger.info(" | ".join(log_parts))
 

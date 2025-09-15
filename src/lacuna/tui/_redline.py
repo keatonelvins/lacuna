@@ -8,6 +8,9 @@ class RedlineWidget(Static):
         self.border_title = "_redline"
         self.update_content()
 
+    def on_mount(self) -> None:
+        self.set_interval(1, self.update_content)
+
     def update_content(self) -> None:
         latest = get_latest_metrics()
         if latest:

@@ -81,10 +81,17 @@ class Redline:
 
     def read(self) -> dict[str, float]:
         """Get all metrics as a dict."""
-        if not self._step_times:
-            return {}
+        metrics = {
+            "tps": 0.0,
+            "mfu_pct": 0.0,
+            "tflops": 0.0,
+            "data_pct": 0.0,
+            "max_reserved_gb": 0.0,
+            "max_reserved_pct": 0.0,
+        }
 
-        metrics = {}
+        if not self._step_times:
+            return metrics
 
         total_step_time = sum(self._step_times)
         total_data_time = sum(self._data_load_times)
