@@ -13,6 +13,7 @@ from _curves import CurvesWidget
 from _data import DataWidget
 from _i_o import IOWidget
 from _redline import RedlineWidget
+from _splash import SplashScreen
 
 
 class Lacuna(App):
@@ -55,6 +56,10 @@ class Lacuna(App):
             CurvesWidget(),
             IOWidget(),
         )
+
+    def on_mount(self) -> None:
+        """Show splash screen on app startup."""
+        self.push_screen(SplashScreen())
 
 
 if __name__ == "__main__":
