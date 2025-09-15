@@ -18,6 +18,7 @@ dependencies = [
     "psutil>=7.0.0",
     "s3fs>=2025.3.0",
     "textual>=6.1.0",
+    "nvidia-ml-py>=13.580.82",
 ]
 
 [project.scripts]

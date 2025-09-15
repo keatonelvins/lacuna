@@ -1,5 +1,5 @@
 from textual.widgets import Static
-from .utils import get_latest_metrics
+from .utils import get_latest_metrics, get_gpu_hardware
 
 
 class RedlineWidget(Static):
@@ -13,11 +13,29 @@ class RedlineWidget(Static):
 
     def update_content(self) -> None:
         latest = get_latest_metrics()
+        gpu_hw = get_gpu_hardware()
+
+        content_lines = []
+
         if latest:
-            content = f"MFU: {latest['mfu_pct']:.1f}%\n"
-            content += f"TFLOPS: {latest['tflops']:.1f}\n"
-            content += f"Tok/s: {latest['tps']:.0f}\n"
-            content += f"Memory: {latest['max_reserved_gb']:.1f}GB"
-            self.update(content)
+            content_lines.extend([
+                f"MFU: {latest['mfu_pct']:.1f}%",
+                f"TFLOPS: {latest['tflops']:.1f}",
+                f"Tok/s: {latest['tps']:.0f}",
+                f"Memory: {latest['max_reserved_gb']:.1f}GB"
+            ])
         else:
-            self.update("No active run")
+            content_lines.append("No active run")
+
+        for i, gpu in enumerate(gpu_hw):
+            content_lines.extend([
+                f"GPU{i}: {gpu['gpu_util']}% util",
+                f"Temp: {gpu['temp']}°C",
+                f"Power: {gpu['power']}W",
+                f"VRAM: {gpu['mem_used_gb']:.1f}/{gpu['mem_total_gb']:.1f}GB"
+            ])
+
+        if not gpu_hw:
+            content_lines.append("No GPUs detected")
+
+        self.update("\n".join(content_lines))
