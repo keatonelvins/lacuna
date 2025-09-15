@@ -66,7 +66,6 @@ class LacunaDataset:
             num_workers=self.config.data.num_workers,
             drop_last=True,
             pin_memory=True,
-            persistent_workers=True,
             multiprocessing_context=mp.get_context("spawn"),
             sampler=self.sampler,
         )
