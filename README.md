@@ -38,5 +38,4 @@ uv run pre-commit install
 There are a ton of great training repos out there already! Some influences:
 - [prime-rl](https://github.com/PrimeIntellect-ai/prime-rl)
 - [torchtitan](https://github.com/pytorch/torchtitan)
-- [AutoModel](https://github.com/NVIDIA-NeMo/Automodel)
 - [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
