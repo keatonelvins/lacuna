@@ -4,17 +4,7 @@ import time
 from collections import deque
 import torch
 from loguru import logger
-from dataclasses import dataclass
 from .distributed import get_local_rank
-
-
-@dataclass
-class StateTracker:
-    step: int = 0
-    total_tokens: int = 0
-    peak_mfu: float = 0.0
-    peak_tflops: float = 0.0
-    peak_mem_gb: float = 0.0
 
 
 # ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/tools/utils.py
@@ -53,6 +43,7 @@ class Redline:
         seq_len: int,
         world_size: int = 1,
         window_steps: int = 100,
+        start_step: int = 0,
     ):
         self.seq_len = seq_len
         self.world_size = world_size
@@ -69,7 +60,8 @@ class Redline:
         self.device_props = torch.cuda.get_device_properties(self.device)
         self.total_memory = self.device_props.total_memory
 
-        self.state = StateTracker()
+        self.step = start_step
+        self.total_tokens = 0
 
         torch.cuda.reset_peak_memory_stats()
 
@@ -79,8 +71,8 @@ class Redline:
         self._tokens.append(tokens)
         self._data_load_times.append(data_load_time)
 
-        self.state.total_tokens += tokens
-        self.state.step += 1
+        self.total_tokens += tokens
+        self.step += 1
 
         if self._last_time is not None:
             step_time = now - self._last_time
@@ -106,10 +98,6 @@ class Redline:
         metrics["data_pct"] = 100 * total_data_time / total_step_time
 
         metrics.update(self._get_memory())
-
-        self.state.peak_mfu = max(self.state.peak_mfu, metrics["mfu_pct"])
-        self.state.peak_tflops = max(self.state.peak_tflops, metrics["tflops"])
-        self.state.peak_mem_gb = max(self.state.peak_mem_gb, metrics.get("max_reserved_gb", 0.0))
 
         return metrics
 

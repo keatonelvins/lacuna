@@ -5,10 +5,7 @@ import torch
 from loguru import logger
 from torch.amp import autocast
 
-from .checkpoint import (
-    load_checkpoint,
-    save_checkpoint,
-)
+from .checkpoint import save_checkpoint
 from .config import LacunaConfig
 from .data import setup_dataloader
 from .scheduler import setup_scheduler
@@ -22,7 +19,7 @@ from .distributed import get_world_size, init_dist, setup_dist, destroy_dist
 
 @logger.catch(reraise=True)
 def train(config: LacunaConfig) -> None:
-    setup_env(config)
+    run_dir = setup_env(config)
     init_dist(config)
     display_config(config)
 
@@ -49,21 +46,23 @@ def train(config: LacunaConfig) -> None:
         scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
         redline = Redline(model=model, seq_len=config.trainer.seq_len, world_size=world_size)
 
+        start_step = 0
+
+        current_epoch = 0
         accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
         if config.checkpoint.resume_from is not None:
             logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
-            redline.state = load_checkpoint(
-                model=model,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                path=config.checkpoint.resume_from,
-            )
+            # TODO: Fix load_checkpoint to return step
+            # start_step = load_checkpoint(
+            #     model=model,
+            #     optimizer=optimizer,
+            #     scheduler=scheduler,
+            #     dataloader=dataloader,
+            #     path=config.checkpoint.resume_from,
+            # )
 
         logger.info("Starting training!")
-
-        start_step = redline.state.step
-        current_epoch = 0
 
         for step in range(start_step, total_steps):
             if dataset.length and config.trainer.epochs > 1:
@@ -108,8 +107,8 @@ def train(config: LacunaConfig) -> None:
                 current_lr = scheduler.get_last_lr()[0]
                 metrics = redline.read()
 
-                log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics)
-                log_wandb_metrics(loss.item(), current_lr, grad_norm, redline.state, metrics, wandb_run)
+                log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics, run_dir)
+                log_wandb_metrics(loss.item(), current_lr, grad_norm, step, metrics, wandb_run)
 
             if (
                 config.checkpoint.save_every
@@ -118,18 +117,18 @@ def train(config: LacunaConfig) -> None:
             ):
                 logger.info(f"Saving checkpoint at step {step}")
                 save_checkpoint(
-                    model=model,
+                    step=step,
                     config=config,
-                    state=redline.state,
+                    model=model,
                     optimizer=optimizer,
                     scheduler=scheduler,
                     dataloader=dataloader,
                 )
 
         save_checkpoint(
-            model=model,
+            step=redline.step,
             config=config,
-            state=redline.state,
+            model=model,
             optimizer=optimizer,
             scheduler=scheduler,
             dataloader=dataloader,

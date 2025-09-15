@@ -24,9 +24,8 @@ from torch.optim.optimizer import Optimizer
 from torchdata.stateful_dataloader import StatefulDataLoader
 
 from .config import LacunaConfig
-from .metrics import StateTracker
 from .data import get_tokenizer
-from .utils import save_state_json, save_settings_json, load_state_json
+from .utils import save_settings_json
 
 
 # ref: https://docs.pytorch.org/tutorials/recipes/distributed_async_checkpoint_recipe.html
@@ -67,7 +66,7 @@ class TrainerState(Stateful):
 
 
 def save_checkpoint(
-    state: StateTracker,
+    step: int,
     config: LacunaConfig,
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -76,7 +75,7 @@ def save_checkpoint(
     final: bool = False,
 ) -> None:
     """Save DCP shards or final HF sharded weights."""
-    ckpt_name = "final" if final else f"step_{state.step}"
+    ckpt_name = "final" if final else f"step_{step}"
     path = config.checkpoint.save_dir / ckpt_name
 
     unwrapped_model = model.module if hasattr(model, "module") else model
@@ -99,7 +98,6 @@ def save_checkpoint(
             warnings.filterwarnings("ignore", message="TypedStorage is deprecated", category=UserWarning)
             unwrapped_model.save_pretrained(path)
 
-    save_state_json(path, state)
     save_settings_json(path, config)
 
 
@@ -109,7 +107,7 @@ def load_checkpoint(
     scheduler: torch.optim.lr_scheduler.LRScheduler,
     dataloader: StatefulDataLoader,
     path: Path,
-) -> StateTracker:
+):
     """Load DCP checkpoint and restore full training state."""
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at {path}")
@@ -137,4 +135,4 @@ def load_checkpoint(
 
     logger.info(f"Loaded {'HF' if is_hf else 'DCP'} checkpoint from {path}")
 
-    return load_state_json(path)
+    return None

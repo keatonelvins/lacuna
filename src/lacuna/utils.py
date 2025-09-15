@@ -1,10 +1,10 @@
 import json
 import os
 from pathlib import Path
+from datetime import datetime
 from loguru import logger
 from rich.pretty import Pretty
 from rich.console import Console
-from dataclasses import asdict
 from collections import defaultdict, deque
 
 import torch
@@ -14,7 +14,6 @@ import pyarrow.compute as pc
 
 from .distributed import is_master
 from .config import LacunaConfig
-from .metrics import StateTracker
 
 
 def master_only(fn):
@@ -28,26 +27,53 @@ def master_only(fn):
     return wrapper
 
 
-def setup_logger() -> None:
+def get_run_dir() -> Path:
+    """Create and return a timestamped run directory."""
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = Path(".lacuna_cache/runs") / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    active_link = Path(".lacuna_cache/active_run")
+    if active_link.exists() or active_link.is_symlink():
+        active_link.unlink()
+    active_link.symlink_to(run_dir.relative_to(active_link.parent))
+
+    return run_dir
+
+
+def setup_logger(run_dir: Path = None) -> None:
+    """Setup logging to console and run directory."""
     logger.remove()  # Remove default handler
+
     logger.add(
         sink=lambda msg: print(msg, end=""),
         format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {message}",
         level="INFO",
         filter=lambda r: is_master(),
     )
-    logger.add(
-        "runs.log", format="{time:HH:mm:ss} | {level} | {message}", level="INFO", filter=lambda r: is_master(), rotation="1 MB"
-    )
+
+    if run_dir:
+        logger.add(
+            run_dir / "run.log",
+            format="{time:HH:mm:ss} | {level} | {message}",
+            level="INFO",
+            filter=lambda r: is_master(),
+            rotation="100 MB",
+        )
 
 
-def setup_env(config: LacunaConfig) -> None:
+def setup_env(config: LacunaConfig) -> Path:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
 
-    setup_logger()
+    run_dir = get_run_dir()
+    setup_logger(run_dir)
+    save_settings_json(run_dir, config)
+
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
     os.makedirs(".lacuna_cache", exist_ok=True)
+
+    return run_dir
 
 
 def display_config(config: LacunaConfig) -> None:
@@ -58,10 +84,19 @@ def display_config(config: LacunaConfig) -> None:
 
 
 @master_only
-def save_state_json(path: Path, state: StateTracker) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    with (path / "state.json").open("w") as f:
-        f.write(json.dumps(asdict(state), indent=4))
+def save_metrics_jsonl(run_dir: Path, step: int, loss: float, grad_norm: float, lr: float, metrics: dict) -> None:
+    metrics_data = {
+        "step": step,
+        "loss": loss,
+        "grad_norm": float(grad_norm),
+        "lr": lr,
+        "timestamp": datetime.now().isoformat(),
+        **metrics,
+    }
+
+    metrics_file = run_dir / "metrics.jsonl"
+    with metrics_file.open("a") as f:
+        f.write(json.dumps(metrics_data) + "\n")
 
 
 @master_only
@@ -71,20 +106,13 @@ def save_settings_json(path: Path, config: LacunaConfig) -> None:
         f.write(config.model_dump_json(indent=4))
 
 
-def load_state_json(path: Path) -> StateTracker:
-    tracker_path = path / "state.json"
-    if tracker_path.exists():
-        with tracker_path.open("r") as f:
-            return StateTracker(**json.load(f))
-    return StateTracker()
-
-
 def log_training_metrics(
     step: int,
     loss: float,
     grad_norm: float,
     lr: float,
     metrics: dict[str, float],
+    run_dir: Path = None,
 ) -> None:
     log_parts = [
         f"Step {step:>6}",
@@ -96,6 +124,9 @@ def log_training_metrics(
         f"Data: {metrics.get('data_pct', 0.0):5.1f}%",
     ]
     logger.info(" | ".join(log_parts))
+
+    if run_dir:
+        save_metrics_jsonl(run_dir, step, loss, grad_norm, lr, metrics)
 
 
 # some gpt-5 code for bfd packing

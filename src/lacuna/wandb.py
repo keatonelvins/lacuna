@@ -1,7 +1,6 @@
 import wandb
 
 from .config import LacunaConfig
-from .metrics import StateTracker
 from .utils import master_only
 
 
@@ -25,7 +24,7 @@ def log_wandb_metrics(
     loss: float,
     lr: float,
     grad_norm: float,
-    state: StateTracker,
+    step: int,
     redline_metrics: dict[str, float],
     run: wandb.sdk.wandb_run.Run | None,
 ) -> None:
@@ -34,7 +33,6 @@ def log_wandb_metrics(
             "train/loss": loss,
             "train/lr": lr,
             "train/grad_norm": grad_norm,
-            "train/total_tokens": state.total_tokens,
             "perf/tps": redline_metrics.get("tps", 0.0),
             "perf/tflops": redline_metrics.get("tflops", 0.0),
             "perf/mfu_pct": redline_metrics.get("mfu_pct", 0.0),
@@ -42,7 +40,7 @@ def log_wandb_metrics(
             "memory/max_reserved_gb": redline_metrics.get("max_reserved_gb", 0.0),
             "memory/max_reserved_pct": redline_metrics.get("max_reserved_pct", 0.0),
         }
-        wandb.log(metrics, step=state.step)
+        wandb.log(metrics, step=step)
 
 
 def finish(run: wandb.sdk.wandb_run.Run | None) -> None:
