@@ -76,6 +76,7 @@ def setup_env(config: LacunaConfig) -> Path:
     return run_dir
 
 
+@master_only
 def display_config(config: LacunaConfig) -> None:
     console = Console(force_terminal=False, no_color=True)
     with console.capture() as capture:
@@ -106,6 +107,7 @@ def save_settings_json(path: Path, config: LacunaConfig) -> None:
         f.write(config.model_dump_json(indent=4))
 
 
+@master_only
 def log_training_metrics(
     step: int,
     loss: float,
