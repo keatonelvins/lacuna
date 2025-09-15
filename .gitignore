@@ -138,6 +138,7 @@ cython_debug/
 
 .vscode/
 .idea/
+.DS_Store
 
 # Ruff stuff:
 .ruff_cache/
@@ -157,10 +158,10 @@ __marimo__/
 .claude
 REFS/*
 CLAUDE.md
-NOTES.md
 TODO.md
 
 # Artifacts
 weights/
 wandb/
 configs/
+.lacuna_cache/
