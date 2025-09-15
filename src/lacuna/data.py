@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .utils import pack_bfd
 from .config import LacunaConfig
-from .distributed import get_rank, get_world_size
+from .distributed import get_rank, get_world_size, is_master
 
 
 def _encode(examples, tokenizer, column):
@@ -48,9 +48,9 @@ class LacunaDataset:
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
-        self.config.data.fingerprint = self._dataset._fingerprint
         self.sampler = None
         if not config.data.stream:
+            self.config.data.fingerprint = self._dataset._fingerprint
             self.sampler = DistributedSampler(
                 self._dataset,
                 num_replicas=self.dp_world,
@@ -129,5 +129,7 @@ class LacunaDataset:
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
+    if is_master(): # force hf to cache tokenizer 
+        _tok = get_tokenizer(config); del _tok 
     dataset = LacunaDataset(config)
     return dataset.dataloader, dataset

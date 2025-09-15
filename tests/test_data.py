@@ -1,5 +1,6 @@
 import pyarrow as pa
 from pathlib import Path
+import unittest.mock
 from types import SimpleNamespace
 
 from transformers import AutoTokenizer
@@ -175,3 +176,52 @@ def test_dataset_cache_reuse():
 
     assert fingerprint1 != fingerprint3
     assert len(dataset3._dataset) != len(dataset1._dataset)
+
+
+def test_data_parallel_unique_splits():
+    """Test that different DP ranks get unique data splits."""
+    config = SimpleNamespace(
+        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
+        data=SimpleNamespace(
+            datasets=["keatone/TinierStories"],
+            split="train",
+            column="text",
+            num_workers=1,
+            chat_template=None,
+            eos_token=None,
+            stream=False,
+            map_batch_size=4,
+            pack_batch_size=10,
+            sampling_probs=None,
+            shuffle_buffer=1000,
+        ),
+        trainer=SimpleNamespace(seq_len=128, seed=42, steps=125),
+    )
+
+    map_datasets = []
+    dataset_lengths = []
+
+    for rank in range(8):
+        with unittest.mock.patch("lacuna.data.get_world_size", return_value=8), \
+             unittest.mock.patch("lacuna.data.get_rank", return_value=rank):
+            map_datasets.append(LacunaDataset(config))
+
+    stream_datasets = []
+    config.data.stream = True
+    for rank in range(8):
+        with unittest.mock.patch("lacuna.data.get_world_size", return_value=8), \
+             unittest.mock.patch("lacuna.data.get_rank", return_value=rank):
+            stream_datasets.append(LacunaDataset(config))
+
+    first_map_samples = []
+    first_stream_samples = []
+    for map_dataset, stream_dataset in zip(map_datasets, stream_datasets):
+        assert map_dataset.length == 125, f"Dataset length mismatch: {map_dataset.length}"
+        assert stream_dataset.length == 125, f"Dataset length mismatch: {stream_dataset.length}"
+        first_map_batch = next(map_dataset)
+        first_stream_batch = next(stream_dataset)
+        first_map_samples.append(tuple(first_map_batch["input_ids"].flatten().tolist()[:10]))
+        first_stream_samples.append(tuple(first_stream_batch["input_ids"].flatten().tolist()[:10]))
+
+    assert len(set(first_map_samples)) == len(first_map_samples), f"Splits are not unique: {first_map_samples}"
+    assert len(set(first_stream_samples)) == len(first_stream_samples), f"Splits are not unique: {first_stream_samples}"
