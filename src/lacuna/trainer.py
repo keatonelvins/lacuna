@@ -138,3 +138,4 @@ def train(config: LacunaConfig) -> None:
     finally:
         finish(wandb_run)
         destroy_dist()
+        del dataloader

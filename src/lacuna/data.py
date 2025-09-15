@@ -50,7 +50,7 @@ class LacunaDataset:
         self._dataset = self._build_dataset()
         self.config.data.fingerprint = self._dataset._fingerprint
         self.sampler = None
-        if config.data.stream:
+        if not config.data.stream:
             self.sampler = DistributedSampler(
                 self._dataset,
                 num_replicas=self.dp_world,
@@ -115,9 +115,9 @@ class LacunaDataset:
     def set_epoch(self, epoch: int):
         """Set epoch for proper shuffling across epochs."""
         if self.config.data.stream:
-            self.sampler.set_epoch(epoch)
-        else:
             self._dataset.set_epoch(epoch)
+        else:
+            self.sampler.set_epoch(epoch)
 
     @property
     def length(self) -> int:
