@@ -27,6 +27,7 @@ def master_only(fn):
     return wrapper
 
 
+@master_only
 def get_run_dir() -> Path:
     """Create and return a timestamped run directory."""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
