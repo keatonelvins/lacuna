@@ -6,6 +6,7 @@ from functools import partial
 from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from datasets.distributed import split_dataset_by_node
 from torch.utils.data import DistributedSampler
+from torch import distributed as dist
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
@@ -44,7 +45,7 @@ class LacunaDataset:
 
     def __init__(self, config: LacunaConfig):
         self.config = config
-        self.dp_world, self.dp_rank = get_world_size(), get_rank()
+        self.dp_world, self.dp_rank = get_world_size(), get_rank() # TODO: needs to use dp_replicate
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
@@ -105,6 +106,12 @@ class LacunaDataset:
 
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
+
+        if not self.config.data.stream: # tokenize on master and cache result
+            if is_master():
+                cached_ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
+                cached_ds = cached_ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
+            dist.barrier()
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
         ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
