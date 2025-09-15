@@ -148,6 +148,7 @@ def test_dataset_cache_reuse():
             datasets=["keatone/TinierStories"],
             split="train[:10]",
             column="text",
+            num_workers=1,
             chat_template=None,
             eos_token=None,
             stream=False,

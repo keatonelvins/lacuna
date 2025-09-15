@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from loguru import logger
 from rich.pretty import Pretty
@@ -35,7 +36,6 @@ def setup_logger() -> None:
         level="INFO",
         filter=lambda r: is_master(),
     )
-    # Also log to file for debugging
     logger.add(
         "runs.log", format="{time:HH:mm:ss} | {level} | {message}", level="INFO", filter=lambda r: is_master(), rotation="1 MB"
     )
@@ -47,10 +47,11 @@ def setup_env(config: LacunaConfig) -> None:
 
     setup_logger()
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
+    os.makedirs(".lacuna_cache", exist_ok=True)
 
 
 def display_config(config: LacunaConfig) -> None:
-    console = Console()
+    console = Console(force_terminal=False, no_color=True)
     with console.capture() as capture:
         console.print(Pretty(config, expand_all=True))  # omg Will you've outdone yourself
     logger.info("Starting training with config:\n" + capture.get().strip())
@@ -86,13 +87,13 @@ def log_training_metrics(
     metrics: dict[str, float],
 ) -> None:
     log_parts = [
-        f"\033[91mStep {step:>6}\033[0m",
-        f"\033[92mLoss: {loss:7.4f}\033[0m",
-        f"\033[93mGrad: {grad_norm:8.4f}\033[0m",
-        f"\033[94mLR: {lr:9.2e}\033[0m",
-        f"\033[36mMem: {metrics.get('max_reserved_gb', 0.0):5.1f}GB ({metrics.get('max_reserved_pct', 0.0):3.0f}%)\033[0m",
-        f"\033[92mMFU: {metrics.get('mfu_pct', 0.0):5.1f}%\033[0m",
-        f"\033[33mData: {metrics.get('data_pct', 0.0):5.1f}%\033[0m",
+        f"Step {step:>6}",
+        f"Loss: {loss:7.4f}",
+        f"Grad: {grad_norm:8.4f}",
+        f"LR: {lr:9.2e}",
+        f"Mem: {metrics.get('max_reserved_gb', 0.0):5.1f}GB ({metrics.get('max_reserved_pct', 0.0):3.0f}%)",
+        f"MFU: {metrics.get('mfu_pct', 0.0):5.1f}%",
+        f"Data: {metrics.get('data_pct', 0.0):5.1f}%",
     ]
     logger.info(" | ".join(log_parts))
 
