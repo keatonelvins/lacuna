@@ -115,9 +115,9 @@ class LacunaDataset:
     def set_epoch(self, epoch: int):
         """Set epoch for proper shuffling across epochs."""
         if self.config.data.stream:
-            self._dataset.set_epoch(epoch)
-        else:
             self.sampler.set_epoch(epoch)
+        else:
+            self._dataset.set_epoch(epoch)
 
     @property
     def length(self) -> int:
