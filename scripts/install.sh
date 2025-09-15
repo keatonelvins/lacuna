@@ -43,7 +43,7 @@ main() {
     uv sync --dev
 
     log_info "Installation complete!"
-    log_info "See options with uv run lacuna --help"
+    log_info "See options with uv run train --help"
 }
 
 main

@@ -4,8 +4,6 @@ Seeing smaller labs use `torchtitan` for pretraining and `axolotl` for post-trai
 
 `lacuna` came from using these (and other frameworks) and not really understanding how they worked under the hood.
 
-I want it to be tiny and hackable: `uv run count_lines` should return <3k
-
 ## Order of model builder
 Liger/Kernelize -> AC -> torch.compile -> FSDP
 - Model patches always happens first

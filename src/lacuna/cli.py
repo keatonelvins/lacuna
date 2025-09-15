@@ -2,7 +2,6 @@
 
 import os
 import sys
-import subprocess
 import tomllib
 from pathlib import Path
 from typing import Type, TypeVar
@@ -38,7 +37,7 @@ def launch_torchrun(config: BaseSettings) -> None:
         )
     elif torchrun.nnodes > 1:
         print(f"Error: For multi-node training (nnodes={torchrun.nnodes}) must specify node_rank")
-        print("Example: uv run lacuna configs/multi_node.toml --torchrun.node_rank 0")
+        print("Example: uv run train configs/multi_node.toml --torchrun.node_rank 0")
         sys.exit(1)
 
     cmd.extend(["-m", "lacuna.cli", "lacuna"])
@@ -80,23 +79,10 @@ def lacuna():
     train(config)
 
 
-def count_lines():
-    """Check the total repo line count."""
-    result = subprocess.run(
-        "git ls-files 'src/lacuna/*.py' | xargs cat | wc -l",
-        shell=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    )
-
-    line_count = int(result.stdout.strip())
-    print(f"Total repo lines: {line_count}")
-
-
 def main():
     """Torchrun entry point."""
     if len(sys.argv) < 2:
-        print("Usage: uv run python -m lacuna.cli train")
+        print("Usage: uv run python -m lacuna.cli lacuna")
         sys.exit(1)
     cmd = sys.argv[1]
     sys.argv = [sys.argv[0]] + sys.argv[2:]

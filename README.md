@@ -9,17 +9,17 @@ Seeing how far we can push HF modeling code!
 ```bash
 # Install (or clone + `uv sync`) and test (requires ~5GB VRAM)
 curl -sSL https://raw.githubusercontent.com/keatonelvins/lacuna/main/scripts/install.sh | bash
-uv run lacuna
+uv run train
 
 # See all config options
-uv run lacuna --help
+uv run train --help
 
 # Pass args directly
-uv run lacuna --model.name Qwen/Qwen3-8B --trainer.batch-size 8
+uv run train --model.name Qwen/Qwen3-8B --trainer.batch-size 8
 
 # Load args from a toml (w/ overrides)
-uv run lacuna path/to/config.toml
-uv run lacuna path/to/config.toml --optimizer.lr 1e-5
+uv run train path/to/config.toml
+uv run train path/to/config.toml --optimizer.lr 1e-5
 
 # Log runs + access gated repos
 uv run wandb login

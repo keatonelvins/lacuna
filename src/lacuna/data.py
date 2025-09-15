@@ -50,17 +50,19 @@ class LacunaDataset:
 
         self._dataset = self._build_dataset()
         self.config.data.fingerprint = self._dataset._fingerprint
-        self.sampler = DistributedSampler(
-            self._dataset,
-            num_replicas=self.dp_world,
-            rank=self.dp_rank,
-            shuffle=True,
-            drop_last=True,
-            seed=config.trainer.seed,
-        ) if config.data.stream else None
+        self.sampler = None
+        if config.data.stream:
+            self.sampler = DistributedSampler(
+                self._dataset,
+                num_replicas=self.dp_world,
+                rank=self.dp_rank,
+                shuffle=True,
+                drop_last=True,
+                seed=config.trainer.seed,
+            )
 
         self.dataloader = StatefulDataLoader(
-            self._dataset, 
+            self._dataset,
             num_workers=self.config.data.num_workers,
             drop_last=True,
             pin_memory=True,
@@ -68,6 +70,10 @@ class LacunaDataset:
             multiprocessing_context=mp.get_context("spawn"),
             sampler=self.sampler,
         )
+        self.data_iter = self.infinite_dataloader()
+
+    def __next__(self):
+        return next(self.data_iter)
 
     def _load_datasets(self, split: str, stream: bool):
         datasets = []
@@ -116,6 +122,12 @@ class LacunaDataset:
         if self.config.data.stream:
             return self.config.trainer.steps
         return len(self.dataloader) if self.dataloader else 1
+
+    def infinite_dataloader(self):
+        """Infinite dataset generator."""
+        while True:
+            for batch in self.dataloader:
+                yield batch
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:

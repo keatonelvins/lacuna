@@ -9,11 +9,11 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid
 
-from _curves import CurvesWidget
-from _data import DataWidget
-from _i_o import IOWidget
-from _redline import RedlineWidget
-from _splash import SplashScreen
+from ._curves import CurvesWidget
+from ._data import DataWidget
+from ._i_o import IOWidget
+from ._redline import RedlineWidget
+from ._splash import SplashScreen
 
 
 class Lacuna(App):
@@ -62,6 +62,10 @@ class Lacuna(App):
         self.push_screen(SplashScreen())
 
 
-if __name__ == "__main__":
+def main():
     app = Lacuna()
     app.run()
+
+
+if __name__ == "__main__":
+    main()

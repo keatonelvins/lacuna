@@ -2,7 +2,6 @@
 
 import time
 import torch
-import warnings
 from loguru import logger
 from torch.amp import autocast
 
@@ -61,7 +60,7 @@ def train(config: LacunaConfig) -> None:
                 path=config.checkpoint.resume_from,
             )
 
-        logger.info(f"Starting training!")
+        logger.info("Starting training!")
 
         start_step = redline.state.step
         current_epoch = 0
@@ -75,7 +74,7 @@ def train(config: LacunaConfig) -> None:
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
-            batch = next(dataloader)
+            batch = next(dataset)
             data_load_time = time.perf_counter() - data_load_start
 
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:

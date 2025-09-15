@@ -20,9 +20,8 @@ dependencies = [
 ]
 
 [project.scripts]
-lacuna = "lacuna.cli:lacuna"
-count_lines = "lacuna.cli:count_lines"
-tui = "ui:app"
+train = "lacuna.cli:lacuna"
+lacuna = "lacuna.tui.app:main"
 
 [dependency-groups]
 dev = [

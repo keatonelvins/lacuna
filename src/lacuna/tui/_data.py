@@ -1,5 +1,6 @@
 from textual.widgets import Static
 
+
 class DataWidget(Static):
     def __init__(self) -> None:
         super().__init__()
