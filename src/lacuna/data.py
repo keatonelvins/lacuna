@@ -45,7 +45,18 @@ class LacunaDataset:
         self.dp_world, self.dp_rank = get_world_size(), get_rank()  # TODO: needs to use dp_replicate
         self.split = config.data.split
 
-        self._dataset = self._build_dataset()
+        # TODO: figure out something like accelerate context manager
+        if dist.is_initialized() and not is_master():
+            dist.barrier()
+        try:
+            self._dataset = self._build_dataset()
+        except Exception as e:
+            if is_master():
+                dist.barrier()
+            raise e
+        if dist.is_initialized() and is_master():
+            dist.barrier()
+
         self.sampler = DistributedSampler(
             self._dataset,
             num_replicas=self.dp_world,
@@ -73,9 +84,6 @@ class LacunaDataset:
 
     def _build_dataset(self):
         """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""
-        if not is_master() and dist.is_initialized():
-            dist.barrier()
-
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
         raw = self._load_datasets(self.split)
@@ -97,9 +105,6 @@ class LacunaDataset:
         ).with_format("torch")
 
         self.config.data.fingerprint = ds._fingerprint
-
-        if is_master() and dist.is_initialized():
-            dist.barrier()
 
         return ds
 
