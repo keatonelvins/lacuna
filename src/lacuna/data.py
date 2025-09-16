@@ -75,7 +75,7 @@ class LacunaDataset:
     def _build_dataset(self):
         """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""
         if not is_master() and dist.is_initialized():
-            dist.barrier()
+            dist.barrier(device_ids=[torch.cuda.current_device()])
 
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
@@ -100,7 +100,7 @@ class LacunaDataset:
         self.config.data.fingerprint = ds._fingerprint
 
         if is_master() and dist.is_initialized():
-            dist.barrier()
+            dist.barrier(device_ids=[torch.cuda.current_device()])
 
         return ds
 

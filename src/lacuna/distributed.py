@@ -33,8 +33,9 @@ def init_dist(config: LacunaConfig) -> None:
     if config.dist.cpu_offload:
         backend = "cuda:nccl,cpu:gloo"  # nccl on cuda, gloo on cpu
 
-    dist.init_process_group(backend=backend)
-    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+    local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group(backend=backend, device_id=local_rank)
     logger.info(f"Initialized distributed: rank {get_rank()}/{get_world_size()}")
 
 
