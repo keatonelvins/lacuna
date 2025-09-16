@@ -35,10 +35,11 @@ def train(config: LacunaConfig) -> None:
 
         logger.info("Setting up dataloader")
         dataloader, dataset = setup_dataloader(config)
+        data_iter = iter(dataloader)
 
         if config.trainer.steps:
             total_steps = config.trainer.steps
-        else:  # must be map-style
+        else:
             total_steps = dataset.length * config.trainer.epochs
 
         optimizer = setup_optimizer(model, config)
@@ -46,7 +47,6 @@ def train(config: LacunaConfig) -> None:
         redline = Redline(model=model, seq_len=config.trainer.seq_len, world_size=world_size)
 
         start_step = 0
-
         current_epoch = 0
         accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
@@ -64,7 +64,7 @@ def train(config: LacunaConfig) -> None:
         logger.info("Starting training!")
 
         for step in range(start_step, total_steps):
-            if dataset.length and config.trainer.epochs > 1:
+            if config.trainer.epochs > 1:
                 epoch = step // dataset.length
                 if epoch > current_epoch:
                     current_epoch = epoch
@@ -72,7 +72,7 @@ def train(config: LacunaConfig) -> None:
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
-            batch = next(dataset)
+            batch = next(data_iter)
             data_load_time = time.perf_counter() - data_load_start
 
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
@@ -100,7 +100,7 @@ def train(config: LacunaConfig) -> None:
             optimizer.step()
             scheduler.step()
 
-            redline.update(batch["input_ids"].shape[1], data_load_time)
+            redline.update(batch["input_ids"].numel(), data_load_time)
 
             if step % config.metrics.steps_per_log == 0:
                 current_lr = scheduler.get_last_lr()[0]
@@ -110,20 +110,18 @@ def train(config: LacunaConfig) -> None:
                 log_wandb_metrics(loss.item(), current_lr, grad_norm, step, metrics, wandb_run)
                 save_batch_json(run_dir, step, batch)
 
-            if (
-                config.checkpoint.save_every
-                and current_epoch > 0
-                and step % int(config.checkpoint.save_every * dataset.length) == 0
-            ):
-                logger.info(f"Saving checkpoint at step {step}")
-                save_checkpoint(
-                    step=step,
-                    config=config,
-                    model=model,
-                    optimizer=optimizer,
-                    scheduler=scheduler,
-                    dataloader=dataloader,
-                )
+            if config.checkpoint.save_every:
+                interval = max(1, int(config.checkpoint.save_every * dataset.length))
+                if step > 0 and step % interval == 0:
+                    logger.info(f"Saving checkpoint at step {step}")
+                    save_checkpoint(
+                        step=step,
+                        config=config,
+                        model=model,
+                        optimizer=optimizer,
+                        scheduler=scheduler,
+                        dataloader=dataloader,
+                    )
 
         save_checkpoint(
             step=redline.step,

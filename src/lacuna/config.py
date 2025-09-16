@@ -34,7 +34,6 @@ class TrainerConfig(BaseModel):
     epochs: int = Field(1, gt=0, description="Number of epochs")
     steps: Optional[int] = Field(None, gt=0, description="Max training steps (will override epochs if set)")
     seq_len: int = Field(512, ge=1, description="Sequence length")
-    eval_every: float = Field(None, gt=0, le=1, description="Eval frequency in epochs, can be fractional (default no eval)")
 
 
 class DataConfig(BaseModel):
@@ -46,11 +45,6 @@ class DataConfig(BaseModel):
     column: str = Field("text", description="Dataset column to use ('text' or 'messages')")
     chat_template: str = Field(None, description="Chat template to use for the dataset (either a string or a path to a file)")
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
-    stream: bool = Field(False, description="Enable streaming the datasets (e.g. if it's too big to fit on disk)")
-    sampling_probs: list[float] = Field(default=None, description="If streaming multiple datasets, how to sample from them")
-    shuffle_buffer: int = Field(
-        50000, description="If streaming, the num samples shuffled at a time (for disk we shuffle the entire dataset)"
-    )
     map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
     num_workers: int = Field(1, description="The number of workers to use for data loading")

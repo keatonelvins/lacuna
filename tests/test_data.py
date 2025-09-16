@@ -152,7 +152,6 @@ def test_dataset_cache_reuse():
             num_workers=1,
             chat_template=None,
             eos_token=None,
-            stream=False,
             map_batch_size=4,
             pack_batch_size=10,
         ),
@@ -189,39 +188,25 @@ def test_data_parallel_unique_splits():
             num_workers=1,
             chat_template=None,
             eos_token=None,
-            stream=False,
             map_batch_size=4,
             pack_batch_size=10,
-            sampling_probs=None,
-            shuffle_buffer=1000,
         ),
         trainer=SimpleNamespace(seq_len=128, seed=42, steps=125),
     )
 
-    map_datasets = []
-    dataset_lengths = []
+    datasets = []
 
     for rank in range(8):
-        with unittest.mock.patch("lacuna.data.get_world_size", return_value=8), \
-             unittest.mock.patch("lacuna.data.get_rank", return_value=rank):
-            map_datasets.append(LacunaDataset(config))
+        with (
+            unittest.mock.patch("lacuna.data.get_world_size", return_value=8),
+            unittest.mock.patch("lacuna.data.get_rank", return_value=rank),
+        ):
+            datasets.append(LacunaDataset(config))
 
-    stream_datasets = []
-    config.data.stream = True
-    for rank in range(8):
-        with unittest.mock.patch("lacuna.data.get_world_size", return_value=8), \
-             unittest.mock.patch("lacuna.data.get_rank", return_value=rank):
-            stream_datasets.append(LacunaDataset(config))
+    first_samples = []
+    for dataset in datasets:
+        assert dataset.length == 125, f"Dataset length mismatch: {dataset.length}"
+        first_batch = next(iter(dataset.dataloader))
+        first_samples.append(tuple(first_batch["input_ids"].flatten().tolist()[:10]))
 
-    first_map_samples = []
-    first_stream_samples = []
-    for map_dataset, stream_dataset in zip(map_datasets, stream_datasets):
-        assert map_dataset.length == 125, f"Dataset length mismatch: {map_dataset.length}"
-        assert stream_dataset.length == 125, f"Dataset length mismatch: {stream_dataset.length}"
-        first_map_batch = next(map_dataset)
-        first_stream_batch = next(stream_dataset)
-        first_map_samples.append(tuple(first_map_batch["input_ids"].flatten().tolist()[:10]))
-        first_stream_samples.append(tuple(first_stream_batch["input_ids"].flatten().tolist()[:10]))
-
-    assert len(set(first_map_samples)) == len(first_map_samples), f"Splits are not unique: {first_map_samples}"
-    assert len(set(first_stream_samples)) == len(first_stream_samples), f"Splits are not unique: {first_stream_samples}"
+    assert len(set(first_samples)) == len(first_samples), f"Splits are not unique: {first_samples}"

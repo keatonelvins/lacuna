@@ -3,8 +3,7 @@
 from loguru import logger
 import multiprocessing as mp
 from functools import partial
-from datasets import load_dataset, interleave_datasets, concatenate_datasets
-from datasets.distributed import split_dataset_by_node
+from datasets import load_dataset, concatenate_datasets
 from torch.utils.data import DistributedSampler
 from torch import distributed as dist
 from torchdata.stateful_dataloader import StatefulDataLoader
@@ -41,80 +40,56 @@ def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
 
 
 class LacunaDataset:
-    """Dataset wrapper that supports streaming (iterable) or cached (map-style) datasets."""
-
     def __init__(self, config: LacunaConfig):
         self.config = config
         self.dp_world, self.dp_rank = get_world_size(), get_rank()  # TODO: needs to use dp_replicate
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
-        self.sampler = None
-        if not config.data.stream:
-            self.config.data.fingerprint = self._dataset._fingerprint
-            self.sampler = DistributedSampler(
-                self._dataset,
-                num_replicas=self.dp_world,
-                rank=self.dp_rank,
-                shuffle=True,
-                drop_last=True,
-                seed=config.trainer.seed,
-            )
+        self.config.data.fingerprint = self._dataset._fingerprint
+        self.sampler = DistributedSampler(
+            self._dataset,
+            num_replicas=self.dp_world,
+            rank=self.dp_rank,
+            shuffle=True,
+            drop_last=True,
+            seed=config.trainer.seed,
+        )
 
         self.dataloader = StatefulDataLoader(
             self._dataset,
-            num_workers=self.config.data.num_workers,
             drop_last=True,
             pin_memory=True,
-            multiprocessing_context=mp.get_context("spawn"),
             sampler=self.sampler,
+            num_workers=self.config.data.num_workers,
+            multiprocessing_context=mp.get_context("spawn"),
         )
-        self._current_iter = None
 
-    def __next__(self):
-        if self._current_iter is None:
-            self._current_iter = iter(self.dataloader)
-        try:
-            return next(self._current_iter)
-        except StopIteration:
-            self._current_iter = iter(self.dataloader)
-            return next(self._current_iter)
-
-    def _load_datasets(self, split: str, stream: bool):
+    def _load_datasets(self, split: str):
         datasets = []
         for name in self.config.data.datasets:
             if name.startswith("s3://"):
-                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split, streaming=stream)
+                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split)
             else:
-                ds = load_dataset(name, split=split, streaming=stream)
+                ds = load_dataset(name, split=split)
 
             datasets.append(ds)
         return datasets
 
     def _build_dataset(self):
-        raw = self._load_datasets(self.split, self.config.data.stream)
-        if self.config.data.stream:
-            ds = interleave_datasets(
-                raw,
-                probabilities=self.config.data.sampling_probs,
-                stopping_strategy="first_exhausted",
-                seed=self.config.trainer.seed,
-            ).shuffle(seed=self.config.trainer.seed, buffer_size=self.config.data.shuffle_buffer)
-            ds = split_dataset_by_node(ds, rank=self.dp_rank, world_size=self.dp_world)
-        else:
-            ds = concatenate_datasets(raw)
+        raw = self._load_datasets(self.split)
+        ds = concatenate_datasets(raw)
 
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
 
-        if not self.config.data.stream:  # tokenize on master and cache result
-            if is_master():
-                cached_ds = ds.map(
-                    encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
-                )
-                cached_ds = cached_ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
-            if dist.is_initialized():
-                dist.barrier()
+        if is_master():  # tokenize on master and cache result
+            cached_ds = ds.map(
+                encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
+            )
+            cached_ds = cached_ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
+        if dist.is_initialized():
+            dist.barrier()
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
         ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
@@ -125,21 +100,16 @@ class LacunaDataset:
 
     def set_epoch(self, epoch: int):
         """Set epoch for proper shuffling across epochs."""
-        if self.config.data.stream:
-            self._dataset.set_epoch(epoch)
-        else:
-            self.sampler.set_epoch(epoch)
+        self.sampler.set_epoch(epoch)
 
     @property
     def length(self) -> int:
         """Return length per epoch of the dataset."""
-        if self.config.data.stream:
-            return self.config.trainer.steps
-        return len(self.dataloader) if self.dataloader else 1
+        return len(self.dataloader)
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
-    if is_master():  # force hf to cache tokenizer
+    if is_master():  # force hf to cache tokenizer before workers init
         _tok = get_tokenizer(config)
         del _tok
     dataset = LacunaDataset(config)
