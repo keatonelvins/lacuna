@@ -7,7 +7,7 @@ from torch.amp import autocast
 
 from .checkpoint import save_checkpoint
 from .config import LacunaConfig
-from .data import setup_dataloader
+from .data import LacunaDataset
 from .scheduler import setup_scheduler
 from .metrics import Redline
 from .model import setup_model
@@ -95,7 +95,7 @@ def train(config: LacunaConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.max_norm)
-            if hasattr(grad_norm, "full_tensor"):  # needed for FSDP
+            if hasattr(grad_norm, "full_tensor"):  # TODO: docs say we don't need this for FSDP?
                 grad_norm = grad_norm.full_tensor()
             optimizer.step()
             scheduler.step()

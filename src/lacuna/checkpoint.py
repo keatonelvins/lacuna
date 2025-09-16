@@ -70,16 +70,12 @@ class TrainerState(Stateful):
 def save_hf_weights_dtensor(
     model: torch.nn.Module,
     output_dir: Path,
-    dtype: torch.dtype = torch.bfloat16,
 ) -> None:
-    # DTensor state dict -> full CPU state dict (rank 0 only)
     sharded_sd = model.state_dict()
     cpu_state: dict[str, torch.Tensor] = {}
 
     for name, shard in sharded_sd.items():
         full_tensor = shard.full_tensor() if hasattr(shard, "full_tensor") else shard
-        if full_tensor.is_floating_point():
-            full_tensor = full_tensor.to(dtype)
 
         if is_master():
             cpu_state[name] = full_tensor.detach().cpu()
@@ -90,14 +86,7 @@ def save_hf_weights_dtensor(
         dist.barrier()
 
     if is_master():
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore", message="TypedStorage is deprecated", category=UserWarning
-            )
-            model.save_pretrained(
-                output_dir,
-                state_dict=cpu_state,
-            )
+        model.save_pretrained(output_dir, state_dict=cpu_state)
 
 
 def save_checkpoint(
@@ -130,7 +119,7 @@ def save_checkpoint(
         logger.info(f"Saving final checkpoint in HF format to {path}")
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="TypedStorage is deprecated", category=UserWarning)
-            save_hf_weights_dtensor(model, path, dtype=torch.bfloat16)
+            save_hf_weights_dtensor(model, path)
 
     save_settings_json(path, config)
 
