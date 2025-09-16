@@ -55,14 +55,11 @@ class LacunaDataset:
             drop_last=True,
             seed=config.trainer.seed,
         )
-
         self.dataloader = StatefulDataLoader(
             self._dataset,
             drop_last=True,
             pin_memory=True,
             sampler=self.sampler,
-            num_workers=self.config.data.num_workers,
-            multiprocessing_context=mp.get_context("spawn"),
         )
 
     def _load_datasets(self, split: str):
@@ -77,24 +74,33 @@ class LacunaDataset:
         return datasets
 
     def _build_dataset(self):
-        raw = self._load_datasets(self.split)
-        ds = concatenate_datasets(raw)
+        """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""
+        if not is_master() and dist.is_initialized():
+            dist.barrier()
 
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
-
-        if is_master():  # tokenize on master and cache result
-            cached_ds = ds.map(
-                encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
-            )
-            cached_ds = cached_ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
-        if dist.is_initialized():
-            dist.barrier()
+        raw = self._load_datasets(self.split)
+        ds = concatenate_datasets(raw)
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
-        ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
-        ds = ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
-        ds = ds.with_format("torch")
+        print(f"Tokenizing!! on rank {self.dp_rank}")
+        ds = ds.map(
+            encode, 
+            batched=True, 
+            num_proc=self.config.data.num_proc,
+            batch_size=self.config.data.map_batch_size, 
+            remove_columns=list(next(iter(ds)).keys()),
+        ).with_format("arrow")
+        ds = ds.map(
+            pack, 
+            batched=True, 
+            batch_size=self.config.data.pack_batch_size, 
+            num_proc=self.config.data.num_proc,
+        ).with_format("torch")
+
+        if is_master() and dist.is_initialized():
+            dist.barrier()
 
         return ds
 
@@ -109,8 +115,5 @@ class LacunaDataset:
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
-    if is_master():  # force hf to cache tokenizer before workers init
-        _tok = get_tokenizer(config)
-        del _tok
     dataset = LacunaDataset(config)
     return dataset.dataloader, dataset

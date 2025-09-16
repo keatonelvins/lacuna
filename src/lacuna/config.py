@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import torch
+import psutil
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -47,7 +48,7 @@ class DataConfig(BaseModel):
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
     map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
-    num_workers: int = Field(1, description="The number of workers to use for data loading")
+    num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
     fingerprint: str = Field(None, description="Fingerprint of the dataset to use for caching")
 
     @model_validator(mode="after")
