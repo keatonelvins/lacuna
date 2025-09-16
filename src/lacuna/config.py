@@ -32,8 +32,8 @@ class TrainerConfig(BaseModel):
 
     seed: int = Field(42, description="Global seed")
     epochs: int = Field(1, gt=0, description="Number of epochs")
-    steps: Optional[int] = Field(None, gt=0, description="Max training steps (will override epochs if set)")
-    seq_len: int = Field(512, ge=1, description="Sequence length")
+    steps: Optional[int] = Field(None, gt=0, description="Max training steps (must be less than dataset length)")
+    seq_len: int = Field(512, ge=1, description="Tokens per GPU (batch size is always 1)")
 
 
 class DataConfig(BaseModel):
@@ -48,7 +48,7 @@ class DataConfig(BaseModel):
     map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
     num_workers: int = Field(1, description="The number of workers to use for data loading")
-    fingerprint: str = Field(None, description="Fingerprint of the dataset")
+    fingerprint: str = Field(None, description="Fingerprint of the dataset to use for caching")
 
     @model_validator(mode="after")
     def set_files(self):
@@ -78,14 +78,14 @@ class OptimizerConfig(BaseModel):
     lr: float = Field(3e-4, gt=0, description="Peak learning rate")
     weight_decay: float = Field(0.01, ge=0, description="Weight decay (not applied to embeddings etc.)")
     betas: tuple[float, float] = Field((0.9, 0.95), description="Adam betas")
-    grad_clip: float = Field(1.0, gt=0, description="Gradient clipping norm ")
+    max_norm: float = Field(1.0, gt=0, description="Gradient clipping norm ")
 
 
 class SchedulerConfig(BaseModel):
     """LR Scheduler config"""
 
-    warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio for the scheduler")
-    decay_ratio: float = Field(0.05, ge=0, le=1, description="Decay ratio for the scheduler")
+    warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio over total steps")
+    decay_ratio: float = Field(0.05, ge=0, le=1, description="Decay ratio over total steps")
     min_lr_ratio: float = Field(0, ge=0, le=1, description="Minimum LR as ratio of max LR")
     decay_type: Literal["linear", "cosine"] = "linear"
 

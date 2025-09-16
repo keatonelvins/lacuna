@@ -16,32 +16,6 @@ from .distributed import is_master
 from .config import LacunaConfig
 
 
-def master_only(fn):
-    """Decorator to run a function only on the master process."""
-
-    def wrapper(*args, **kwargs):
-        if not is_master():
-            return
-        return fn(*args, **kwargs)
-
-    return wrapper
-
-
-@master_only
-def get_run_dir() -> Path:
-    """Create and return a timestamped run directory."""
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = Path(".lacuna_cache/runs") / timestamp
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    active_link = Path(".lacuna_cache/active_run")
-    if active_link.exists() or active_link.is_symlink():
-        active_link.unlink()
-    active_link.symlink_to(run_dir.relative_to(active_link.parent))
-
-    return run_dir
-
-
 def setup_logger(run_dir: Path = None) -> None:
     """Setup logging to console and run directory."""
     logger.remove()  # Remove default handler
@@ -73,6 +47,32 @@ def setup_env(config: LacunaConfig) -> Path:
 
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
     os.makedirs(".lacuna_cache", exist_ok=True)
+
+    return run_dir
+
+
+def master_only(fn):
+    """Decorator to run a function only on the master process."""
+
+    def wrapper(*args, **kwargs):
+        if not is_master():
+            return
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@master_only
+def get_run_dir() -> Path:
+    """Create and return a timestamped run directory."""
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = Path(".lacuna_cache/runs") / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    active_link = Path(".lacuna_cache/active_run")
+    if active_link.exists() or active_link.is_symlink():
+        active_link.unlink()
+    active_link.symlink_to(run_dir.relative_to(active_link.parent))
 
     return run_dir
 

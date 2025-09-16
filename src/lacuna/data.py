@@ -3,9 +3,9 @@
 from loguru import logger
 import multiprocessing as mp
 from functools import partial
-from datasets import load_dataset, concatenate_datasets
-from torch.utils.data import DistributedSampler
 from torch import distributed as dist
+from torch.utils.data import DistributedSampler
+from datasets import load_dataset, concatenate_datasets
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
@@ -24,7 +24,7 @@ def _encode(examples, tokenizer, column):
         return {"input_ids": out["input_ids"], "assistant_masks": out["assistant_masks"]}
     else:
         input_ids = tokenizer(examples[column]).input_ids
-        return {"input_ids": [ids + [tokenizer.eos_token_id] for ids in input_ids]}
+        return {"input_ids": [ids + [tokenizer.eos_token_id] for ids in input_ids]}  # TODO: support other models
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:

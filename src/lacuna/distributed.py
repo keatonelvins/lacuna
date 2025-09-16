@@ -44,11 +44,6 @@ def destroy_dist() -> None:
         dist.destroy_process_group()
 
 
-def get_local_rank() -> int:
-    """Get current process local rank."""
-    return torch.cuda.current_device()
-
-
 def get_rank() -> int:
     """Get current process rank."""
     return dist.get_rank() if dist.is_initialized() else 0
@@ -114,7 +109,7 @@ def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     if mesh:
         return setup_fsdp2(model, config, mesh)
     else:
-        model = model.cuda(get_local_rank())
+        model = model.cuda(torch.cuda.current_device())
         return setup_ddp(model, config)
 
 
@@ -153,7 +148,7 @@ def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     is_compiled = config.model.compile_mode is not None
     model = DDP(
         model,
-        device_ids=[get_local_rank()],
+        device_ids=[torch.cuda.current_device()],
         broadcast_buffers=False,
         gradient_as_bucket_view=True,
         static_graph=is_compiled,  # only use static graph if model is compiled

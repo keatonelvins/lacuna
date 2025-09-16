@@ -4,7 +4,6 @@ import time
 from collections import deque
 import torch
 from loguru import logger
-from .distributed import get_local_rank
 
 
 # ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/tools/utils.py
@@ -48,7 +47,7 @@ class Redline:
         self.seq_len = seq_len
         self.world_size = world_size
         self.window_steps = window_steps
-        self.device = torch.device("cuda", get_local_rank())
+        self.device = torch.device("cuda")
 
         self._tokens: deque[int] = deque(maxlen=window_steps)
         self._step_times: deque[float] = deque(maxlen=window_steps)
