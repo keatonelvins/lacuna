@@ -28,7 +28,7 @@ def _encode(examples, tokenizer, column):
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
-    tokenizer = AutoTokenizer.from_pretrained(config.model.name)
+    tokenizer = AutoTokenizer.from_pretrained(config.model.name, model_max_length=int(1e10))
     if config.data.chat_template:
         tokenizer.chat_template = config.data.chat_template
     if config.data.eos_token:
@@ -65,17 +65,16 @@ class LacunaDataset:
         datasets = []
         for name in self.config.data.datasets:
             if name.startswith("s3://"):
-                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split)
+                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split, num_proc=self.config.data.num_proc)
             else:
-                ds = load_dataset(name, split=split)
-
+                ds = load_dataset(name, split=split, num_proc=self.config.data.num_proc)
             datasets.append(ds)
         return datasets
 
     def _build_dataset(self):
         """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""
         if not is_master() and dist.is_initialized():
-            dist.barrier(device_ids=[torch.cuda.current_device()])
+            dist.barrier()
 
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
@@ -100,7 +99,7 @@ class LacunaDataset:
         self.config.data.fingerprint = ds._fingerprint
 
         if is_master() and dist.is_initialized():
-            dist.barrier(device_ids=[torch.cuda.current_device()])
+            dist.barrier()
 
         return ds
 
