@@ -50,6 +50,7 @@ class DataConfig(BaseModel):
     map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
     num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
+    redownload: bool = Field(False, description="Force redownload of the dataset")
     fingerprint: str = Field(None, description="Fingerprint of the dataset to use for caching")
 
     @model_validator(mode="after")

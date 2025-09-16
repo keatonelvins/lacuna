@@ -76,9 +76,9 @@ class LacunaDataset:
         datasets = []
         for name in self.config.data.datasets:
             if name.startswith("s3://"):
-                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split, num_proc=self.config.data.num_proc)
+                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split, num_proc=self.config.data.num_proc, download_mode='force_redownload' if self.config.data.redownload else None)
             else:
-                ds = load_dataset(name, split=split, num_proc=self.config.data.num_proc)
+                ds = load_dataset(name, split=split, num_proc=self.config.data.num_proc, download_mode='force_redownload' if self.config.data.redownload else None)
             datasets.append(ds)
         return datasets
 

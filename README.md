@@ -17,9 +17,10 @@ uv run train --help
 # Pass args directly
 uv run train --model.name Qwen/Qwen3-8B --trainer.steps 100
 
-# Load args from a toml (w/ overrides)
+# Load args from a toml (w/ temp overrides)
 uv run train path/to/config.toml
 uv run train path/to/config.toml --optimizer.lr 1e-5
+uv run train path/to/config.toml --data.redownload
 
 # Log runs + access gated repos
 uv run wandb login
