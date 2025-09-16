@@ -6,6 +6,7 @@ import tomllib
 from pathlib import Path
 from typing import Type, TypeVar
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
 
 import torch
 import psutil
@@ -14,7 +15,7 @@ from lacuna.config import LacunaConfig
 from lacuna.trainer import train
 
 T = TypeVar("T", bound=BaseSettings)
-
+load_dotenv()
 
 def launch_torchrun(config: BaseSettings) -> None:
     torchrun = config.torchrun

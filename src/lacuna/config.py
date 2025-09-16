@@ -1,5 +1,6 @@
 """Pydantic settings."""
 
+import os
 import shutil
 from pathlib import Path
 from typing import Literal, Optional
@@ -56,6 +57,13 @@ class DataConfig(BaseModel):
         for dataset in self.datasets:
             if dataset.startswith("s3://") and dataset not in self.files:
                 self.files[dataset] = {self.split: dataset.rstrip("/") + f"/{self.split}/*.parquet"}
+        return self
+
+    @model_validator(mode="after")
+    def check_auth(self):
+        if self.datasets[0].startswith("s3://"):
+            if "AWS_ACCESS_KEY_ID" not in os.environ or "AWS_SECRET_ACCESS_KEY" not in os.environ:
+                raise ValueError("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set")
         return self
 
     @field_validator("chat_template", mode="after")
