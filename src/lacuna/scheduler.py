@@ -28,14 +28,18 @@ def setup_scheduler(optimizer: Optimizer, config: SchedulerConfig, total_steps: 
         schedulers.append(constant_scheduler)
         milestones.append(decay_start_step)
 
-    # Phase 3: Final decay
-    if config.decay_type == "linear":
-        decay_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=config.min_lr_ratio, total_iters=decay_steps)
-    else:  # cosine
-        decay_scheduler = CosineAnnealingLR(
-            optimizer, T_max=decay_steps, eta_min=optimizer.param_groups[0]["lr"] * config.min_lr_ratio
-        )
+    # Phase 3: Final decay (if any)
+    if decay_steps > 0:
+        if config.decay_type == "linear":
+            decay_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=config.min_lr_ratio, total_iters=decay_steps)
+        else:  # cosine
+            decay_scheduler = CosineAnnealingLR(
+                optimizer, T_max=decay_steps, eta_min=optimizer.param_groups[0]["lr"] * config.min_lr_ratio
+            )
+        schedulers.append(decay_scheduler)
 
-    schedulers.append(decay_scheduler)
+    assert len(schedulers) > 0, "No schedulers created, please check your config"
+    if len(schedulers) == 1:
+        return schedulers[0]
 
     return SequentialLR(optimizer, schedulers, milestones=milestones)

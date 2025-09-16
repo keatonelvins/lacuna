@@ -34,8 +34,8 @@ def train(config: LacunaConfig) -> None:
         model = setup_dist(model, config)
 
         logger.info("Setting up dataloader")
-        dataloader, dataset = setup_dataloader(config)
-        data_iter = iter(dataloader)
+        dataset = LacunaDataset(config)
+        data_iter = iter(dataset.dataloader)
 
         if config.trainer.steps:
             total_steps = config.trainer.steps
@@ -120,7 +120,7 @@ def train(config: LacunaConfig) -> None:
                         model=model,
                         optimizer=optimizer,
                         scheduler=scheduler,
-                        dataloader=dataloader,
+                        dataloader=dataset.dataloader,
                     )
 
         save_checkpoint(
@@ -129,7 +129,7 @@ def train(config: LacunaConfig) -> None:
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            dataloader=dataloader,
+            dataloader=dataset.dataloader,
             final=True,
         )
     except KeyboardInterrupt:

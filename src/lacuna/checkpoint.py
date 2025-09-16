@@ -7,6 +7,7 @@ import warnings
 
 import torch
 import torch.distributed.checkpoint as dcp
+import torch.distributed as dist
 from torch.distributed.checkpoint import (
     FileSystemReader,
     FileSystemWriter,
@@ -25,6 +26,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 
 from .config import LacunaConfig
 from .data import get_tokenizer
+from .distributed import is_master
 from .utils import save_settings_json
 
 
@@ -64,6 +66,39 @@ class TrainerState(Stateful):
         self.scheduler.load_state_dict(state_dict["scheduler"])
         self.dataloader.load_state_dict(state_dict["dataloader"])
 
+# TODO: remove in torch 2.9.0 and use HuggingFaceStorageWriter
+def save_hf_weights_dtensor(
+    model: torch.nn.Module,
+    output_dir: Path,
+    dtype: torch.dtype = torch.bfloat16,
+) -> None:
+    # DTensor state dict -> full CPU state dict (rank 0 only)
+    sharded_sd = model.state_dict()
+    cpu_state: dict[str, torch.Tensor] = {}
+
+    for name, shard in sharded_sd.items():
+        full_tensor = shard.full_tensor() if hasattr(shard, "full_tensor") else shard
+        if full_tensor.is_floating_point():
+            full_tensor = full_tensor.to(dtype)
+
+        if is_master():
+            cpu_state[name] = full_tensor.detach().cpu()
+        else:
+            del full_tensor
+
+    if dist.is_initialized():
+        dist.barrier()
+
+    if is_master():
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", message="TypedStorage is deprecated", category=UserWarning
+            )
+            model.save_pretrained(
+                output_dir,
+                state_dict=cpu_state,
+            )
+
 
 def save_checkpoint(
     step: int,
@@ -93,10 +128,9 @@ def save_checkpoint(
             dcp.save(state_dict, storage_writer=writer)
     else:
         logger.info(f"Saving final checkpoint in HF format to {path}")
-        # TODO: use HuggingFaceStorageWriter in torch 2.9.0
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="TypedStorage is deprecated", category=UserWarning)
-            unwrapped_model.save_pretrained(path)
+            save_hf_weights_dtensor(model, path, dtype=torch.bfloat16)
 
     save_settings_json(path, config)
 

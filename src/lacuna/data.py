@@ -46,7 +46,6 @@ class LacunaDataset:
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
-        self.config.data.fingerprint = self._dataset._fingerprint
         self.sampler = DistributedSampler(
             self._dataset,
             num_replicas=self.dp_world,
@@ -84,7 +83,6 @@ class LacunaDataset:
         ds = concatenate_datasets(raw)
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
-        print(f"Tokenizing!! on rank {self.dp_rank}")
         ds = ds.map(
             encode, 
             batched=True, 
@@ -99,21 +97,17 @@ class LacunaDataset:
             num_proc=self.config.data.num_proc,
         ).with_format("torch")
 
+        self.config.data.fingerprint = ds._fingerprint
+
         if is_master() and dist.is_initialized():
             dist.barrier()
 
         return ds
 
     def set_epoch(self, epoch: int):
-        """Set epoch for proper shuffling across epochs."""
         self.sampler.set_epoch(epoch)
 
     @property
     def length(self) -> int:
         """Return length per epoch of the dataset."""
         return len(self.dataloader)
-
-
-def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
-    dataset = LacunaDataset(config)
-    return dataset.dataloader, dataset
