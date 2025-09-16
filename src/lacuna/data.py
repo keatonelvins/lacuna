@@ -45,7 +45,7 @@ class LacunaDataset:
 
     def __init__(self, config: LacunaConfig):
         self.config = config
-        self.dp_world, self.dp_rank = get_world_size(), get_rank() # TODO: needs to use dp_replicate
+        self.dp_world, self.dp_rank = get_world_size(), get_rank()  # TODO: needs to use dp_replicate
         self.split = config.data.split
 
         self._dataset = self._build_dataset()
@@ -107,11 +107,14 @@ class LacunaDataset:
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
 
-        if not self.config.data.stream: # tokenize on master and cache result
+        if not self.config.data.stream:  # tokenize on master and cache result
             if is_master():
-                cached_ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
+                cached_ds = ds.map(
+                    encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column]
+                )
                 cached_ds = cached_ds.with_format("arrow").map(pack, batched=True, batch_size=self.config.data.pack_batch_size)
-            dist.barrier()
+            if dist.is_initialized():
+                dist.barrier()
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
         ds = ds.map(encode, batched=True, batch_size=self.config.data.map_batch_size, remove_columns=[self.config.data.column])
@@ -136,7 +139,8 @@ class LacunaDataset:
 
 
 def setup_dataloader(config: LacunaConfig) -> tuple[StatefulDataLoader, LacunaDataset]:
-    if is_master(): # force hf to cache tokenizer 
-        _tok = get_tokenizer(config); del _tok 
+    if is_master():  # force hf to cache tokenizer
+        _tok = get_tokenizer(config)
+        del _tok
     dataset = LacunaDataset(config)
     return dataset.dataloader, dataset
