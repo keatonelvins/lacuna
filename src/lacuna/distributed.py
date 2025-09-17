@@ -36,7 +36,6 @@ def init_dist(config: LacunaConfig) -> None:
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     dist.init_process_group(backend=backend, device_id=local_rank)
-    logger.info(f"Initialized distributed: rank {get_rank()}/{get_world_size()}")
 
 
 def destroy_dist() -> None:
