@@ -53,7 +53,6 @@ class LacunaDataset:
         except Exception as e:
             if is_master():
                 dist.barrier()
-            logger.error(f"Error building dataset: {e}")
             raise e
         if dist.is_initialized() and is_master():
             dist.barrier()
