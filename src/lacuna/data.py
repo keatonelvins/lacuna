@@ -43,7 +43,7 @@ class LacunaDataset:
         self.config = config
         self.dp_world, self.dp_rank = get_world_size(), get_rank()  # TODO: needs to use dp_replicate
 
-        # TODO: figure out something like accelerate context manager
+        # TODO: figure out something better? like `with accelerator.main_process_first()`
         if dist.is_initialized() and not is_master():
             dist.barrier()
         try:
