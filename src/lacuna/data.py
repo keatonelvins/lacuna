@@ -67,6 +67,7 @@ class LacunaDataset:
             self._dataset,
             drop_last=True,
             pin_memory=True,
+            num_workers=self.config.data.num_workers,
             sampler=self.sampler,
         )
 
@@ -92,13 +93,13 @@ class LacunaDataset:
             encode,
             batched=True,
             num_proc=self.config.data.num_proc,
-            batch_size=self.config.data.map_batch_size,
+            batch_size=self.config.data.map_bs,
             remove_columns=ds.column_names,
         ).with_format("arrow")
         ds = ds.map(
             pack,
             batched=True,
-            batch_size=self.config.data.pack_batch_size,
+            batch_size=self.config.data.pack_bs,
             num_proc=self.config.data.num_proc,
             remove_columns=ds.column_names,
         ).with_format("torch")
@@ -111,5 +112,4 @@ class LacunaDataset:
 
     @property
     def length(self) -> int:
-        """Return length per epoch of the dataset."""
         return len(self.dataloader)

@@ -9,7 +9,6 @@ from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 import torch
-import psutil
 
 from lacuna.config import LacunaConfig
 from lacuna.trainer import train
@@ -17,13 +16,9 @@ from lacuna.trainer import train
 T = TypeVar("T", bound=BaseSettings)
 load_dotenv()
 
+
 def launch_torchrun(config: BaseSettings) -> None:
     torchrun = config.torchrun
-
-    if "OMP_NUM_THREADS" not in os.environ:
-        physical_cores = psutil.cpu_count(logical=False)
-        optimal_threads = max(1, physical_cores // torchrun.nproc_per_node)
-        os.environ["OMP_NUM_THREADS"] = str(optimal_threads)
 
     cmd = ["torchrun", f"--nproc_per_node={torchrun.nproc_per_node}"]
 

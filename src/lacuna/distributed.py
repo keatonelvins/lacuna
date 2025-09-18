@@ -26,7 +26,7 @@ def init_dist(config: LacunaConfig) -> None:
     if not dist.is_available():
         return
 
-    if "RANK" not in os.environ:
+    if "LOCAL_RANK" not in os.environ:
         return
 
     backend = "nccl"
@@ -39,23 +39,19 @@ def init_dist(config: LacunaConfig) -> None:
 
 
 def destroy_dist() -> None:
-    """Destroy distributed process group."""
     if dist.is_initialized():
         dist.destroy_process_group()
 
 
 def get_rank() -> int:
-    """Get current process rank."""
     return dist.get_rank() if dist.is_initialized() else 0
 
 
 def get_world_size() -> int:
-    """Get total number of processes."""
     return dist.get_world_size() if dist.is_initialized() else 1
 
 
 def is_master() -> bool:
-    """Check if current process is master (rank 0)."""
     return get_rank() == 0
 
 

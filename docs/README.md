@@ -47,3 +47,4 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - [ND-Parallel](https://huggingface.co/blog/accelerate-nd-parallel)
     - [Visualizing 6D Mesh Parallelism](https://main-horse.github.io/posts/visualizing-6d/)
     - [llm.c](https://github.com/karpathy/llm.c)
+    - [PyTorch Tuning Guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html)

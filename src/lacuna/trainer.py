@@ -102,17 +102,17 @@ def train(config: LacunaConfig) -> None:
 
             redline.update(batch["input_ids"].numel(), data_load_time)
 
-            if step % config.metrics.steps_per_log == 0:
+            if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
+                current_loss = loss.item()
                 metrics = redline.read()
 
-                log_training_metrics(step, loss.item(), grad_norm, current_lr, metrics, run_dir)
-                log_wandb_metrics(loss.item(), current_lr, grad_norm, step, metrics, wandb_run)
+                log_training_metrics(step, current_loss, grad_norm, current_lr, metrics, run_dir)
+                log_wandb_metrics(current_loss, current_lr, grad_norm, step, metrics, wandb_run)
                 save_batch_json(run_dir, step, batch)
 
             if config.checkpoint.save_every:
-                interval = max(1, int(config.checkpoint.save_every * dataset.length))
-                if step > 0 and step % interval == 0:
+                if step > 0 and step % config.checkpoint.save_every == 0:
                     logger.info(f"Saving checkpoint at step {step}")
                     save_checkpoint(
                         step=step,

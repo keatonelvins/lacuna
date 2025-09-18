@@ -3,7 +3,6 @@
 from typing import Any
 from loguru import logger
 from pathlib import Path
-import warnings
 
 import torch
 import torch.distributed.checkpoint as dcp
@@ -66,6 +65,7 @@ class TrainerState(Stateful):
         self.scheduler.load_state_dict(state_dict["scheduler"])
         self.dataloader.load_state_dict(state_dict["dataloader"])
 
+
 # TODO: remove in torch 2.9.0 and use HuggingFaceStorageWriter
 def save_hf_weights_dtensor(
     model: torch.nn.Module,
@@ -112,14 +112,10 @@ def save_checkpoint(
         trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
         writer = FileSystemWriter(str(path))
         state_dict = {"trainer": trainer_state}
-        with warnings.catch_warnings():  # ignore warnings if on single device
-            warnings.filterwarnings("ignore", category=UserWarning, module="torch.distributed.*")
-            dcp.save(state_dict, storage_writer=writer)
+        dcp.save(state_dict, storage_writer=writer)
     else:
         logger.info(f"Saving final checkpoint in HF format to {path}")
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="TypedStorage is deprecated", category=UserWarning)
-            save_hf_weights_dtensor(model, path)
+        save_hf_weights_dtensor(model, path)
 
     save_settings_json(path, config)
 

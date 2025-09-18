@@ -1,8 +1,5 @@
 """Model setup and optimization utilities."""
 
-import os
-from contextlib import redirect_stdout, redirect_stderr
-
 import torch
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
@@ -54,12 +51,7 @@ def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrain
     if not config.liger:
         return model
 
-    with (
-        open(os.devnull, "w") as devnull,
-        redirect_stdout(devnull),
-        redirect_stderr(devnull),
-    ):  # silence ugly liger print (lol liger print)
-        _apply_liger_kernel_to_instance(model)
+    _apply_liger_kernel_to_instance(model)
 
     return model
 

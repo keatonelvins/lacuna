@@ -1,13 +1,12 @@
 """Pydantic settings."""
 
-import os
 import shutil
 from pathlib import Path
 from typing import Literal, Optional
 
 import torch
 import psutil
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,23 +18,18 @@ class ModelConfig(BaseModel):
     accum_fp32: bool = Field(True, description="Enable fp32 accumulation for cross entropy loss")
     liger: bool = Field(False, description="Enable Liger kernels")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
-    compile_mode: Optional[
-        Literal[
-            "default",
-            "reduce-overhead",
-            "max-autotune",
-            "max-autotune-no-cudagraphs",
-        ]
-    ] = Field(None, description="Compile mode (if omitted, torch.compile will not be used)")
+    compile_mode: Optional[Literal["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"]] = Field(
+        None, description="Compile mode (if omitted, torch.compile will not be used)"
+    )
 
 
 class TrainerConfig(BaseModel):
     """Training loop config"""
 
     seed: int = Field(42, description="Global seed")
+    seq_len: int = Field(512, ge=1, description="Tokens per GPU (batch size is always 1)")
     epochs: int = Field(1, gt=0, description="Number of epochs")
     steps: Optional[int] = Field(None, gt=0, description="Max training steps (must be less than dataset length)")
-    seq_len: int = Field(512, ge=1, description="Tokens per GPU (batch size is always 1)")
 
 
 class DatasetConfig(BaseModel):
@@ -55,19 +49,13 @@ class DataConfig(BaseModel):
     column: str = Field("text", description="Column to use for all datasets")
     chat_template: str = Field(None, description="Chat template to use for the dataset (either a string or a path to a file)")
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
-    map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
-    pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
-    num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
-    redownload: bool = Field(False, description="Force redownload of the dataset")
     tokenizer_override: str = Field(None, description="Model name to override the default tokenizer")
+    redownload: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
     fingerprint: str = Field(None, description="Fingerprint of the dataset to use for caching")
-
-    @model_validator(mode="after")
-    def check_auth(self):
-        if "s3://" in "".join(d.model_dump_json() for d in self.datasets):
-            if "AWS_ACCESS_KEY_ID" not in os.environ or "AWS_SECRET_ACCESS_KEY" not in os.environ:
-                raise ValueError("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set")
-        return self
+    map_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
+    pack_bs: int = Field(10000, description="Batch size to use when packing the dataset")
+    num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
+    num_workers: int = Field(1, description="Number of workers to use for the torch DataLoader")
 
     @field_validator("chat_template", mode="after")
     @classmethod
@@ -105,7 +93,7 @@ class SchedulerConfig(BaseModel):
 class CheckpointConfig(BaseModel):
     """Checkpoint saving config"""
 
-    save_every: float = Field(None, description="Epochs between checkpoint saves (default no checkpointing)")
+    save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
     save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
     resumable_final_save: bool = Field(False, description="Make the final save resumable by storing optimizer state")
@@ -119,7 +107,7 @@ class CheckpointConfig(BaseModel):
 class MetricsConfig(BaseModel):
     """Metrics and logging config"""
 
-    steps_per_log: int = Field(10, gt=0, description="Steps between log outputs")
+    log_every: int = Field(10, gt=0, description="Steps between log outputs")
 
 
 class TorchrunConfig(BaseModel):
