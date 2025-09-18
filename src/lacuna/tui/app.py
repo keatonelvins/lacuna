@@ -4,7 +4,6 @@ from textual.containers import Grid
 
 from ._config import ConfigScreen
 from ._curves import CurvesWidget
-from ._data import DataWidget
 from ._i_o import IOWidget
 from ._redline import RedlineWidget
 from ._splash import SplashScreen
@@ -21,17 +20,13 @@ class Lacuna(App):
         grid-size: 2;
         grid-columns: 2fr 1fr;
         grid-rows: 2fr 1fr;
-        grid-gutter: 1;
+        grid-gutter: 0 1;
         height: 100%;
     }
 
     RedlineWidget {
         border: solid red;
-        height: 100%;
-    }
-
-    DataWidget {
-        border: solid green;
+        column-span: 2;
         height: 100%;
     }
 
@@ -49,7 +44,6 @@ class Lacuna(App):
     def compose(self) -> ComposeResult:
         yield Grid(
             RedlineWidget(),
-            DataWidget(),
             CurvesWidget(),
             IOWidget(),
         )

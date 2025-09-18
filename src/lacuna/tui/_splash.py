@@ -7,7 +7,6 @@ from textual.widgets import Static
 
 
 class SplashScreen(ModalScreen):
-
     class DismissScreen(Message):
         """Message to dismiss the splash screen."""
 
@@ -63,7 +62,7 @@ class SplashScreen(ModalScreen):
 
     def on_mount(self) -> None:
         """Auto-dismiss after 2 seconds."""
-        self.set_timer(2.0, lambda: self.post_message(self.DismissScreen()))
+        self.set_timer(1.0, lambda: self.post_message(self.DismissScreen()))
 
     def on_splash_screen_dismiss_screen(self) -> None:
         """Handle the dismiss message."""

@@ -5,7 +5,6 @@ from .utils import get_latest_metrics
 class CurvesWidget(Static):
     def __init__(self) -> None:
         super().__init__()
-        self.border_title = "_curves"
         self.update_content()
 
     def on_mount(self) -> None:

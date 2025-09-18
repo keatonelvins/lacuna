@@ -51,6 +51,12 @@ def setup_env(config: LacunaConfig) -> Path:
     return run_dir
 
 
+def cleanup_env() -> None:
+    active_link = Path(".lacuna_cache/active_run")
+    if active_link.exists() or active_link.is_symlink():
+        active_link.unlink()
+
+
 def master_only(fn):
     """Decorator to run a function only on the master process."""
 
@@ -106,31 +112,6 @@ def save_settings_json(path: Path, config: LacunaConfig) -> None:
     path.mkdir(parents=True, exist_ok=True)
     with (path / "settings.json").open("w") as f:
         f.write(config.model_dump_json(indent=4))
-
-
-@master_only
-def save_batch_json(run_dir: Path, step: int, batch: dict) -> None:
-    """Save batch data for TUI visualization, keeping only last 50 batches."""
-    batch_dir = run_dir / "batches"
-    batch_dir.mkdir(exist_ok=True)
-
-    batch_data = {
-        "step": step,
-        "input_ids": batch["input_ids"].tolist(),
-        "position_ids": batch["position_ids"].tolist(),
-    }
-
-    if "assistant_masks" in batch:
-        batch_data["assistant_masks"] = batch["assistant_masks"].tolist()
-
-    batch_file = batch_dir / f"batch_{step:06d}.json"
-    with batch_file.open("w") as f:
-        json.dump(batch_data, f)
-
-    batch_files = sorted(batch_dir.glob("batch_*.json"))
-    while len(batch_files) > 50:
-        batch_files[0].unlink()
-        batch_files.pop(0)
 
 
 @master_only
