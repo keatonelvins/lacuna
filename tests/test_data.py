@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from transformers import AutoTokenizer
 
+from lacuna.config import DatasetConfig, DataConfig, ModelConfig, TrainerConfig
 from lacuna.utils import pack_bfd
 from lacuna.data import LacunaDataset, get_tokenizer, _encode
 
@@ -55,8 +56,8 @@ def test_encode_text():
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base")
 
     mock_config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
-        data=SimpleNamespace(column="text", chat_template=None, eos_token=None),
+        model=ModelConfig(name="Qwen/Qwen3-0.6B-Base"),
+        data=DataConfig(),
     )
 
     tokenizer = get_tokenizer(mock_config)
@@ -75,8 +76,8 @@ def test_add_eos_token():
     assert tokenizer.eos_token_id == 151643
 
     mock_config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
-        data=SimpleNamespace(column="text", chat_template=None, eos_token="<|im_end|>"),
+        model=ModelConfig(name="Qwen/Qwen3-0.6B-Base"),
+        data=DataConfig(eos_token="<|im_end|>"),
     )
 
     tokenizer = get_tokenizer(mock_config)
@@ -100,8 +101,8 @@ def test_encode_messages():
     """Test _encode function with messages column."""
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
     mock_config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B"),
-        data=SimpleNamespace(column="messages", chat_template=Path("tests/test.jinja").read_text(), eos_token=None),
+        model=ModelConfig(name="Qwen/Qwen3-0.6B"),
+        data=DataConfig(column="messages", chat_template=Path("tests/test.jinja").read_text()),
     )
 
     tokenizer = get_tokenizer(mock_config)
@@ -144,21 +145,9 @@ Within cells interlinked<|im_end|>
 def test_dataset_cache_reuse():
     """Test that LacunaDataset reuses cache when built with same config."""
     config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
-        data=SimpleNamespace(
-            datasets=["keatone/TinierStories"],
-            split="train[:10]",
-            column="text",
-            chat_template=None,
-            eos_token=None,
-            map_batch_size=4,
-            num_proc=1,
-            pack_batch_size=10,
-        ),
-    )
-    config.trainer = SimpleNamespace(
-        seq_len=128,
-        seed=42,
+        model=ModelConfig(),
+        data=DataConfig(datasets=[DatasetConfig(split="train[:10]")], num_proc=1),
+        trainer=TrainerConfig(seq_len=128, seed=42),
     )
 
     dataset1 = LacunaDataset(config)
@@ -167,31 +156,22 @@ def test_dataset_cache_reuse():
     fingerprint2 = config.data.fingerprint
 
     assert fingerprint1 == fingerprint2
-    assert len(dataset1._dataset) == len(dataset2._dataset)
+    assert len(dataset1._dataset) == len(dataset2._dataset) == 10
 
-    config.trainer.seq_len = 256
+    config.trainer.seq_len = 512
     dataset3 = LacunaDataset(config)
     fingerprint3 = config.data.fingerprint
 
     assert fingerprint1 != fingerprint3
-    assert len(dataset3._dataset) != len(dataset1._dataset)
+    assert len(dataset3._dataset) == 5
 
 
 def test_data_parallel_unique_splits():
     """Test that different DP ranks get unique data splits."""
     config = SimpleNamespace(
-        model=SimpleNamespace(name="Qwen/Qwen3-0.6B-Base"),
-        data=SimpleNamespace(
-            datasets=["keatone/TinierStories"],
-            split="train",
-            column="text",
-            chat_template=None,
-            eos_token=None,
-            map_batch_size=4,
-            pack_batch_size=10,
-            num_proc=1,
-        ),
-        trainer=SimpleNamespace(seq_len=128, seed=42, steps=125),
+        model=ModelConfig(),
+        data=DataConfig(datasets=[DatasetConfig()], num_proc=1),
+        trainer=TrainerConfig(seq_len=128, seed=42, steps=125),
     )
 
     datasets = []

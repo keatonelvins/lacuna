@@ -38,31 +38,33 @@ class TrainerConfig(BaseModel):
     seq_len: int = Field(512, ge=1, description="Tokens per GPU (batch size is always 1)")
 
 
+class DatasetConfig(BaseModel):
+    """Dataset config (matching hf load_dataset API)"""
+
+    path: str = Field("keatone/TinierStories", description="Path or name of the dataset")
+    name: str = Field(None, description="Name of the dataset configuration")
+    data_dir: str = Field(None, description="Data directory of the dataset configuration")
+    data_files: str | list[str] | dict[str, str] = Field(None, description="Data files of the dataset configuration")
+    split: str = Field("train", description="Split to use")
+
+
 class DataConfig(BaseModel):
     """Data loading config"""
 
-    datasets: list[str] = Field(["keatone/TinierStories"], description="HF dataset names")
-    files: dict = Field(default_factory=dict, description="Mapping of dataset to regex for fs matching")
-    split: str = Field("train", description="Split to use for all the datasets")
-    column: str = Field("text", description="Dataset column to use ('text' or 'messages')")
+    datasets: list[DatasetConfig] = Field([DatasetConfig(path="keatone/TinierStories")], description="Datasets to use")
+    column: str = Field("text", description="Column to use for all datasets")
     chat_template: str = Field(None, description="Chat template to use for the dataset (either a string or a path to a file)")
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
     map_batch_size: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_batch_size: int = Field(10000, description="Batch size to use when packing the dataset")
     num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
     redownload: bool = Field(False, description="Force redownload of the dataset")
+    tokenizer_override: str = Field(None, description="Model name to override the default tokenizer")
     fingerprint: str = Field(None, description="Fingerprint of the dataset to use for caching")
 
     @model_validator(mode="after")
-    def set_files(self):
-        for dataset in self.datasets:
-            if dataset.startswith("s3://") and dataset not in self.files:
-                self.files[dataset] = {self.split: dataset.rstrip("/") + f"/{self.split}/*.parquet"}
-        return self
-
-    @model_validator(mode="after")
     def check_auth(self):
-        if self.datasets[0].startswith("s3://"):
+        if "s3://" in "".join(d.model_dump_json() for d in self.datasets):
             if "AWS_ACCESS_KEY_ID" not in os.environ or "AWS_SECRET_ACCESS_KEY" not in os.environ:
                 raise ValueError("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set")
         return self

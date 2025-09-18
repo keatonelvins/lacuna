@@ -1,7 +1,6 @@
 """Data loading, tokenization, and packing for training."""
 
 from loguru import logger
-import multiprocessing as mp
 from functools import partial
 from torch import distributed as dist
 from torch.utils.data import DistributedSampler
@@ -28,7 +27,7 @@ def _encode(examples, tokenizer, column):
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
-    tokenizer = AutoTokenizer.from_pretrained(config.model.name, model_max_length=int(1e10))
+    tokenizer = AutoTokenizer.from_pretrained(config.data.tokenizer_override or config.model.name, model_max_length=int(1e10))
     if config.data.chat_template:
         tokenizer.chat_template = config.data.chat_template
     if config.data.eos_token:
@@ -43,7 +42,6 @@ class LacunaDataset:
     def __init__(self, config: LacunaConfig):
         self.config = config
         self.dp_world, self.dp_rank = get_world_size(), get_rank()  # TODO: needs to use dp_replicate
-        self.split = config.data.split
 
         # TODO: figure out something like accelerate context manager
         if dist.is_initialized() and not is_master():
@@ -51,7 +49,7 @@ class LacunaDataset:
         try:
             self._dataset = self._build_dataset()
         except Exception as e:
-            if is_master():
+            if dist.is_initialized() and is_master():
                 dist.barrier()
             raise e
         if dist.is_initialized() and is_master():
@@ -72,13 +70,14 @@ class LacunaDataset:
             sampler=self.sampler,
         )
 
-    def _load_datasets(self, split: str):
+    def _load_datasets(self):
         datasets = []
-        for name in self.config.data.datasets:
-            if name.startswith("s3://"):
-                ds = load_dataset("parquet", data_files=self.config.data.files[name], split=split, num_proc=self.config.data.num_proc, download_mode='force_redownload' if self.config.data.redownload else None)
-            else:
-                ds = load_dataset(name, split=split, num_proc=self.config.data.num_proc, download_mode='force_redownload' if self.config.data.redownload else None)
+        for dataset in self.config.data.datasets:
+            ds = load_dataset(
+                **dataset.model_dump(),
+                num_proc=self.config.data.num_proc,
+                download_mode="force_redownload" if self.config.data.redownload else None,
+            )
             datasets.append(ds)
         return datasets
 
@@ -86,24 +85,23 @@ class LacunaDataset:
         """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""
         encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
         pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
-        raw = self._load_datasets(self.split)
-        ds = concatenate_datasets(raw)
+        ds = concatenate_datasets(self._load_datasets())
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
         ds = ds.map(
-            encode, 
-            batched=True, 
+            encode,
+            batched=True,
             num_proc=self.config.data.num_proc,
-            batch_size=self.config.data.map_batch_size, 
-            remove_columns=list(next(iter(ds)).keys()),
+            batch_size=self.config.data.map_batch_size,
+            remove_columns=ds.column_names,
         ).with_format("arrow")
         ds = ds.map(
-            pack, 
-            batched=True, 
-            batch_size=self.config.data.pack_batch_size, 
+            pack,
+            batched=True,
+            batch_size=self.config.data.pack_batch_size,
             num_proc=self.config.data.num_proc,
+            remove_columns=ds.column_names,
         ).with_format("torch")
-
         self.config.data.fingerprint = ds._fingerprint
 
         return ds

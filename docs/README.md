@@ -24,11 +24,16 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
     - On top of intra-document masking, we also mask the first token on the boundary (TODO: run ablation)
 
 ## Datasets
-- We will tokenize and pack using `.map()` from `datasets` which automatically fingerprints and caches the final dataset/
+- We will tokenize and pack using `.map()` from `datasets` which automatically fingerprints and caches the final dataset
     - This means you only need to tokenize and pack once! Subsequent runs will stream directly from the cache under `HF_HOME`.
-- Helpful docs
-    - https://huggingface.co/docs/datasets/en/use_with_pytorch
-    - https://docs.pytorch.org/docs/stable/data.html
+    - Also, changing the seq_len will only re-pack instead of also re-tokenizing :)
+    - If you change models but want to use the cache, you can pass in data.tokenizer_override to force cache use
+- The DatasetConfig is passed directly through to `load_dataset`, so you can load datasets directly from s3 with s3fs:
+    ```toml
+    [[data.datasets]]
+    path = "parquet"
+    data_files = "s3://path/to/data/train/*.parquet"
+    ```
 
 ## Tokenization
 - HF tokenization is littered with footguns, highly recommend Quentin's post on this:
