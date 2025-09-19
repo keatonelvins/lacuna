@@ -8,10 +8,8 @@ from loguru import logger
 
 # ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/tools/utils.py
 def get_peak_flops(device_name: str) -> int:
-    if "H100" in device_name:
+    if "H100" or "H200" in device_name:
         return 989e12  # assuming H100 SXM bc otherwise what are you doing my guy
-    elif "H200" in device_name:
-        return 989e12
     elif "B200" in device_name:
         return 2.25e15
     elif "3090" in device_name:
