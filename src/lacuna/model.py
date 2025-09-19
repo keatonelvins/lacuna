@@ -58,13 +58,11 @@ def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrain
 
 def apply_activation_checkpointing(model: PreTrainedModel, ac_config: ActivationCheckpointConfig) -> PreTrainedModel:
     """Apply activation checkpointing if enabled."""
-    if ac_config.mode == "none":
+    if ac_config.stride == 0:
         return model
 
-    checkpoint_freq = 1 if ac_config.mode == "full" else ac_config.stride
-
     for idx, layer in enumerate(model.model.layers):
-        if idx % checkpoint_freq == 0:
+        if idx % ac_config.stride == 0:
             model.model.layers[idx] = checkpoint_wrapper(layer)
 
     return model

@@ -35,6 +35,7 @@ def train(config: LacunaConfig) -> None:
 
         logger.info("Setting up dataloader")
         dataset = LacunaDataset(config)
+        logger.info(f"Packed dataset length: {dataset.length}")
         data_iter = iter(dataset.dataloader)
 
         if config.trainer.steps:

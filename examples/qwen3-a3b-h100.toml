@@ -3,7 +3,7 @@ name = "Qwen/Qwen3-30B-A3B-Base"
 liger = true
 
 [trainer]
-seq_len = 8192
+seq_len = 512
 
 [[data.datasets]]
 path = "open-r1/ioi-cots"
@@ -11,11 +11,11 @@ path = "open-r1/ioi-cots"
 [data]
 column = "generation"
 
+[dist]
+cpu_offload = true
+
 [optimizer]
 lr = 0.0003
-
-[ac]
-mode = "full"
 
 [wandb]
 project = "qwen-a3b-test"

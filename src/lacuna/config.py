@@ -133,8 +133,7 @@ class DistributedConfig(BaseModel):
 class ActivationCheckpointConfig(BaseModel):
     """Activation checkpointing config"""
 
-    mode: Literal["none", "full", "partial"] = Field("none", description="Activation checkpointing mode")
-    stride: int = Field(2, ge=1, description="If partial, checkpoint every nth layer")
+    stride: int = Field(0, ge=0, description="Checkpoint every nth layer (0 means no checkpointing)")
 
 
 class WandbConfig(BaseModel):
