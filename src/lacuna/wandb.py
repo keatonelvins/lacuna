@@ -6,7 +6,7 @@ from .utils import master_only
 
 @master_only
 def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
-    if not config.wandb.enabled:
+    if not config.wandb.project:
         return None
 
     run = wandb.init(
@@ -19,7 +19,7 @@ def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
 
     return run
 
-
+@master_only
 def log_wandb_metrics(
     loss: float,
     lr: float,
@@ -42,7 +42,7 @@ def log_wandb_metrics(
         }
         wandb.log(metrics, step=step)
 
-
+@master_only
 def finish(run: wandb.sdk.wandb_run.Run | None) -> None:
     if run:
         wandb.finish()

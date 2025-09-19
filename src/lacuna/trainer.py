@@ -93,8 +93,10 @@ def train(config: LacunaConfig) -> None:
                 loss = outputs.loss
 
             loss.backward()
-
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.max_norm)
+            if hasattr(grad_norm, "full_tensor"):
+                grad_norm = grad_norm.full_tensor()
+
             optimizer.step()
             scheduler.step()
 
@@ -132,6 +134,6 @@ def train(config: LacunaConfig) -> None:
     except KeyboardInterrupt:
         logger.info("Training interrupted :(")
     finally:
-        finish(wandb_run)
         destroy_dist()
+        finish(wandb_run)
         cleanup_env()

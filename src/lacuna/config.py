@@ -140,7 +140,6 @@ class ActivationCheckpointConfig(BaseModel):
 class WandbConfig(BaseModel):
     """Weights and Biases logging config"""
 
-    enabled: bool = Field(False, description="Enable wandb logging")
     project: str = Field(None, description="wandb project name")
     name: str = Field(None, description="wandb run name")
     entity: str = Field(None, description="wandb entity (team/user)")
