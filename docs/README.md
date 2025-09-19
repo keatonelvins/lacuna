@@ -17,7 +17,6 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 - For FSDP, we fully shard the layers individually, then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
 - We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
     - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
-- Set `OMP_NUM_THREADS` to `cpu_cores / num_gpus` for torchrun (physical cores so no hyper-threads!!)
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking
     - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!
