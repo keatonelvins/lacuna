@@ -79,12 +79,7 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
     torch._dynamo.config.suppress_errors = True
 
     for idx, layer in enumerate(model.model.layers):
-        compiled_layer = torch.compile(
-            layer,
-            fullgraph=False,
-            mode=config.model.compile_mode,
-        )
-        model.model.layers[idx] = compiled_layer
+        model.model.layers[idx] = torch.compile(layer, mode=config.model.compile_mode)
 
     return model
 

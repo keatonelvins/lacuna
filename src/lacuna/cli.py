@@ -36,9 +36,7 @@ def launch_torchrun(config: BaseSettings) -> None:
         print("Example: uv run train configs/multi_node.toml --torchrun.node_rank 0")
         sys.exit(1)
 
-    cmd.extend(["-m", "lacuna.cli", "lacuna"])
-    cmd.extend(sys.argv[1:])
-
+    cmd.extend(["-m", "lacuna.cli", "lacuna"] + sys.argv[1:])
     print(f"Launching: {' '.join(cmd)}")
 
     os.execvp("torchrun", cmd)

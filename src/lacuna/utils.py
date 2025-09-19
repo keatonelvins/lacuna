@@ -18,8 +18,7 @@ from .config import LacunaConfig
 
 def setup_logger(run_dir: Path = None) -> None:
     """Setup logging to console and run directory."""
-    logger.remove()  # Remove default handler
-
+    logger.remove()
     logger.add(
         sink=lambda msg: print(msg, end=""),
         format="<green>{time:HH:mm:ss}</green> | <level>{level}</level> | {message}",

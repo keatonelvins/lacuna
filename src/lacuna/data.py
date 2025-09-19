@@ -41,7 +41,6 @@ def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
 class LacunaDataset:
     def __init__(self, config: LacunaConfig):
         self.config = config
-        self.dp_world, self.dp_rank = get_world_size(), get_rank()  # TODO: needs to use dp_replicate
 
         # TODO: figure out something better? like `with accelerator.main_process_first()`
         if dist.is_initialized() and not is_master():
@@ -55,10 +54,11 @@ class LacunaDataset:
         if dist.is_initialized() and is_master():
             dist.barrier()
 
+        # TODO: use dp_replicate and dp_shard
         self.sampler = DistributedSampler(
             self._dataset,
-            num_replicas=self.dp_world,
-            rank=self.dp_rank,
+            num_replicas=get_world_size(),
+            rank=get_rank(),
             shuffle=True,
             drop_last=True,
             seed=config.trainer.seed,
@@ -72,15 +72,14 @@ class LacunaDataset:
         )
 
     def _load_datasets(self):
-        datasets = []
-        for dataset in self.config.data.datasets:
-            ds = load_dataset(
+        return [
+            load_dataset(
                 **dataset.model_dump(),
                 num_proc=self.config.data.num_proc,
                 download_mode="force_redownload" if self.config.data.redownload else None,
             )
-            datasets.append(ds)
-        return datasets
+            for dataset in self.config.data.datasets
+        ]
 
     def _build_dataset(self):
         """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""

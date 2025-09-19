@@ -95,8 +95,6 @@ def train(config: LacunaConfig) -> None:
             loss.backward()
 
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.max_norm)
-            if hasattr(grad_norm, "full_tensor"):  # TODO: docs say we don't need this for FSDP?
-                grad_norm = grad_norm.full_tensor()
             optimizer.step()
             scheduler.step()
 

@@ -33,7 +33,7 @@ class TrainerConfig(BaseModel):
 
 
 class DatasetConfig(BaseModel):
-    """Dataset config (matching hf load_dataset API)"""
+    """Dataset config (matches hf load_dataset API)"""
 
     path: str = Field("keatone/TinierStories", description="Path or name of the dataset")
     name: str = Field(None, description="Name of the dataset configuration")

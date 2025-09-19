@@ -105,7 +105,6 @@ def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     if mesh:
         return setup_fsdp2(model, config, mesh)
     else:
-        model = model.cuda(torch.cuda.current_device())
         return setup_ddp(model, config)
 
 
@@ -142,6 +141,7 @@ def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
     bucket = 25 * (1 + scale) * (1.5 if get_world_size() > 32 else 1)
     bucket_cap_guess = int(min(max(bucket, 10), 250))
     is_compiled = config.model.compile_mode is not None
+    model = model.cuda(torch.cuda.current_device())
     model = DDP(
         model,
         device_ids=[torch.cuda.current_device()],

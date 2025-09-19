@@ -128,23 +128,13 @@ def load_checkpoint(
     path: Path,
 ):
     """Load DCP checkpoint and restore full training state."""
-    if not path.exists():
-        raise FileNotFoundError(f"Checkpoint not found at {path}")
 
-    is_dcp = (path / ".metadata").exists()
-    is_hf = (path / "model.safetensors.index.json").exists()
-
-    if is_hf:
-        # TODO: remove and use HuggingFaceStorageReader in torch 2.9.0
-        raise NotImplementedError("HF checkpoint loading not implemented")
-
-    if not is_dcp and not is_hf:
-        raise ValueError(f"Checkpoint at {path} is neither DCP nor HF format")
-
-    if is_hf:
+    if (path / "model.safetensors.index.json").exists():
         storage_reader = HuggingFaceStorageReader(path=str(path))
-    else:
+    elif (path / ".metadata").exists():
         storage_reader = FileSystemReader(str(path))
+    else:
+        raise ValueError(f"Checkpoint at {path} is neither DCP nor HF format")
 
     dcp.load(
         {"trainer": TrainerState(model, optimizer, scheduler, dataloader)},
@@ -152,6 +142,4 @@ def load_checkpoint(
         checkpoint_id=str(path),
     )
 
-    logger.info(f"Loaded {'HF' if is_hf else 'DCP'} checkpoint from {path}")
-
-    return None
+    logger.info(f"Loaded checkpoint from {path}")
