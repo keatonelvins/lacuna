@@ -76,8 +76,8 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
     torch._dynamo.config.cache_size_limit = 256
     torch._dynamo.config.suppress_errors = True
 
-    for idx, layer in enumerate(model.model.layers):
-        model.model.layers[idx] = torch.compile(layer, mode=config.model.compile_mode)
+    for layer in model.model.layers:
+        layer.compile(mode=config.model.compile_mode)
 
     return model
 
