@@ -42,14 +42,12 @@ class LacunaDataset:
     def __init__(self, config: LacunaConfig):
         self.config = config
 
-        # TODO: figure out something better? like `with accelerator.main_process_first()`
-        if dist.is_initialized() and not is_master():
+        if dist.is_initialized():
+            if is_master():
+                self._build_dataset()  # warm cache on master first
             dist.barrier()
 
         self._dataset = self._build_dataset()
-
-        if dist.is_initialized() and is_master():
-            dist.barrier()
 
         # TODO: use dp_replicate and dp_shard
         self.sampler = DistributedSampler(

@@ -26,7 +26,6 @@ def log_wandb_metrics(
     loss: float,
     grad_norm: float,
     lr: float,
-    redline_metrics: dict[str, float],
     run: wandb.sdk.wandb_run.Run | None,
 ) -> None:
     if run:
@@ -34,12 +33,6 @@ def log_wandb_metrics(
             "train/loss": loss,
             "train/lr": lr,
             "train/grad_norm": grad_norm,
-            "perf/tps": redline_metrics.get("tps", 0.0),
-            "perf/tflops": redline_metrics.get("tflops", 0.0),
-            "perf/mfu_pct": redline_metrics.get("mfu_pct", 0.0),
-            "perf/data_loading_pct": redline_metrics.get("data_pct", 0.0),
-            "memory/max_reserved_gb": redline_metrics.get("max_reserved_gb", 0.0),
-            "memory/max_reserved_pct": redline_metrics.get("max_reserved_pct", 0.0),
         }
         wandb.log(metrics, step=step)
 

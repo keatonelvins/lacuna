@@ -1,6 +1,7 @@
 """FSDP2 and DDP distributed training utilities."""
 
 import os
+import time
 import random
 import numpy as np
 import torch
@@ -32,11 +33,13 @@ def init_dist(config: LacunaConfig) -> None:
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
 
-    dist.init_process_group(backend=backend, device_id=local_rank)
+    dist.init_process_group(backend=backend, device_id=local_rank)  # TODO: maybe we want to set timeout? default is 10 mins
 
 
 def destroy_dist() -> None:
     if dist.is_initialized():
+        if is_master():
+            time.sleep(2)  # give other ranks a second to finish
         dist.destroy_process_group()
 
 

@@ -48,6 +48,7 @@ def setup_logger(run_dir: Path = None) -> None:
 
 
 def cleanup_env() -> None:
+    """Cleanup active run link."""
     active_link = Path(".lacuna_cache/active_run")
     if active_link.exists() or active_link.is_symlink():
         active_link.unlink()
@@ -79,6 +80,7 @@ def setup_run_dir() -> Path:
 
 @master_only
 def display_config(config: LacunaConfig) -> None:
+    """Pretty print the config in the console."""
     console = Console(force_terminal=False, no_color=True)
     with console.capture() as capture:
         console.print(Pretty(config, expand_all=True))  # omg Will you've outdone yourself
@@ -86,15 +88,8 @@ def display_config(config: LacunaConfig) -> None:
 
 
 @master_only
-def save_metrics_jsonl(run_dir: Path, step: int, loss: float, grad_norm: float, lr: float, metrics: dict) -> None:
-    metrics_data = {
-        "step": step,
-        "loss": loss,
-        "grad_norm": float(grad_norm),
-        "lr": lr,
-        "timestamp": datetime.now().isoformat(),
-        **metrics,
-    }
+def save_metrics_jsonl(run_dir: Path, step: int, loss: float, grad_norm: float, lr: float) -> None:
+    metrics_data = {"step": step, "loss": loss, "grad_norm": float(grad_norm), "lr": lr, "timestamp": datetime.now().isoformat()}
 
     metrics_file = run_dir / "metrics.jsonl"
     with metrics_file.open("a") as f:
@@ -114,7 +109,6 @@ def log_training_metrics(
     loss: float,
     grad_norm: float,
     lr: float,
-    metrics: dict[str, float],
     run_dir: Path = None,
 ) -> None:
     log_parts = [
@@ -122,14 +116,24 @@ def log_training_metrics(
         f"Loss: {loss:7.4f}",
         f"Grad: {grad_norm:8.4f}",
         f"LR: {lr:9.2e}",
-        f"Mem: {metrics['max_reserved_gb']:5.1f}GB ({metrics['max_reserved_pct']:3.0f}%)",
-        f"MFU: {metrics['mfu_pct']:5.1f}%",
-        f"Data: {metrics['data_pct']:5.1f}%",
     ]
     logger.info(" | ".join(log_parts))
 
     if run_dir:
-        save_metrics_jsonl(run_dir, step, loss, grad_norm, lr, metrics)
+        save_metrics_jsonl(run_dir, step, loss, grad_norm, lr)
+
+
+# TODO: this is super approximate, should add per-model calculations
+def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
+    """Get parameter count and FLOPs/token at seq_len."""
+    config = model.config
+    num_params = sum(p.numel() for p in model.parameters())
+    head_dim = config.hidden_size // config.num_attention_heads
+
+    attn_flops = 12 * config.num_hidden_layers * config.num_attention_heads * head_dim * seq_len
+    flops_per_token = 6 * num_params + attn_flops
+
+    return int(flops_per_token)
 
 
 # some gpt-5 code for bfd packing
