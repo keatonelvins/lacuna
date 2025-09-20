@@ -1,4 +1,4 @@
-"""Model setup and optimization utilities."""
+"""Model setup and optimization utils."""
 
 import torch
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (

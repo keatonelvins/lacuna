@@ -1,8 +1,7 @@
-"""Pydantic settings."""
+"""Pydantic settings for jobs."""
 
 import os
 import shutil
-import psutil
 import torch
 from pathlib import Path
 from typing import Literal, Optional
@@ -51,7 +50,7 @@ class DataConfig(BaseModel):
     redownload: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
     map_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_bs: int = Field(10000, description="Batch size to use when packing the dataset")
-    num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
+    num_proc: int = Field(os.cpu_count(), description="Number of processes to use for dataset.map()")
     num_workers: int = Field(1, description="Number of workers to use for the torch DataLoader")
 
     @field_validator("chat_template", mode="after")

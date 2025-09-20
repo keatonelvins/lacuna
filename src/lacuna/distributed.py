@@ -1,4 +1,4 @@
-"""FSDP2 and DDP distributed training utilities."""
+"""Distributed training setup and utils."""
 
 import os
 import time

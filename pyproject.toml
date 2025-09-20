@@ -10,7 +10,6 @@ dependencies = [
     "kernels>=0.10.1",
     "loguru>=0.7.3",
     "nvidia-ml-py>=13.580.82",
-    "psutil>=7.1.0",
     "pydantic-settings>=2.10.1",
     "s3fs>=2025.9.0",
     "textual>=6.1.0",

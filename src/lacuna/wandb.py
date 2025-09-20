@@ -1,3 +1,5 @@
+"""Weights and Biases logging."""
+
 import wandb
 
 from .config import LacunaConfig

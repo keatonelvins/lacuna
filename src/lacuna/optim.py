@@ -1,3 +1,5 @@
+"""Optimizer setup."""
+
 from torch import nn
 from torch.optim import Optimizer, AdamW
 from transformers import PreTrainedModel
