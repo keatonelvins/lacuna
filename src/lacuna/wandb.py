@@ -19,12 +19,13 @@ def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
 
     return run
 
+
 @master_only
 def log_wandb_metrics(
-    loss: float,
-    lr: float,
-    grad_norm: float,
     step: int,
+    loss: float,
+    grad_norm: float,
+    lr: float,
     redline_metrics: dict[str, float],
     run: wandb.sdk.wandb_run.Run | None,
 ) -> None:
@@ -41,6 +42,7 @@ def log_wandb_metrics(
             "memory/max_reserved_pct": redline_metrics.get("max_reserved_pct", 0.0),
         }
         wandb.log(metrics, step=step)
+
 
 @master_only
 def finish(run: wandb.sdk.wandb_run.Run | None) -> None:

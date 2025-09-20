@@ -151,16 +151,16 @@ def test_dataset_cache_reuse():
     )
 
     dataset1 = LacunaDataset(config)
-    fingerprint1 = config.data.fingerprint
+    fingerprint1 = dataset1._dataset._fingerprint
     dataset2 = LacunaDataset(config)
-    fingerprint2 = config.data.fingerprint
+    fingerprint2 = dataset2._dataset._fingerprint
 
     assert fingerprint1 == fingerprint2
     assert len(dataset1._dataset) == len(dataset2._dataset) == 10
 
     config.trainer.seq_len = 512
     dataset3 = LacunaDataset(config)
-    fingerprint3 = config.data.fingerprint
+    fingerprint3 = dataset3._dataset._fingerprint
 
     assert fingerprint1 != fingerprint3
     assert len(dataset3._dataset) == 5

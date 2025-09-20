@@ -36,6 +36,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     )
     model.config.use_cache = False  # needed for ac to work
 
+    # TODO: reference flame for order of patches
     model.criterion = FusedLinearCrossEntropyLoss()
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
@@ -51,6 +52,7 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
     if ac_config.stride == 0:
         return model
 
+    # TODO: may need SAC for MoE's
     for idx, layer in enumerate(model.model.layers):
         if idx % ac_config.stride == 0:
             model.model.layers[idx] = checkpoint_wrapper(layer)

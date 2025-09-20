@@ -1,11 +1,11 @@
 """Pydantic settings."""
 
+import os
 import shutil
+import psutil
+import torch
 from pathlib import Path
 from typing import Literal, Optional
-
-import torch
-import psutil
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,10 +13,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ModelConfig(BaseModel):
     """Modeling and patching config"""
 
-    name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
-    attention: Literal["FA3"] = Field("FA3", description="Attention implementation (FA3 only for now)")
+    name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or (local?) path")
+    attention: Literal["FA3"] = Field("FA3", description="Attention backend (FA3 only for now)")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
-    compile_mode: Optional[Literal["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"]] = Field(
+    compile_mode: Literal["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"] = Field(
         None, description="Compile mode (if omitted, torch.compile will not be used)"
     )
 
@@ -27,13 +27,13 @@ class TrainerConfig(BaseModel):
     seed: int = Field(42, description="Global seed")
     seq_len: int = Field(512, ge=1, description="Tokens per GPU (batch size is always 1)")
     epochs: int = Field(1, gt=0, description="Number of epochs")
-    steps: Optional[int] = Field(None, gt=0, description="Max training steps (must be less than dataset length)")
+    steps: int = Field(None, gt=0, description="Max training steps (overrides epochs, must be < dataset.length)")
 
 
 class DatasetConfig(BaseModel):
-    """Dataset config (matches hf load_dataset API)"""
+    """Dataset config (matching datasets.load_dataset API)"""
 
-    path: str = Field("keatone/TinierStories", description="Path or name of the dataset")
+    path: str = Field("keatone/TinierStories", description="Name or path or builder type of the dataset")
     name: str = Field(None, description="Name of the dataset configuration")
     data_dir: str = Field(None, description="Data directory of the dataset configuration")
     data_files: str | list[str] | dict[str, str] = Field(None, description="Data files of the dataset configuration")
@@ -43,13 +43,12 @@ class DatasetConfig(BaseModel):
 class DataConfig(BaseModel):
     """Data loading config"""
 
-    datasets: list[DatasetConfig] = Field([DatasetConfig(path="keatone/TinierStories")], description="Datasets to use")
+    datasets: list[DatasetConfig] = Field([DatasetConfig()], description="Datasets to use")
     column: str = Field("text", description="Column to use for all datasets")
-    chat_template: str = Field(None, description="Chat template to use for the dataset (either a string or a path to a file)")
+    chat_template: str = Field(None, description="Chat template to use (either a string or a path to a file)")
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
-    tokenizer_override: str = Field(None, description="Model name to override the default tokenizer")
+    tokenizer_override: str = Field(None, description="Model name to override the default tokenizer (for caching purposes)")
     redownload: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
-    fingerprint: str = Field(None, description="Fingerprint of the dataset to use for caching")
     map_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     pack_bs: int = Field(10000, description="Batch size to use when packing the dataset")
     num_proc: int = Field(psutil.cpu_count(logical=False), description="Number of processes to use for dataset.map()")
@@ -59,13 +58,10 @@ class DataConfig(BaseModel):
     @classmethod
     def validate_chat_template(cls, chat_template: str | None) -> str:
         """If chat_template is a file path, read the template from the file."""
-        if chat_template:
-            try:
-                maybe_template_path = Path(chat_template)
-                if maybe_template_path.exists() and maybe_template_path.is_file():
-                    return maybe_template_path.read_text()
-            except Exception:
-                pass
+        if chat_template and isinstance(chat_template, os.PathLike):
+            maybe_template_path = Path(chat_template)
+            if maybe_template_path.exists() and maybe_template_path.is_file():
+                return maybe_template_path.read_text()
         return chat_template
 
 
@@ -109,7 +105,7 @@ class MetricsConfig(BaseModel):
 
 
 class TorchrunConfig(BaseModel):
-    """Torchrun distributed config"""
+    """Torchrun distributed config (matching torchrun API)"""
 
     nproc_per_node: int = Field(
         default_factory=lambda: torch.cuda.device_count(), ge=1, description="Number of processes per node"
@@ -121,7 +117,7 @@ class TorchrunConfig(BaseModel):
 
 
 class DistributedConfig(BaseModel):
-    """Distributed training config"""
+    """Distributed training and parallelism config"""
 
     dp_replicate: int = Field(None, ge=1, description="Number of replicated DP groups (defaults to nnodes)")
     dp_shard: int = Field(None, ge=1, description="Number of shards per replica (defaults to nproc_per_node)")

@@ -1,8 +1,8 @@
 """MFU, memory, and throughput tracking."""
 
 import time
-from collections import deque
 import torch
+from collections import deque
 from loguru import logger
 
 

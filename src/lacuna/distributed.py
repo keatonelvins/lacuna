@@ -2,7 +2,6 @@
 
 import os
 import random
-
 import numpy as np
 import torch
 import torch.distributed as dist
@@ -29,12 +28,10 @@ def init_dist(config: LacunaConfig) -> None:
     if "LOCAL_RANK" not in os.environ:
         return
 
-    backend = "nccl"
-    if config.dist.cpu_offload:
-        backend = "cuda:nccl,cpu:gloo"  # nccl on cuda, gloo on cpu
-
+    backend = "cuda:nccl,cpu:gloo" if config.dist.cpu_offload else "nccl"
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
+
     dist.init_process_group(backend=backend, device_id=local_rank)
 
 
@@ -80,7 +77,7 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
     shard = config.dist.dp_shard or config.torchrun.nproc_per_node
 
     if rep * shard != world_size:
-        raise ValueError(f"dp_replicate×dp_shard={rep}×{shard} ≠ world_size={world_size}")
+        raise ValueError(f"dp_replicate x dp_shard={rep} x {shard} != world_size={world_size}")
 
     if rep > 1 and shard > 1:
         mode, mesh = "HSDP", init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
@@ -112,6 +109,7 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
     cpu_offload_policy = CPUOffloadPolicy() if config.dist.cpu_offload else None
 
+    # TODO: can be optimized further (see prime-rl)
     for i, block in enumerate(model.model.layers):
         # Last block: don't reshard since FSDP prefetches
         reshard = i < len(model.model.layers) - 1

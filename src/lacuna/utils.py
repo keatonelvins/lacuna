@@ -1,19 +1,30 @@
 import json
-import os
-from pathlib import Path
+import torch
+import numpy as np
+import pyarrow as pa
+import pyarrow.compute as pc
 from datetime import datetime
+from pathlib import Path
 from loguru import logger
 from rich.pretty import Pretty
 from rich.console import Console
 from collections import defaultdict, deque
 
-import torch
-import numpy as np
-import pyarrow as pa
-import pyarrow.compute as pc
-
 from .distributed import is_master
 from .config import LacunaConfig
+
+
+def setup_env(config: LacunaConfig) -> Path:
+    """Setup environment and output artifacts for a run."""
+    # high -> TF32, highest -> FP32
+    torch.set_float32_matmul_precision("high")
+
+    run_dir = setup_run_dir()
+    setup_logger(run_dir)
+    save_settings_json(run_dir, config)
+    config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
+
+    return run_dir
 
 
 def setup_logger(run_dir: Path = None) -> None:
@@ -36,20 +47,6 @@ def setup_logger(run_dir: Path = None) -> None:
         )
 
 
-def setup_env(config: LacunaConfig) -> Path:
-    # high -> TF32, highest -> FP32
-    torch.set_float32_matmul_precision("high")
-
-    run_dir = get_run_dir()
-    setup_logger(run_dir)
-    save_settings_json(run_dir, config)
-
-    config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
-    os.makedirs(".lacuna_cache", exist_ok=True)
-
-    return run_dir
-
-
 def cleanup_env() -> None:
     active_link = Path(".lacuna_cache/active_run")
     if active_link.exists() or active_link.is_symlink():
@@ -68,15 +65,13 @@ def master_only(fn):
 
 
 @master_only
-def get_run_dir() -> Path:
+def setup_run_dir() -> Path:
     """Create and return a timestamped run directory."""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_dir = Path(".lacuna_cache/runs") / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
 
     active_link = Path(".lacuna_cache/active_run")
-    if active_link.exists() or active_link.is_symlink():
-        active_link.unlink()
     active_link.symlink_to(run_dir.relative_to(active_link.parent))
 
     return run_dir

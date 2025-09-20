@@ -1,38 +1,33 @@
-"""lacuna cli entry point for uv scripts."""
+"""lacuna cli entry point."""
 
 import os
 import sys
+import torch
 import tomllib
 from pathlib import Path
-from typing import Type, TypeVar
-from pydantic_settings import BaseSettings
+from typing import Type
 from dotenv import load_dotenv
-
-import torch
 
 from lacuna.config import LacunaConfig
 from lacuna.trainer import train
 
-T = TypeVar("T", bound=BaseSettings)
 load_dotenv()
 
 
-def launch_torchrun(config: BaseSettings) -> None:
-    torchrun = config.torchrun
+def launch_torchrun(config: LacunaConfig) -> None:
+    cmd = ["torchrun", f"--nproc_per_node={config.torchrun.nproc_per_node}"]
 
-    cmd = ["torchrun", f"--nproc_per_node={torchrun.nproc_per_node}"]
-
-    if torchrun.node_rank is not None:
+    if config.torchrun.node_rank is not None:
         cmd.extend(
             [
-                f"--nnodes={torchrun.nnodes}",
-                f"--master_addr={torchrun.master_addr}",
-                f"--master_port={torchrun.master_port}",
-                f"--node_rank={torchrun.node_rank}",
+                f"--nnodes={config.torchrun.nnodes}",
+                f"--master_addr={config.torchrun.master_addr}",
+                f"--master_port={config.torchrun.master_port}",
+                f"--node_rank={config.torchrun.node_rank}",
             ]
         )
-    elif torchrun.nnodes > 1:
-        print(f"Error: For multi-node training (nnodes={torchrun.nnodes}) must specify node_rank")
+    elif config.torchrun.nnodes > 1:
+        print(f"Error: For multi-node training (nnodes={config.torchrun.nnodes}) must specify node_rank")
         print("Example: uv run train configs/multi_node.toml --torchrun.node_rank 0")
         sys.exit(1)
 
@@ -42,15 +37,12 @@ def launch_torchrun(config: BaseSettings) -> None:
     os.execvp("torchrun", cmd)
 
 
-def parse_argv(config_cls: Type[T]) -> T:
+def parse_argv(config_cls: Type[LacunaConfig]) -> LacunaConfig:
     args = sys.argv[1:]
 
     if args and not args[0].startswith("--"):
         config_path = Path(args[0])
         cli_args = args[1:]
-
-        if not config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
 
         with open(config_path, "rb") as f:
             toml_data = tomllib.load(f)

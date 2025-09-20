@@ -48,7 +48,7 @@ def train(config: LacunaConfig) -> None:
         redline = Redline(model=model, seq_len=config.trainer.seq_len, world_size=world_size)
 
         start_step = 0
-        current_epoch = 0
+        epoch = 0
 
         if config.checkpoint.resume_from is not None:
             logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
@@ -64,11 +64,9 @@ def train(config: LacunaConfig) -> None:
         logger.info("Starting training!")
 
         for step in range(start_step, total_steps):
-            if config.trainer.epochs > 1:
-                epoch = step // dataset.length
-                if epoch > current_epoch:
-                    current_epoch = epoch
-                    dataset.set_epoch(epoch)
+            if step % dataset.length == 0:
+                epoch += 1
+                dataset.set_epoch(epoch)
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
@@ -107,7 +105,7 @@ def train(config: LacunaConfig) -> None:
                 metrics = redline.read()
 
                 log_training_metrics(step, current_loss, grad_norm, current_lr, metrics, run_dir)
-                log_wandb_metrics(current_loss, current_lr, grad_norm, step, metrics, wandb_run)
+                log_wandb_metrics(step, current_loss, grad_norm, current_lr, metrics, wandb_run)
 
             if config.checkpoint.save_every:
                 if step > 0 and step % config.checkpoint.save_every == 0:

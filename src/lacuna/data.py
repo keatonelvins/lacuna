@@ -45,12 +45,9 @@ class LacunaDataset:
         # TODO: figure out something better? like `with accelerator.main_process_first()`
         if dist.is_initialized() and not is_master():
             dist.barrier()
-        try:
-            self._dataset = self._build_dataset()
-        except Exception as e:
-            if dist.is_initialized() and is_master():
-                dist.barrier()
-            raise e
+
+        self._dataset = self._build_dataset()
+
         if dist.is_initialized() and is_master():
             dist.barrier()
 
@@ -102,7 +99,6 @@ class LacunaDataset:
             num_proc=self.config.data.num_proc,
             remove_columns=ds.column_names,
         ).with_format("torch")
-        self.config.data.fingerprint = ds._fingerprint
 
         return ds
 
