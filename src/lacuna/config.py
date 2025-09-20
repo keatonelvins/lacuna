@@ -15,8 +15,6 @@ class ModelConfig(BaseModel):
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or path")
     attention: Literal["FA3"] = Field("FA3", description="Attention implementation (FA3 only for now)")
-    accum_fp32: bool = Field(True, description="Enable fp32 accumulation for cross entropy loss")
-    liger: bool = Field(False, description="Enable Liger kernels")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
     compile_mode: Optional[Literal["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"]] = Field(
         None, description="Compile mode (if omitted, torch.compile will not be used)"

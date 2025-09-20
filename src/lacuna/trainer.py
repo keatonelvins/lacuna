@@ -49,7 +49,6 @@ def train(config: LacunaConfig) -> None:
 
         start_step = 0
         current_epoch = 0
-        accum_dtype = torch.float32 if config.model.accum_fp32 else torch.bfloat16
 
         if config.checkpoint.resume_from is not None:
             logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
@@ -87,7 +86,6 @@ def train(config: LacunaConfig) -> None:
 
             batch["labels"] = labels
             model_inputs = {k: v.cuda() for k, v in batch.items()}
-            model_inputs["accum_dtype"] = accum_dtype  # only used for Liger FLCE
 
             with autocast("cuda", dtype=torch.bfloat16):
                 outputs = model(**model_inputs)

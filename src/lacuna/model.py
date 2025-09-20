@@ -6,7 +6,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from kernels import kernelize, Mode
-from liger_kernel.transformers.monkey_patch import _apply_liger_kernel_to_instance
+from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
 from loguru import logger
 
 from .config import (
@@ -36,22 +36,12 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     )
     model.config.use_cache = False  # needed for ac to work
 
-    model = apply_liger_patches(model, config.model)
+    model.criterion = FusedLinearCrossEntropyLoss()
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config)
 
     model.train()
-
-    return model
-
-
-def apply_liger_patches(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Apply Liger kernel patches if enabled"""
-    if not config.liger:
-        return model
-
-    _apply_liger_kernel_to_instance(model)
 
     return model
 

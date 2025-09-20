@@ -5,20 +5,19 @@ description = "pretrain and finetune hf models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "torch>=2.8.0",
-    "datasets>=4.1.0",
-    "torchdata>=0.11.0",
-    "liger-kernel>=0.6.2",
-    "transformers>=4.56.1",
-    "kernels>=0.10.0",
-    "pydantic-settings>=2.10.1",
-    "wandb>=0.21.2",
+    "datasets>=4.1.1",
+    "fla-core>=0.3.2",
+    "kernels>=0.10.1",
     "loguru>=0.7.3",
-    "rich>=14.1.0",
-    "psutil>=7.0.0",
-    "s3fs>=2025.3.0",
-    "textual>=6.1.0",
     "nvidia-ml-py>=13.580.82",
+    "psutil>=7.1.0",
+    "pydantic-settings>=2.10.1",
+    "s3fs>=2025.9.0",
+    "textual>=6.1.0",
+    "torch>=2.8.0",
+    "torchdata>=0.11.0",
+    "transformers>=4.56.2",
+    "wandb>=0.22.0",
 ]
 
 [project.scripts]

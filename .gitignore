@@ -156,7 +156,7 @@ __marimo__/
 
 # LLMS
 .claude
-REFS/*
+refs/*
 CLAUDE.md
 TODO.md
 
