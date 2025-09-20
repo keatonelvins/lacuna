@@ -109,7 +109,7 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
     cpu_offload_policy = CPUOffloadPolicy() if config.dist.cpu_offload else None
 
-    # TODO: can be optimized further (see prime-rl)
+    # TODO: can be optimized further for head/embeddings (see prime-rl)
     for i, block in enumerate(model.model.layers):
         # Last block: don't reshard since FSDP prefetches
         reshard = i < len(model.model.layers) - 1

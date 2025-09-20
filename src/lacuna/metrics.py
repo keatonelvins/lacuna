@@ -19,6 +19,7 @@ def get_peak_flops(device_name: str) -> int:
         return 312e12
 
 
+# TODO: this is super approximate, should add per-model calculations
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
     """Get parameter count and FLOPs/token at seq_len."""
     config = model.config

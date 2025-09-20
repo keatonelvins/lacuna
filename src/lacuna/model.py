@@ -37,7 +37,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     model.config.use_cache = False  # needed for ac to work
 
     # TODO: reference flame for order of patches
-    model.criterion = FusedLinearCrossEntropyLoss()
+    model.criterion = FusedLinearCrossEntropyLoss()  # NOTE: may need to be careful with TP
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config)
