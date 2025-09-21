@@ -1,11 +1,7 @@
 # lacuna docs
 
-Seeing smaller labs use `torchtitan` for pretraining and `axolotl` for post-training. These are awesome!
-
-`lacuna` came from using these (and other frameworks) and not really understanding how they worked under the hood.
-
 ## Order of model builder
-Liger/Kernelize -> AC -> torch.compile -> FSDP
+Kernelize -> AC -> torch.compile -> FSDP
 - Model patches always happens first
 - Compile wrapped AC: compile already recomputes with the min-cut partitioner, so wrapping AC over a compiled region might mean multiple recomputations
     - see https://pytorch.org/blog/activation-checkpointing-techniques/ for more info
@@ -15,8 +11,7 @@ Liger/Kernelize -> AC -> torch.compile -> FSDP
 - Don't apply weight decay to embeddings/layer norms/biases (https://github.com/karpathy/minGPT/pull/24#issuecomment-679316025)
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
 - For FSDP, we fully shard the layers individually, then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
-- We default to fp32 accumulation (`accum_dtype=torch.float32`) for stability reasons (at the cost of some speed/memory):
-    - For Liger Kernel, can pass through starting in `0.6.2`: https://github.com/linkedin/Liger-Kernel/pull/830
+- Use fp32 for accum! Liger Kernel doesn't do this by default, but our FLCE comes from fla-core which does (in liger 0.6.2 you can pass through accum_dtype)
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking
     - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!
