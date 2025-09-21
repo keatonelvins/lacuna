@@ -25,7 +25,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 from .config import LacunaConfig
 from .data import get_tokenizer
 from .distributed import is_master
-from .utils import save_settings_json
+from .utils import save_settings
 
 
 # ref: https://docs.pytorch.org/tutorials/recipes/distributed_async_checkpoint_recipe.html
@@ -116,7 +116,7 @@ def save_checkpoint(
         logger.info(f"Saving final checkpoint in HF format to {path}")
         save_hf_weights_dtensor(model, path)
 
-    save_settings_json(path, config)
+    save_settings(path, config)
 
 
 def load_checkpoint(

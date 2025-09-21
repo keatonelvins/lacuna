@@ -26,7 +26,7 @@ def setup_env(config: LacunaConfig) -> Path:
 
     run_dir = setup_run_dir()
     setup_logger(run_dir)
-    save_settings_json(run_dir, config)
+    save_settings(run_dir, config)
     config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
 
     return run_dir
@@ -102,7 +102,7 @@ def save_metrics_jsonl(run_dir: Path, step: int, loss: float, grad_norm: float, 
 
 
 @master_only
-def save_settings_json(path: Path, config: LacunaConfig) -> None:
+def save_settings(path: Path, config: LacunaConfig) -> None:
     path.mkdir(parents=True, exist_ok=True)
     with (path / "settings.json").open("w") as f:
         f.write(config.model_dump_json(indent=4))
