@@ -1,11 +1,11 @@
 """Core training loop."""
 
+import time
 import torch
 from loguru import logger
 from torch.amp import autocast
 from torchtitan.tools import utils
 from torch.distributed.elastic.multiprocessing.errors import record
-from torchtitan.components.metrics import build_metrics_processor
 from torchtitan.distributed.utils import clip_grad_norm_ as clip
 
 from .checkpoint import save_checkpoint
@@ -14,7 +14,7 @@ from .data import LacunaDataset
 from .scheduler import setup_scheduler
 from .model import setup_model
 from .optim import setup_optimizer
-from .utils import display_config, log_training_metrics, setup_env, cleanup_env, calculate_model_flops
+from .utils import display_config, log_training_metrics, setup_env, cleanup_env, setup_metrics_processor
 from .wandb import init_wandb, log_wandb_metrics, finish
 from .distributed import get_world_size, init_dist, setup_dist, destroy_dist
 
@@ -50,9 +50,7 @@ def train(config: LacunaConfig) -> None:
 
         optimizer = setup_optimizer(model, config)
         scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
-
-        metric_logger = build_metrics_processor()
-        metric_logger.num_flops_per_token = calculate_model_flops(model, config.trainer.seq_len)
+        metrics_processor = setup_metrics_processor(config, model)
 
         step, epoch = 0, 0
 
@@ -69,15 +67,6 @@ def train(config: LacunaConfig) -> None:
 
         logger.info("Starting training!")
 
-        # with (
-        #     maybe_enable_profiling(
-        #         job_config, global_step=train_state.step
-        #     ) as torch_profiler,
-        #     maybe_enable_memory_snapshot(
-        #         job_config, global_step=train_state.step
-        #     ) as memory_profiler,
-        # ):
-
         while step < total_steps:
             step += 1
             if step % dataset.length == 0:
@@ -87,7 +76,11 @@ def train(config: LacunaConfig) -> None:
             gc_handler.run(step)
             optimizer.zero_grad()
 
+            data_load_start = time.perf_counter()
             batch = next(data_iter)
+            ntokens_batch = batch["input_ids"].numel()
+            metrics_processor.ntokens_since_last_log += ntokens_batch
+            metrics_processor.data_loading_times.append(time.perf_counter() - data_load_start)
 
             labels = batch["input_ids"].clone()
             labels[batch["position_ids"] == 0] = -100  # mask document boundaries
@@ -114,6 +107,7 @@ def train(config: LacunaConfig) -> None:
                 current_lr = scheduler.get_last_lr()[0]
                 current_loss = loss.item()  # TODO: this is local loss
 
+                metrics_processor.update()
                 log_training_metrics(step, current_loss, grad_norm, current_lr, run_dir)
                 log_wandb_metrics(step, current_loss, grad_norm, current_lr, wandb_run)
 
@@ -128,18 +122,6 @@ def train(config: LacunaConfig) -> None:
                         scheduler=scheduler,
                         dataloader=dataset.dataloader,
                     )
-
-            # if torch_profiler:
-            #     torch_profiler.step()
-            # if memory_profiler:
-            #     memory_profiler.step()
-
-            # after first step, can reduce pg timeout for faster feedback
-            # if train_state.step == 1:
-            #     dist_utils.set_pg_timeouts(
-            #         timeout=timedelta(seconds=job_config.comm.train_timeout_seconds),
-            #         world_mesh=world_mesh,
-            #     )
 
         save_checkpoint(
             step=step,

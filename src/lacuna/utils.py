@@ -1,5 +1,6 @@
 """Misc utils for trainer and data."""
 
+import time
 import json
 import torch
 import numpy as np
@@ -11,6 +12,8 @@ from loguru import logger
 from rich.pretty import Pretty
 from rich.console import Console
 from collections import defaultdict, deque
+from torchtitan.components.metrics import build_device_memory_monitor
+from torchtitan.tools.utils import get_peak_flops
 
 from .distributed import is_master
 from .config import LacunaConfig
@@ -136,6 +139,57 @@ def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, in
     flops_per_token = 6 * num_params + attn_flops
 
     return int(flops_per_token)
+
+
+# ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/components/metrics.py
+class MetricsProcessor:
+    def __init__(self, config: LacunaConfig):
+        self.config = config
+        self.device_memory_monitor = build_device_memory_monitor()
+        self.gpu_peak_flops = get_peak_flops(self.device_memory_monitor.device_name)
+        self.ntokens_since_last_log = 0
+        self.data_loading_times = []
+        self.time_last_log = time.perf_counter()
+        self.device_memory_monitor.reset_peak_stats()
+
+    def update(self):
+        time_delta = time.perf_counter() - self.time_last_log
+        tps = self.ntokens_since_last_log / time_delta
+        mfu = 100 * self.num_flops_per_token * tps / self.gpu_peak_flops
+        tflops = self.num_flops_per_token * tps / 1e12
+        time_end_to_end = time_delta / self.config.metrics.log_every
+        time_data_loading = sum(self.data_loading_times) / len(self.data_loading_times)
+        time_data_loading_pct = 100 * sum(self.data_loading_times) / time_delta
+        device_mem_stats = self.device_memory_monitor.get_peak_stats()
+
+        metrics = {
+            "throughput(tps)": tps,
+            "tflops": tflops,
+            "mfu(%)": mfu,
+            "time_metrics/end_to_end(s)": time_end_to_end,
+            "time_metrics/data_loading(s)": time_data_loading,
+            "time_metrics/data_loading(%)": time_data_loading_pct,
+            "memory/max_active(GiB)": device_mem_stats.max_active_gib,
+            "memory/max_active(%)": device_mem_stats.max_active_pct,
+            "memory/max_reserved(GiB)": device_mem_stats.max_reserved_gib,
+            "memory/max_reserved(%)": device_mem_stats.max_reserved_pct,
+            "memory/num_alloc_retries": device_mem_stats.num_alloc_retries,
+            "memory/num_ooms": device_mem_stats.num_ooms,
+        }
+
+        self.ntokens_since_last_log = 0
+        self.data_loading_times.clear()
+        self.time_last_log = time.perf_counter()
+        self.device_memory_monitor.reset_peak_stats()
+
+        return metrics
+
+
+def setup_metrics_processor(config: LacunaConfig, model: torch.nn.Module) -> MetricsProcessor:
+    """Setup metrics processor for training."""
+    processor = MetricsProcessor(config)
+    processor.num_flops_per_token = calculate_model_flops(model, config.trainer.seq_len)
+    return processor
 
 
 # some gpt-5 code for bfd packing

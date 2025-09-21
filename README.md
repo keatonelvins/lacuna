@@ -2,8 +2,6 @@
 
 Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
 
-Seeing how far we can push HF modeling code!
-
 ## Quick Start
 
 ```bash

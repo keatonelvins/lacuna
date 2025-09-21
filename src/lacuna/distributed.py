@@ -33,7 +33,9 @@ def init_dist(config: LacunaConfig) -> None:
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
 
-    dist.init_process_group(backend=backend, device_id=local_rank)  # TODO: maybe we want to set timeout? default is 10 mins
+    dist.init_process_group(
+        backend=backend, device_id=local_rank
+    )  # TODO: maybe we want to set timeout? can reduce after first step
 
 
 def destroy_dist() -> None:
