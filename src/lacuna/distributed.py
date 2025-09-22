@@ -98,8 +98,7 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
 
 
 def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
-    world_size = get_world_size()
-    if world_size == 1:
+    if get_world_size() == 1:
         return model.cuda()
 
     mesh = get_dp_mesh(config)

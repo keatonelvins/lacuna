@@ -10,7 +10,6 @@ from torch.distributed.checkpoint import (
     FileSystemReader,
     FileSystemWriter,
     HuggingFaceStorageReader,
-    # HuggingFaceStorageWriter,
 )
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
@@ -106,8 +105,8 @@ def save_checkpoint(
     tokenizer = get_tokenizer(config)
     tokenizer.save_pretrained(path)
 
-    if not final or config.checkpoint.resumable_final_save:
-        logger.info(f"Saving resumable checkpoint to {path}")
+    if not final:
+        logger.info(f"Saving checkpoint to {path}")
         trainer_state = TrainerState(model, optimizer, scheduler, dataloader)
         writer = FileSystemWriter(str(path))
         state_dict = {"trainer": trainer_state}
@@ -115,6 +114,8 @@ def save_checkpoint(
     else:
         logger.info(f"Saving final checkpoint in HF format to {path}")
         save_hf_weights_dtensor(model, path)
+        # writer = HuggingFaceStorageWriter(str(path))
+        # dcp.save(unwrapped_model.state_dict(), storage_writer=writer)
 
     save_settings(path, config)
 

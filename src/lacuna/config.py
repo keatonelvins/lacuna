@@ -90,7 +90,6 @@ class CheckpointConfig(BaseModel):
     save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
     save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
-    resumable_final_save: bool = Field(False, description="Make the final save resumable by storing optimizer state")
 
     def prepare_save_dir(self) -> None:
         """Clear save_dir if not resuming from checkpoint."""

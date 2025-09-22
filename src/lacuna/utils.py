@@ -186,7 +186,6 @@ class MetricsProcessor:
 
 
 def setup_metrics_processor(config: LacunaConfig, model: torch.nn.Module) -> MetricsProcessor:
-    """Setup metrics processor for training."""
     processor = MetricsProcessor(config)
     processor.num_flops_per_token = calculate_model_flops(model, config.trainer.seq_len)
     return processor

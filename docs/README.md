@@ -2,7 +2,6 @@
 
 ## Order of model builder
 Kernelize -> AC -> torch.compile -> FSDP
-- Model patches always happens first
 - Compile wrapped AC: compile already recomputes with the min-cut partitioner, so wrapping AC over a compiled region might mean multiple recomputations
     - see https://pytorch.org/blog/activation-checkpointing-techniques/ for more info
 - torch.compile before FSDP, otherwise FSDP2 wrapped modules would cause graph breaks

@@ -60,6 +60,7 @@ class LacunaDataset:
             drop_last=True,
             seed=config.trainer.seed,
         )
+        # TODO: test snapshot_every_n_steps and spawn for multiprocessing_context
         self.dataloader = StatefulDataLoader(
             self._dataset,
             drop_last=True,
@@ -80,20 +81,19 @@ class LacunaDataset:
 
     def _build_dataset(self):
         """Master process does all hf hub calls and builds dataset. Other processses wait then load from local cache."""
-        encode = partial(_encode, tokenizer=get_tokenizer(self.config), column=self.config.data.column)
-        pack = partial(pack_bfd, seq_len=self.config.trainer.seq_len)
+        tokenizer = get_tokenizer(self.config)
         ds = concatenate_datasets(self._load_datasets())
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
         ds = ds.map(
-            encode,
+            partial(_encode, tokenizer=tokenizer, column=self.config.data.column),
             batched=True,
             num_proc=self.config.data.num_proc,
             batch_size=self.config.data.map_bs,
             remove_columns=ds.column_names,
         ).with_format("arrow")
         ds = ds.map(
-            pack,
+            partial(pack_bfd, seq_len=self.config.trainer.seq_len),
             batched=True,
             batch_size=self.config.data.pack_bs,
             num_proc=self.config.data.num_proc,
