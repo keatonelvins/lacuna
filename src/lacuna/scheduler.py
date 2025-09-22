@@ -1,5 +1,6 @@
 """Learning rate scheduler setup."""
 
+from loguru import logger
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, LRScheduler, SequentialLR
 
@@ -14,6 +15,7 @@ def setup_scheduler(optimizer: Optimizer, config: SchedulerConfig, total_steps: 
 
     decay_start_step = total_steps - decay_steps
     constant_steps = decay_start_step - warmup_steps
+    logger.info(f"Warmup steps: {warmup_steps}, Constant steps: {constant_steps}, Decay steps: {decay_steps}")
 
     schedulers = []
     milestones = []

@@ -100,7 +100,7 @@ class CheckpointConfig(BaseModel):
 class MetricsConfig(BaseModel):
     """Metrics and logging config"""
 
-    log_every: int = Field(10, gt=0, description="Steps between log outputs")
+    log_every: int = Field(1, gt=0, description="Steps between log outputs")
 
 
 class TorchrunConfig(BaseModel):
