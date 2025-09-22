@@ -17,7 +17,7 @@ class AutoLacunaModelForCausalLM(_BaseAutoModelClass):
     _model_mapping = _CUSTOM_CAUSAL_LM_MAPPING
 
 
-AutoModelForCausalLMPrimeRL = auto_class_update(AutoLacunaModelForCausalLM, head_doc="shhh don't tell arthur")
+AutoLacunaModelForCausalLM = auto_class_update(AutoLacunaModelForCausalLM, head_doc="shhh don't tell arthur")
 
 
 __all__ = ["AutoLacunaModelForCausalLM"]
