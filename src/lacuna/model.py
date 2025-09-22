@@ -1,19 +1,20 @@
 """Model setup and optimization utils."""
 
 import torch
+from loguru import logger
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
-from transformers import PreTrainedModel, AutoModelForCausalLM
 from kernels import kernelize, Mode
-from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
-from loguru import logger
+from transformers import PreTrainedModel, AutoModelForCausalLM
+
 
 from .config import (
     ActivationCheckpointConfig,
     ModelConfig,
     LacunaConfig,
 )
+from .models import AutoLacunaModelForCausalLM
 
 ATTN_IMPL_MAP = {
     "FA3": "kernels-community/flash-attn3",
@@ -29,15 +30,18 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
 
-    model = AutoModelForCausalLM.from_pretrained(
+    if config.model.use_lacuna:
+        model_factory = AutoLacunaModelForCausalLM
+    else:
+        model_factory = AutoModelForCausalLM
+
+    model = model_factory.from_pretrained(
         model_path,
         dtype=torch.bfloat16,
         attn_implementation=ATTN_IMPL_MAP[config.model.attention],
     )
     model.config.use_cache = False  # needed for ac to work
 
-    # TODO: reference flame for order of patches
-    model.criterion = FusedLinearCrossEntropyLoss()  # NOTE: may need to be careful with TP
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config)
