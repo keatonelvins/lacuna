@@ -78,6 +78,8 @@ def setup_run_dir() -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
 
     active_link = Path(".lacuna_cache/active_run")
+    if active_link.exists():
+        active_link.unlink()
     active_link.symlink_to(run_dir.relative_to(active_link.parent))
 
     return run_dir

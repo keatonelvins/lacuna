@@ -7,6 +7,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 from kernels import kernelize, Mode
 from transformers import PreTrainedModel, AutoModelForCausalLM
+from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
 
 
 from .config import (
@@ -42,6 +43,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     )
     model.config.use_cache = False  # needed for ac to work
 
+    model.criterion = FusedLinearCrossEntropyLoss()
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config)

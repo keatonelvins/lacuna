@@ -1,5 +1,5 @@
 """
-Usage: uv run scripts/hf_to_lacuna.py keatone/Qwen3-MoE-Tiny --push
+Usage: uv run scripts/hf_to_lacuna.py Qwen/Qwen3-30B-A3B-Base keatone/Qwen3-30B-A3B-Base-Lacuna --push
 """
 
 import re
@@ -8,7 +8,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
 
 model_name = sys.argv[1]
-output_model_name = f"{model_name}-Lacuna"
+output_model_name = sys.argv[2]
 push = "--push" in sys.argv
 
 model = AutoModelForCausalLM.from_pretrained(model_name)
