@@ -7,7 +7,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 from kernels import kernelize, Mode
 from transformers import PreTrainedModel, AutoModelForCausalLM
-from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
+from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
 
 
 from .config import (
@@ -31,8 +31,10 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
 
-    if config.model.use_lacuna:
+    if config.model.backend == "lacuna":
         model_factory = AutoLacunaModelForCausalLM
+    elif config.model.backend == "liger":
+        model_factory = AutoLigerKernelForCausalLM
     else:
         model_factory = AutoModelForCausalLM
 
@@ -43,7 +45,6 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     )
     model.config.use_cache = False  # needed for ac to work
 
-    model.criterion = FusedLinearCrossEntropyLoss()
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
     model = apply_torch_compile(model, config)

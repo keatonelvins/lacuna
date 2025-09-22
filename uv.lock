@@ -543,6 +543,7 @@ dependencies = [
     { name = "datasets" },
     { name = "fla-core" },
     { name = "kernels" },
+    { name = "liger-kernel" },
     { name = "loguru" },
     { name = "nvidia-ml-py" },
     { name = "pydantic-settings" },
@@ -568,6 +569,7 @@ requires-dist = [
     { name = "datasets", specifier = ">=4.1.1" },
     { name = "fla-core", specifier = ">=0.3.2" },
     { name = "kernels", specifier = ">=0.10.1" },
+    { name = "liger-kernel", specifier = ">=0.6.2" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "nvidia-ml-py", specifier = ">=13.580.82" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
@@ -586,6 +588,19 @@ dev = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.12.11" },
     { name = "ty", specifier = ">=0.0.1a19" },
+]
+
+[[package]]
+name = "liger-kernel"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch" },
+    { name = "triton" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/31/23/be0b4dcac42d77f99406c906567cde22a7a3d71b3f3ffdfda2ac6153ec36/liger_kernel-0.6.2.tar.gz", hash = "sha256:5c5bcffffa769bc26ae838f5a4954170dd5cacde036abb1b383039f39fa5fd69", size = 3679495, upload-time = "2025-08-22T00:15:28.456Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/2c/68d992835e8630c1b94cdcb246ea7eecad790a955037ca3f19b6c01e8215/liger_kernel-0.6.2-py3-none-any.whl", hash = "sha256:303b9bbf5c10f9289c3139afb41e4d989e8c809516624a106b89b064163d971d", size = 192815, upload-time = "2025-08-22T00:15:27.04Z" },
 ]
 
 [[package]]
@@ -1831,7 +1846,7 @@ name = "triton"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools", marker = "sys_platform == 'linux'" },
+    { name = "setuptools" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/66/b1eb52839f563623d185f0927eb3530ee4d5ffe9d377cdaf5346b306689e/triton-3.4.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:31c1d84a5c0ec2c0f8e8a072d7fd150cab84a9c239eaddc6706c081bfae4eb04", size = 155560068, upload-time = "2025-07-30T19:58:37.081Z" },

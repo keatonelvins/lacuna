@@ -13,7 +13,7 @@ class ModelConfig(BaseModel):
     """Modeling and patching config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or (local?) path")
-    use_lacuna: bool = Field(False, description="Use lacuna modeling code (default is native HuggingFace)")
+    backend: Literal["hf", "lacuna", "liger"] = Field("hf", description="Modeling backend")
     attention: Literal["FA3"] = Field("FA3", description="Attention backend (FA3 only for now)")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
     compile_mode: Literal["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"] = Field(

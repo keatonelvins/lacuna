@@ -90,12 +90,16 @@ def train(config: LacunaConfig) -> None:
             if config.model.compile_mode in ["reduce-overhead", "max-autotune"]:
                 torch.compiler.cudagraph_mark_step_begin()
 
+            model_inputs = {
+                "input_ids": batch["input_ids"].cuda(),
+                "position_ids": batch["position_ids"].cuda(),
+                "labels": labels.cuda(),
+            }
+            if config.model.backend == "liger":
+                model_inputs["accum_dtype"] = torch.float32  # force fp32 accum
+
             with autocast("cuda", dtype=torch.bfloat16):
-                outputs = model(
-                    input_ids=batch["input_ids"].cuda(),
-                    position_ids=batch["position_ids"].cuda(),
-                    labels=labels.cuda(),
-                )
+                outputs = model(**model_inputs)
                 loss = outputs.loss
 
             loss.backward()
