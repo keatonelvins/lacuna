@@ -69,6 +69,12 @@ class DataConfig(StrictModel):
         return chat_template
 
 
+class EvalsConfig(StrictModel):
+    """Evals config"""
+
+    datasets: list[DatasetConfig] = Field(default_factory=list, description="Datasets to use for eval")
+
+
 class OptimizerConfig(StrictModel):
     """Optimizer config"""
 
@@ -147,6 +153,7 @@ class LacunaConfig(BaseSettings):
 
     model: ModelConfig = ModelConfig()
     data: DataConfig = DataConfig()
+    evals: EvalsConfig = EvalsConfig()
     trainer: TrainerConfig = TrainerConfig()
     optimizer: OptimizerConfig = OptimizerConfig()
     scheduler: SchedulerConfig = SchedulerConfig()

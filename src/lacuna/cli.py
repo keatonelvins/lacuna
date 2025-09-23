@@ -49,7 +49,7 @@ def parse_argv() -> LacunaConfig:
         toml_data = {}
         cli_args = args
 
-    config = LacunaConfig(**toml_data, _cli_parse_args=cli_args)
+    config = LacunaConfig(**toml_data, _cli_parse_args=cli_args, _cli_implicit_flags=True)
 
     # if multi-gpu and haven't already launched torchrun, launch it
     if torch.cuda.device_count() > 1 and "RANK" not in os.environ:

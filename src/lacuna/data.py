@@ -8,7 +8,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .utils import pack_bfd
-from .config import LacunaConfig
+from .config import LacunaConfig, DatasetConfig
 from .distributed import get_rank, get_world_size, is_master, get_dp_params
 
 
@@ -38,8 +38,9 @@ def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
 
 
 class LacunaDataset:
-    def __init__(self, config: LacunaConfig):
+    def __init__(self, config: LacunaConfig, datasets: list[DatasetConfig] | None = None):
         self.config = config
+        self.datasets = datasets or self.config.data.datasets
 
         if dist.is_initialized():
             if is_master():
@@ -78,7 +79,7 @@ class LacunaDataset:
                 num_proc=self.config.data.num_proc,
                 download_mode="force_redownload" if self.config.data.redownload else None,
             )
-            for dataset in self.config.data.datasets
+            for dataset in self.datasets
         ]
 
     def _build_dataset(self):
