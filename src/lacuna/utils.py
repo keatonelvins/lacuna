@@ -130,9 +130,8 @@ def log_training_metrics(
         save_metrics_jsonl(run_dir, step, loss, grad_norm, lr)
 
 
-# TODO: this is super approximate, should add per-model calculations
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
-    """Get parameter count and FLOPs/token at seq_len."""
+    """Get parameter count and FLOPs/token at seq_len (very approximate currently)."""
     config = model.config
     num_params = sum(p.numel() for p in model.parameters())
     head_dim = config.hidden_size // config.num_attention_heads

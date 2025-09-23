@@ -34,9 +34,7 @@ def init_dist(config: LacunaConfig) -> None:
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
 
-    dist.init_process_group(
-        backend=backend, device_id=local_rank
-    )  # TODO: maybe we want to set timeout? can reduce after first step
+    dist.init_process_group(backend=backend, device_id=local_rank)
 
 
 def destroy_dist() -> None:
@@ -113,27 +111,14 @@ def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> tuple[PreTrained
 
 def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
-    cpu_offload_policy = CPUOffloadPolicy() if config.dist.cpu_offload else None
+    offload = CPUOffloadPolicy() if config.dist.cpu_offload else None
 
-    # TODO: can be optimized further for head/embeddings (see prime-rl)
     for i, block in enumerate(model.model.layers):
-        # Last block: don't reshard since FSDP prefetches
+        # last block, don't reshard since FSDP prefetches (see docs)
         reshard = i < len(model.model.layers) - 1
-        fully_shard(
-            block,
-            mesh=mesh,
-            mp_policy=mp_policy,
-            offload_policy=cpu_offload_policy,
-            reshard_after_forward=reshard,
-        )
+        fully_shard(block, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=reshard)
 
-    model = fully_shard(
-        model,
-        mesh=mesh,
-        mp_policy=mp_policy,
-        offload_policy=cpu_offload_policy,
-        reshard_after_forward=False,
-    )
+    model = fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=False)
 
     logger.info(f"Model sharding complete (cpu_offload={config.dist.cpu_offload})")
     return model

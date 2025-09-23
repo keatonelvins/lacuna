@@ -64,7 +64,6 @@ class TrainerState(Stateful):
         self.dataloader.load_state_dict(state_dict["dataloader"])
 
 
-# TODO: remove in torch 2.9.0 and use HuggingFaceStorageWriter
 def save_hf_weights_dtensor(
     model: torch.nn.Module,
     output_dir: Path,

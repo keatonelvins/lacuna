@@ -1,6 +1,5 @@
 """Data loading, tokenization, and packing for training."""
 
-from loguru import logger
 from functools import partial
 from torch import distributed as dist
 from torch.utils.data import DistributedSampler
@@ -22,10 +21,9 @@ def _encode(examples, tokenizer, column):
         )
         return {"input_ids": out["input_ids"], "assistant_masks": out["assistant_masks"]}
     else:
+        assert "qwen" in tokenizer.name_or_path.lower(), "need to check if glm uses bos"
         input_ids = tokenizer(examples[column]).input_ids
-        return {
-            "input_ids": [ids + [tokenizer.eos_token_id] for ids in input_ids]
-        }  # TODO: models outside qwen family may need bos
+        return {"input_ids": [ids + [tokenizer.eos_token_id] for ids in input_ids]}
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
@@ -34,8 +32,7 @@ def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
         tokenizer.chat_template = config.data.chat_template
     if config.data.eos_token:
         added = tokenizer.add_special_tokens({"eos_token": config.data.eos_token})
-        if added > 0:  # TODO: if not in vocab already, need to resize token embeddings (to multiple of 32)
-            logger.error(f"{config.data.eos_token} was not already a special token!")
+        assert added == 0, "eos token was not already a special token! resizing unsupported atm"
 
     return tokenizer
 

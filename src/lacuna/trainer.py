@@ -82,7 +82,6 @@ def train(config: LacunaConfig) -> None:
             metrics_processor.data_loading_times.append(time.perf_counter() - data_load_start)
 
             labels = batch["input_ids"].clone()
-            labels[batch["position_ids"] == 0] = -100  # mask document boundaries
             if "assistant_masks" in batch:
                 labels[batch["assistant_masks"] == 0] = -100  # mask non-assistant tokens
 
