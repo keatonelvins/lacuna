@@ -100,9 +100,8 @@ def save_checkpoint(
     path = config.checkpoint.save_dir / ckpt_name
 
     unwrapped_model = model.module if hasattr(model, "module") else model
-    unwrapped_model.config.save_pretrained(path)
-    tokenizer = get_tokenizer(config)
-    tokenizer.save_pretrained(path)
+    if is_master():
+        get_tokenizer(config).save_pretrained(path)
 
     if not final:
         logger.info(f"Saving checkpoint to {path}")
