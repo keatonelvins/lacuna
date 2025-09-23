@@ -112,7 +112,7 @@ def save_checkpoint(
         dcp.save(state_dict, storage_writer=writer)
     else:
         logger.info(f"Saving final checkpoint in HF format to {path}")
-        save_hf_weights_dtensor(model, path)
+        save_hf_weights_dtensor(unwrapped_model, path)
         # writer = HuggingFaceStorageWriter(str(path))
         # dcp.save(unwrapped_model.state_dict(), storage_writer=writer)
 
