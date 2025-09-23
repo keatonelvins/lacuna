@@ -83,6 +83,7 @@ def save_hf_weights_dtensor(
         dist.barrier(device_ids=[torch.cuda.current_device()])
 
     if is_master():
+        model.config.architectures = [model.__class__.__name__.removeprefix("FSDP")] # TODO: can remove in next release
         model.save_pretrained(output_dir, state_dict=cpu_state)
 
 
@@ -99,7 +100,6 @@ def save_checkpoint(
     ckpt_name = "final" if final else f"step_{step}"
     path = config.checkpoint.save_dir / ckpt_name
 
-    unwrapped_model = model.module if hasattr(model, "module") else model
     if is_master():
         get_tokenizer(config).save_pretrained(path)
 
@@ -111,9 +111,9 @@ def save_checkpoint(
         dcp.save(state_dict, storage_writer=writer)
     else:
         logger.info(f"Saving final checkpoint in HF format to {path}")
-        save_hf_weights_dtensor(unwrapped_model, path)
+        save_hf_weights_dtensor(model, path)
         # writer = HuggingFaceStorageWriter(str(path))
-        # dcp.save(unwrapped_model.state_dict(), storage_writer=writer)
+        # dcp.save(model.state_dict(), storage_writer=writer)
 
     save_settings(path, config)
 
