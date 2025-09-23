@@ -34,5 +34,6 @@ def setup_optimizer(model: PreTrainedModel, config: LacunaConfig) -> Optimizer:
         get_optimizer_params(model, config),
         lr=config.optimizer.lr,
         betas=config.optimizer.betas,
+        eps=config.optimizer.eps,
         fused=True,
     )

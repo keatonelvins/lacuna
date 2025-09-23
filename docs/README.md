@@ -11,6 +11,7 @@ Kernelize -> AC -> torch.compile -> FSDP
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
 - For FSDP, we fully shard the layers individually, then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
 - Use fp32 for accum! Liger Kernel doesn't do this by default, but our FLCE comes from fla-core which does (in liger 0.6.2 you can pass through accum_dtype)
+- AdamW params taken from https://arxiv.org/pdf/2509.02046 but you should tune!!
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking
     - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!

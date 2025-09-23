@@ -81,7 +81,8 @@ class OptimizerConfig(StrictModel):
     type: Literal["adamw"] = Field("adamw", description="Optimizer type (adamw only for now)")
     lr: float = Field(3e-4, gt=0, description="Peak learning rate")
     weight_decay: float = Field(0.01, ge=0, description="Weight decay (not applied to embeddings etc.)")
-    betas: tuple[float, float] = Field((0.9, 0.95), description="Adam betas")
+    betas: tuple[float, float] = Field((0.9, 0.98), description="Adam betas")
+    eps: float = Field(1e-10, ge=0, description="Adam eps")
     max_norm: float = Field(1.0, gt=0, description="Gradient clipping norm ")
 
 
