@@ -59,7 +59,6 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
     if ac_config.stride == 0:
         return model
 
-    # TODO: may need SAC for MoE's
     for idx, layer in enumerate(model.model.layers):
         if idx % ac_config.stride == 0:
             model.model.layers[idx] = checkpoint_wrapper(layer)

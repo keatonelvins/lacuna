@@ -57,7 +57,6 @@ class LacunaDataset:
             drop_last=True,
             seed=config.trainer.seed,
         )
-        # TODO: test snapshot_every_n_steps and spawn for multiprocessing_context
         self.dataloader = StatefulDataLoader(
             self._dataset,
             drop_last=True,

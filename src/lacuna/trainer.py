@@ -7,7 +7,7 @@ from torchtitan.tools import utils
 from torch.distributed.elastic.multiprocessing.errors import record
 from torchtitan.distributed.utils import clip_grad_norm_ as clip
 
-from .checkpoint import save_checkpoint
+from .checkpoint import save_checkpoint, load_checkpoint
 from .config import LacunaConfig
 from .data import LacunaDataset
 from .scheduler import setup_scheduler
@@ -55,14 +55,13 @@ def train(config: LacunaConfig) -> None:
 
         if config.checkpoint.resume_from is not None:
             logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
-            # TODO: Fix load_checkpoint to return step
-            # step = load_checkpoint(
-            #     model=model,
-            #     optimizer=optimizer,
-            #     scheduler=scheduler,
-            #     dataloader=dataloader,
-            #     path=config.checkpoint.resume_from,
-            # )
+            load_checkpoint(
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                dataloader=dataset.dataloader,
+                path=config.checkpoint.resume_from,
+            )
 
         logger.info("Starting training!")
 
