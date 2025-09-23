@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from .utils import pack_bfd
 from .config import LacunaConfig
-from .distributed import get_rank, get_world_size, is_master
+from .distributed import get_rank, get_world_size, is_master, get_dp_params
 
 
 def _encode(examples, tokenizer, column):
@@ -48,11 +48,17 @@ class LacunaDataset:
 
         self._dataset = self._build_dataset()
 
-        # TODO: use dp_replicate and dp_shard
+        num_replicas, rank = get_world_size(), get_rank()
+        dp_replicate, dp_shard = get_dp_params(config)
+
+        if dp_replicate > 1 and dp_shard > 1:
+            num_replicas = dp_replicate
+            rank = rank // dp_shard
+
         self.sampler = DistributedSampler(
             self._dataset,
-            num_replicas=get_world_size(),
-            rank=get_rank(),
+            num_replicas=num_replicas,
+            rank=rank,
             shuffle=True,
             drop_last=True,
             seed=config.trainer.seed,

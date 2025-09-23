@@ -72,16 +72,26 @@ def set_seed(seed: int) -> int:
     return seed
 
 
-def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
+def get_dp_params(config: LacunaConfig) -> tuple[int, int]:
     world_size = get_world_size()
     if world_size == 1:
-        return None
+        return 1, 1
 
     rep = config.dist.dp_replicate or config.torchrun.nnodes
     shard = config.dist.dp_shard or config.torchrun.nproc_per_node
 
     if rep * shard != world_size:
         raise ValueError(f"dp_replicate x dp_shard={rep} x {shard} != world_size={world_size}")
+
+    return rep, shard
+
+
+def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
+    world_size = get_world_size()
+    if world_size == 1:
+        return None
+
+    rep, shard = get_dp_params(config)
 
     if rep > 1 and shard > 1:
         mode, mesh = "HSDP", init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
