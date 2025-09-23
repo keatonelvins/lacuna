@@ -5,11 +5,15 @@ import shutil
 import torch
 from pathlib import Path
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 
-class ModelConfig(BaseModel):
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModelConfig(StrictModel):
     """Modeling and patching config"""
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or (local?) path")
@@ -21,7 +25,7 @@ class ModelConfig(BaseModel):
     )
 
 
-class TrainerConfig(BaseModel):
+class TrainerConfig(StrictModel):
     """Training loop config"""
 
     seed: int = Field(42, description="Global seed")
@@ -30,7 +34,7 @@ class TrainerConfig(BaseModel):
     steps: int = Field(None, gt=0, description="Max training steps (overrides epochs, must be < dataset.length)")
 
 
-class DatasetConfig(BaseModel):
+class DatasetConfig(StrictModel):
     """Dataset config (matching datasets.load_dataset API)"""
 
     path: str = Field("keatone/TinierStories", description="Name or path or builder type of the dataset")
@@ -40,7 +44,7 @@ class DatasetConfig(BaseModel):
     split: str = Field("train", description="Split to use")
 
 
-class DataConfig(BaseModel):
+class DataConfig(StrictModel):
     """Data loading config"""
 
     datasets: list[DatasetConfig] = Field([DatasetConfig()], description="Datasets to use")
@@ -65,7 +69,7 @@ class DataConfig(BaseModel):
         return chat_template
 
 
-class OptimizerConfig(BaseModel):
+class OptimizerConfig(StrictModel):
     """Optimizer config"""
 
     type: Literal["adamw"] = Field("adamw", description="Optimizer type (adamw only for now)")
@@ -75,7 +79,7 @@ class OptimizerConfig(BaseModel):
     max_norm: float = Field(1.0, gt=0, description="Gradient clipping norm ")
 
 
-class SchedulerConfig(BaseModel):
+class SchedulerConfig(StrictModel):
     """LR Scheduler config"""
 
     warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio over total steps")
@@ -84,7 +88,7 @@ class SchedulerConfig(BaseModel):
     decay_type: Literal["linear", "cosine"] = "linear"
 
 
-class CheckpointConfig(BaseModel):
+class CheckpointConfig(StrictModel):
     """Checkpoint saving config"""
 
     save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
@@ -97,13 +101,13 @@ class CheckpointConfig(BaseModel):
             shutil.rmtree(self.save_dir, ignore_errors=True)
 
 
-class MetricsConfig(BaseModel):
+class MetricsConfig(StrictModel):
     """Metrics and logging config"""
 
     log_every: int = Field(1, gt=0, description="Steps between log outputs")
 
 
-class TorchrunConfig(BaseModel):
+class TorchrunConfig(StrictModel):
     """Torchrun distributed config (matching torchrun API)"""
 
     nproc_per_node: int = Field(
@@ -115,7 +119,7 @@ class TorchrunConfig(BaseModel):
     node_rank: int = Field(None, ge=0, description="Node rank for multi-node training")
 
 
-class DistributedConfig(BaseModel):
+class DistributedConfig(StrictModel):
     """Distributed training and parallelism config"""
 
     dp_replicate: int = Field(None, ge=1, description="Number of replicated DP groups (defaults to nnodes)")
@@ -123,13 +127,13 @@ class DistributedConfig(BaseModel):
     cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
 
 
-class ActivationCheckpointConfig(BaseModel):
+class ActivationCheckpointConfig(StrictModel):
     """Activation checkpointing config"""
 
     stride: int = Field(0, ge=0, description="Checkpoint every nth layer (0 means no checkpointing)")
 
 
-class WandbConfig(BaseModel):
+class WandbConfig(StrictModel):
     """Weights and Biases logging config"""
 
     project: str = Field(None, description="wandb project name")
