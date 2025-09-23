@@ -4,6 +4,7 @@ import os
 import time
 import random
 import numpy as np
+import contextlib
 import torch
 import torch.distributed as dist
 from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
@@ -97,16 +98,17 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
     return mesh
 
 
-def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
+def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> tuple[PreTrainedModel, torch.autocast]:
+    """Returns model and autocast context manager (null for FSDP as handled internally)."""
     if get_world_size() == 1:
-        return model.cuda()
+        return model.cuda(), torch.autocast("cuda", dtype=torch.bfloat16)
 
     mesh = get_dp_mesh(config)
 
     if mesh:
-        return setup_fsdp2(model, config, mesh)
+        return setup_fsdp2(model, config, mesh), contextlib.nullcontext()
     else:
-        return setup_ddp(model, config)
+        return setup_ddp(model, config), torch.autocast("cuda", dtype=torch.bfloat16)
 
 
 def setup_fsdp2(model, config, mesh) -> PreTrainedModel:

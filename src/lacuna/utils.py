@@ -214,7 +214,7 @@ class IntSucc:
 
 
 def _take(arr, idx):
-    out = pc.take(arr, pa.array(idx, type=pa.int64()))
+    out = pc.take(arr, pa.array(idx, type=pa.int32()))
     return out.combine_chunks() if isinstance(out, pa.ChunkedArray) else out
 
 
@@ -264,13 +264,13 @@ def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
     # position_ids: reset to 0 at each original example boundary
     dl = lens[reorder]
     T = int(offs[-1])
-    pos = np.ones(T, dtype=np.int64)
+    pos = np.ones(T, dtype=np.int32)
     pos[0] = 0
     if dl.size > 1:
         cut = dl[:-1].cumsum()
         pos[cut] = -(dl[:-1] - 1)
     pos = pos.cumsum()
-    position_ids = LA.from_arrays(offs, pa.array(pos, type=pa.int64()))
+    position_ids = LA.from_arrays(offs, pa.array(pos, type=pa.int32()))
 
     if has_masks:
         packed_masks = LA.from_arrays(offs, masks_taken.values)

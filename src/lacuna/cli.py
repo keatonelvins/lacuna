@@ -5,7 +5,6 @@ import sys
 import torch
 import tomllib
 from pathlib import Path
-from typing import Type
 from dotenv import load_dotenv
 
 from lacuna.config import LacunaConfig
@@ -37,7 +36,7 @@ def launch_torchrun(config: LacunaConfig) -> None:
     os.execvp("torchrun", cmd)
 
 
-def parse_argv(config_cls: Type[LacunaConfig]) -> LacunaConfig:
+def parse_argv() -> LacunaConfig:
     args = sys.argv[1:]
 
     if args and not args[0].startswith("--"):
@@ -50,7 +49,7 @@ def parse_argv(config_cls: Type[LacunaConfig]) -> LacunaConfig:
         toml_data = {}
         cli_args = args
 
-    config = config_cls(**toml_data, _cli_parse_args=cli_args)
+    config = LacunaConfig(**toml_data, _cli_parse_args=cli_args)
 
     # if multi-gpu and haven't already launched torchrun, launch it
     if torch.cuda.device_count() > 1 and "RANK" not in os.environ:
@@ -61,7 +60,7 @@ def parse_argv(config_cls: Type[LacunaConfig]) -> LacunaConfig:
 
 def lacuna():
     """Entry point for training."""
-    config = parse_argv(LacunaConfig)
+    config = parse_argv()
     train(config)
 
 

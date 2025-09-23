@@ -6,7 +6,7 @@ import torch
 from pathlib import Path
 from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class ModelConfig(BaseModel):
@@ -152,9 +152,3 @@ class LacunaConfig(BaseSettings):
     dist: DistributedConfig = DistributedConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     wandb: WandbConfig = WandbConfig()
-
-    model_config = SettingsConfigDict(
-        cli_parse_args=True,
-        cli_kebab_case=True,
-        cli_implicit_flags=True,
-    )

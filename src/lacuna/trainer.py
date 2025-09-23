@@ -3,7 +3,6 @@
 import time
 import torch
 from loguru import logger
-from torch.amp import autocast
 from torchtitan.tools import utils
 from torch.distributed.elastic.multiprocessing.errors import record
 from torchtitan.distributed.utils import clip_grad_norm_ as clip
@@ -36,7 +35,7 @@ def train(config: LacunaConfig) -> None:
     try:
         logger.info("Setting up model")
         model = setup_model(config)
-        model = setup_dist(model, config)
+        model, amp_manager = setup_dist(model, config)
 
         logger.info("Setting up dataloader")
         dataset = LacunaDataset(config)
@@ -98,7 +97,7 @@ def train(config: LacunaConfig) -> None:
             if config.model.backend == "liger":
                 model_inputs["accum_dtype"] = torch.float32  # force fp32 accum
 
-            with autocast("cuda", dtype=torch.bfloat16):
+            with amp_manager:
                 outputs = model(**model_inputs)
                 loss = outputs.loss
 
