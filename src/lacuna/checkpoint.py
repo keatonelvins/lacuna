@@ -83,7 +83,6 @@ def save_hf_weights_dtensor(
         dist.barrier(device_ids=[torch.cuda.current_device()])
 
     if is_master():
-        model.config.architectures = [model.__class__.__name__.removeprefix("FSDP")] # TODO: can remove in next release
         model.save_pretrained(output_dir, state_dict=cpu_state)
 
 
