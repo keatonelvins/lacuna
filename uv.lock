@@ -577,7 +577,7 @@ requires-dist = [
     { name = "textual", specifier = ">=6.1.0" },
     { name = "torch", specifier = ">=2.8.0", index = "https://download.pytorch.org/whl/cu128" },
     { name = "torchdata", specifier = ">=0.11.0" },
-    { name = "torchtitan", git = "https://github.com/pytorch/torchtitan?rev=e629fe58" },
+    { name = "torchtitan", git = "https://github.com/pytorch/torchtitan?rev=24e9105" },
     { name = "transformers", specifier = ">=4.56.2" },
     { name = "wandb", specifier = ">=0.22.0" },
 ]
@@ -1797,7 +1797,7 @@ wheels = [
 [[package]]
 name = "torchtitan"
 version = "0.1.0"
-source = { git = "https://github.com/pytorch/torchtitan?rev=e629fe58#e629fe58ae16bbfc2ebec21f26c87ce465057147" }
+source = { git = "https://github.com/pytorch/torchtitan?rev=24e9105#24e91056a3ae395aec8dcca8c67aa4f16f3da3d0" }
 dependencies = [
     { name = "datasets" },
     { name = "fsspec" },
