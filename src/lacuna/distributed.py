@@ -87,32 +87,29 @@ def get_dp_params(config: LacunaConfig) -> tuple[int, int]:
 
 def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
     world_size = get_world_size()
-    if world_size == 1:
-        return None
-
     rep, shard = get_dp_params(config)
 
     if rep > 1 and shard > 1:
-        mode, mesh = "HSDP", init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
+        mesh = init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
     elif shard > 1:
-        mode, mesh = "FSDP", init_device_mesh("cuda", [shard], mesh_dim_names=["dp_shard"])
+        mesh = init_device_mesh("cuda", [shard], mesh_dim_names=["dp_shard"])
     elif rep > 1:
-        raise ValueError("Invalid config: ddp unsupported, please use fsdp instead")
+        raise ValueError("Invalid config: DDP unsupported, please use FSDP instead")
     else:
         raise ValueError(f"Invalid config: dp_replicate=1, dp_shard=1 but world_size={world_size}")
 
-    logger.info(f"{mode} mesh: replicate={rep}, shard={shard}, world={world_size}")
+    logger.info(f"Mesh setup complete (replicate={rep}, shard={shard}, world={world_size})")
     return mesh
 
 
-def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> tuple[PreTrainedModel, torch.autocast]:
+def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> tuple[PreTrainedModel, torch.autocast, DeviceMesh | None]:
     """Returns model and autocast context manager (null for FSDP as handled internally)."""
     if get_world_size() == 1:
-        return model.cuda(), torch.autocast("cuda", dtype=torch.bfloat16)
+        return model.cuda(), torch.autocast("cuda", dtype=torch.bfloat16), None
 
     mesh = get_dp_mesh(config)
 
-    return setup_fsdp2(model, config, mesh), contextlib.nullcontext()
+    return setup_fsdp2(model, config, mesh), contextlib.nullcontext(), mesh
 
 
 def setup_fsdp2(model, config, mesh) -> PreTrainedModel:

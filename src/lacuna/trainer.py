@@ -5,7 +5,7 @@ import torch
 from loguru import logger
 from torchtitan.tools import utils
 from torch.distributed.elastic.multiprocessing.errors import record
-from torchtitan.distributed.utils import clip_grad_norm_ as clip
+from torchtitan.distributed.utils import dist_mean, clip_grad_norm_ as clip
 
 from .checkpoint import save_checkpoint, load_checkpoint
 from .config import LacunaConfig
@@ -35,7 +35,7 @@ def train(config: LacunaConfig) -> None:
     try:
         logger.info("Setting up model")
         model = setup_model(config)
-        model, amp_manager = setup_dist(model, config)
+        model, amp_manager, mesh = setup_dist(model, config)
 
         logger.info("Setting up dataloader")
         dataset = LacunaDataset(config)
@@ -106,7 +106,7 @@ def train(config: LacunaConfig) -> None:
 
             if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
-                current_loss = loss.item()  # TODO: this is local loss
+                current_loss = dist_mean(loss.detach(), mesh) if mesh else loss.item()
 
                 metrics_processor.update()
                 log_training_metrics(step, current_loss, grad_norm, current_lr, run_dir)
