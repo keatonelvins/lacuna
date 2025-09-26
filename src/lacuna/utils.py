@@ -217,10 +217,19 @@ def _take(arr, idx):
     return out.combine_chunks() if isinstance(out, pa.ChunkedArray) else out
 
 
-def pack_bfd(examples: pa.Table, seq_len: int) -> pa.Table:
-    ids = pc.list_slice(examples["input_ids"], 0, seq_len)
+def pack_bfd(examples: pa.Table, seq_len: int, context_len: int | None = None, truncate: bool = True) -> pa.Table:
+    """Drop/truncate examples longer than context_len then pack into long samples up to seq_len."""
     has_masks = "assistant_masks" in examples.column_names
-    masks = pc.list_slice(examples["assistant_masks"], 0, seq_len) if has_masks else None
+    context_len = context_len or seq_len
+
+    if truncate:
+        ids = pc.list_slice(examples["input_ids"], 0, context_len)
+        masks = pc.list_slice(examples["assistant_masks"], 0, context_len) if has_masks else None
+    else:
+        sample_lens = pc.list_value_length(examples["input_ids"])
+        long_sample_mask = pc.less_equal(sample_lens, context_len)
+        ids = pc.filter(examples["input_ids"], long_sample_mask)
+        masks = pc.filter(examples["assistant_masks"], long_sample_mask) if has_masks else None
 
     lens = pc.list_value_length(ids).to_numpy()
     order = np.argsort(-lens)
