@@ -13,7 +13,6 @@ from torch.distributed.fsdp import (
     MixedPrecisionPolicy,
     fully_shard,
 )
-from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import PreTrainedModel
 from loguru import logger
 
@@ -95,10 +94,10 @@ def get_dp_mesh(config: LacunaConfig) -> DeviceMesh | None:
 
     if rep > 1 and shard > 1:
         mode, mesh = "HSDP", init_device_mesh("cuda", [rep, shard], mesh_dim_names=["dp_replicate", "dp_shard"])
-    elif rep > 1:
-        mode, mesh = "DDP", None
     elif shard > 1:
         mode, mesh = "FSDP", init_device_mesh("cuda", [shard], mesh_dim_names=["dp_shard"])
+    elif rep > 1:
+        raise ValueError("Invalid config: ddp unsupported, please use fsdp instead")
     else:
         raise ValueError(f"Invalid config: dp_replicate=1, dp_shard=1 but world_size={world_size}")
 
@@ -113,10 +112,7 @@ def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> tuple[PreTrained
 
     mesh = get_dp_mesh(config)
 
-    if mesh:
-        return setup_fsdp2(model, config, mesh), contextlib.nullcontext()
-    else:
-        return setup_ddp(model, config), torch.autocast("cuda", dtype=torch.bfloat16)
+    return setup_fsdp2(model, config, mesh), contextlib.nullcontext()
 
 
 def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
@@ -131,25 +127,4 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     model = fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=False)
 
     logger.info(f"Model sharding complete (cpu_offload={config.dist.cpu_offload})")
-    return model
-
-
-def setup_ddp(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
-    # TODO: document flags and values
-    scale = (12 * model.config.hidden_size**2) / 1e8
-    bucket = 25 * (1 + scale) * (1.5 if get_world_size() > 32 else 1)
-    bucket_cap_guess = int(min(max(bucket, 10), 250))
-    is_compiled = config.model.compile_mode is not None
-    model = model.cuda(torch.cuda.current_device())
-    model = DDP(
-        model,
-        device_ids=[torch.cuda.current_device()],
-        broadcast_buffers=False,
-        gradient_as_bucket_view=True,
-        static_graph=is_compiled,  # only use static graph if model is compiled
-        find_unused_parameters=False,
-        bucket_cap_mb=bucket_cap_guess,
-    )
-
-    logger.info(f"DDP setup complete (static_graph={is_compiled})")
     return model
