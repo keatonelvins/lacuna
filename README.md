@@ -2,6 +2,8 @@
 
 Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
 
+Try `AutoLacunaModelForCausalLM` for training MoE's!! (patches hf code with torchtitan MoE and fused linear cross entropy from fla-org)
+
 ## Quick Start
 
 ```bash
@@ -40,4 +42,4 @@ uv run pre-commit install
 There are a ton of great training repos out there already! Some influences:
 - [prime-rl](https://github.com/PrimeIntellect-ai/prime-rl)
 - [torchtitan](https://github.com/pytorch/torchtitan)
-- [axolotl](https://github.com/axolotl-ai-cloud/axolotl)
+- [flame](https://github.com/fla-org/flame)
