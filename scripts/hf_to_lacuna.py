@@ -2,23 +2,22 @@
 Usage: uv run scripts/hf_to_lacuna.py Qwen/Qwen3-30B-A3B-Base keatone/Qwen3-30B-A3B-Base-Lacuna --push
 """
 
+import os
 import re
 import sys
 import torch
 from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
+from huggingface_hub import save_torch_state_dict
 
 model_name = sys.argv[1]
 output_model_name = sys.argv[2]
 push = "--push" in sys.argv
 
-model = AutoModelForCausalLM.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, low_cpu_mem_usage=True)
 config = AutoConfig.from_pretrained(model_name)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-
-def patch_model(model):
-    state_dict = model.state_dict()
-
+def patch_state_dict(state_dict):
     # group the expert weights (gate_proj, up_proj, and down_proj) by layer/expert index
     grouped_experts = {}
     for sd_key, sd_value in state_dict.items():
@@ -80,25 +79,14 @@ def patch_model(model):
 
     return state_dict
 
-
 def patch_config(config):
     config.load_balance_coeff = 1e-3
     return config
 
-
-def patch_tokenizer(tokenizer):
-    return tokenizer
-
-
-state_dict = patch_model(model)
+state_dict = patch_state_dict(model.state_dict())
 config = patch_config(config)
-tokenizer = patch_tokenizer(tokenizer)
 
-if push:
-    model.push_to_hub(output_model_name, state_dict=state_dict)
-    config.push_to_hub(output_model_name)
-    tokenizer.push_to_hub(output_model_name)
-else:
-    model.save_pretrained(output_model_name, state_dict=state_dict)
-    config.save_pretrained(output_model_name)
-    tokenizer.save_pretrained(output_model_name)
+os.makedirs(output_model_name, exist_ok=True)
+save_torch_state_dict(state_dict, output_model_name)
+config.save_pretrained(output_model_name)
+tokenizer.save_pretrained(output_model_name)
