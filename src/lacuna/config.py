@@ -50,7 +50,7 @@ class DataConfig(StrictModel):
     datasets: list[DatasetConfig] = Field([DatasetConfig()], description="Datasets to use")
     column: str = Field("text", description="Column to use for all datasets")
     context_len: int = Field(None, ge=1, description="Max length of a single example (defaults to seq_len)")
-    truncate: bool = Field(True, description="Whether to truncate long examples to context length or just drop them")
+    truncate: bool = Field(True, description="Whether to truncate long examples to context_len (above) or just drop them")
     chat_template: str = Field(None, description="Chat template to use (either a string or a path to a file)")
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
     tokenizer_override: str = Field(None, description="Model name to override the default tokenizer (for caching purposes)")

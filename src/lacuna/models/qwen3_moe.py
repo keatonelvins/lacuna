@@ -28,6 +28,7 @@ from transformers.configuration_utils import PretrainedConfig
 from transformers.modeling_rope_utils import rope_config_validation
 
 from torchtitan.models.moe import MoE, MoEArgs
+from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
 
 
 class Qwen3MoeConfig(PretrainedConfig):
@@ -801,6 +802,7 @@ class Qwen3MoeForCausalLM(Qwen3MoePreTrainedModel, GenerationMixin):
         self.router_aux_loss_coef = config.router_aux_loss_coef
         self.num_experts = config.num_experts
         self.num_experts_per_tok = config.num_experts_per_tok
+        self.flce = FusedLinearCrossEntropyLoss()
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -860,13 +862,14 @@ class Qwen3MoeForCausalLM(Qwen3MoePreTrainedModel, GenerationMixin):
         )
 
         hidden_states = outputs.last_hidden_state
-        # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
-        slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        loss = None
+        loss, logits = None, None
+        if kwargs.pop("materialize_logits", False):
+            logits = self.lm_head(hidden_states if logits_to_keep is None else hidden_states[:, -logits_to_keep:])
         if labels is not None:
-            loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
+            labels = nn.functional.pad(labels, (0, 1), value=self.flce.ignore_index)
+            shifted_labels = labels[..., 1:].contiguous().to(hidden_states.device)
+            loss = self.flce(hidden_states, shifted_labels, self.lm_head.weight, None)
 
         aux_loss = None
         if output_router_logits:
