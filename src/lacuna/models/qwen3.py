@@ -229,7 +229,7 @@ class Qwen3Config(PretrainedConfig):
                 else "full_attention"
                 for i in range(self.num_hidden_layers)
             ]
-        layer_type_validation(self.layer_types, self.num_hidden_layers)
+        layer_type_validation(self.layer_types)
 
         super().__init__(
             tie_word_embeddings=tie_word_embeddings,
@@ -394,7 +394,7 @@ class Qwen3DecoderLayer(GradientCheckpointingLayer):
         self.mlp = GatedMLP(
             hidden_size=config.hidden_size,
             intermediate_size=config.intermediate_size,
-            hidden_act=config.hidden_act,
+            hidden_act="swish", # default qwen is silu but fla expects swish
             fuse_swiglu=True, 
         )
         self.input_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
