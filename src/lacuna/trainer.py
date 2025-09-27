@@ -91,9 +91,8 @@ def train(config: LacunaConfig) -> None:
                 "input_ids": batch["input_ids"].cuda(),
                 "position_ids": batch["position_ids"].cuda(),
                 "labels": labels.cuda(),
+                "accum_dtype": torch.float32,  # used by liger
             }
-            if config.model.backend == "liger":
-                model_inputs["accum_dtype"] = torch.float32  # force fp32 accum
 
             with amp_manager:
                 outputs = model(**model_inputs)
