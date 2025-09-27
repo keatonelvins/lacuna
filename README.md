@@ -2,7 +2,7 @@
 
 Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
 
-Try `AutoLacunaModelForCausalLM` for training MoE's!! (patches hf code with torchtitan MoE and fused linear cross entropy from fla-org)
+Try `AutoLacunaModelForCausalLM` for training MoE's!! (patches hf code with torchtitan MoE and kernels from fla-org)
 
 ## Quick Start
 
