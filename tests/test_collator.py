@@ -44,7 +44,7 @@ def test_bfd_packing():
     assert packed["assistant_masks"].to_pylist() == expected_packed_masks
 
 
-def test_bfd_packing_wrap():
+def test_bfd_packing_drop():
     input_ids = [
         [1],
         [2, 2],
@@ -64,24 +64,9 @@ def test_bfd_packing_wrap():
 
     packed = pack_bfd(table, seq_len=4, truncate=False)
 
-    expected_packed_input = [
-        [6, 6, 6, 6],
-        [4, 4, 4, 4],
-        [2, 2, 6, 6],
-        [1, 3, 3, 3]
-    ]
-    expected_packed_pos = [
-        [0, 1, 2, 3],
-        [0, 1, 2, 3],
-        [0, 1, 0, 1],
-        [0, 0, 1, 2],
-    ]
-    expected_packed_masks = [
-        [1, 0, 1, 0],
-        [0, 1, 0, 1],
-        [1, 0, 1, 0],
-        [1, 0, 1, 0],
-    ]
+    expected_packed_input = [[4, 4, 4, 4], [3, 3, 3, 1], [2, 2]]
+    expected_packed_pos = [[0, 1, 2, 3], [0, 1, 2, 0], [0, 1]]
+    expected_packed_masks = [[0, 1, 0, 1], [1, 0, 1, 1], [0, 1]]
 
     assert packed["input_ids"].to_pylist() == expected_packed_input
     assert packed["position_ids"].to_pylist() == expected_packed_pos

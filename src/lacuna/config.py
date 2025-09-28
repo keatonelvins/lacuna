@@ -4,7 +4,6 @@ import os
 import torch
 import shutil
 from pathlib import Path
-from datetime import datetime
 from typing import Literal, Optional
 from pydantic_settings import BaseSettings
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -102,12 +101,12 @@ class CheckpointConfig(StrictModel):
     """Checkpoint saving config"""
 
     save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
-    save_dir: Path = Field(None, description="Directory to save checkpoints to")
+    save_dir: Optional[Path] = Field(None, description="Directory to save checkpoints to")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
 
-    def prepare_save_dir(self) -> None:
+    def prepare_save_dir(self, timestamp: str) -> None:
         """Clear save_dir if not resuming from checkpoint."""
-        self.save_dir = self.save_dir or Path("weights") / self.timestamp
+        self.save_dir = self.save_dir or Path("weights") / timestamp
 
         if not self.resume_from and self.save_dir.exists():
             shutil.rmtree(self.save_dir, ignore_errors=True)
@@ -170,5 +169,3 @@ class LacunaConfig(BaseSettings):
     dist: DistributedConfig = DistributedConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     wandb: WandbConfig = WandbConfig()
-
-    timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

@@ -24,11 +24,12 @@ def setup_env(config: LacunaConfig) -> Path:
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
 
-    run_dir = setup_run_dir(config)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = setup_run_dir(config, timestamp)
     setup_logger(run_dir)
     display_config(config)
     save_settings(run_dir, config)
-    config.checkpoint.prepare_save_dir()  # clear save_dir if not resuming
+    config.checkpoint.prepare_save_dir(timestamp)  # clear save_dir if not resuming
 
     return run_dir
 
@@ -72,9 +73,9 @@ def master_only(fn):
 
 
 @master_only
-def setup_run_dir(config: LacunaConfig) -> Path:
+def setup_run_dir(config: LacunaConfig, timestamp: str) -> Path:
     """Create and return a timestamped run directory."""
-    run_dir = Path(".lacuna_cache/runs") / config.timestamp
+    run_dir = Path(".lacuna_cache/runs") / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
 
     active_link = Path(".lacuna_cache/active_run")
