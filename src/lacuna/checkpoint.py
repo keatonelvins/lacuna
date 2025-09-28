@@ -125,7 +125,6 @@ def load_checkpoint(
     path: Path,
 ):
     """Load DCP checkpoint and restore full training state."""
-
     if (path / "model.safetensors.index.json").exists():
         storage_reader = HuggingFaceStorageReader(path=str(path))
     elif (path / ".metadata").exists():
