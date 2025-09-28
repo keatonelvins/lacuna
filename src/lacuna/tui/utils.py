@@ -1,6 +1,25 @@
 import json
 from pathlib import Path
 import pynvml
+from pydantic import BaseModel, Field
+
+
+class Metrics(BaseModel):
+    loss: float = Field(description="Training loss")
+    lr: float = Field(description="Learning rate")
+    grad_norm: float = Field(description="Gradient norm")
+    throughput: float = Field(description="Throughput (tokens per second)")
+    tflops: float = Field(description="TFLOPs")
+    mfu: float = Field(description="MFU (%)")
+    end_to_end: float = Field(description="End to end time per step (s)")
+    data_loading: float = Field(description="Data loading time per step (s)")
+    data_loading_pct: float = Field(description="Data loading time per step (%)")
+    max_active: float = Field(description="Max active memory (GiB)")
+    max_active_pct: float = Field(description="Max active memory (%)")
+    max_reserved: float = Field(description="Max reserved memory (GiB)")
+    max_reserved_pct: float = Field(description="Max reserved memory (%)")
+    num_alloc_retries: int = Field(description="Number of allocation retries")
+    num_ooms: int = Field(description="Number of OOMs")
 
 
 def get_latest_metrics():
@@ -13,7 +32,9 @@ def get_latest_metrics():
         lines = f.readlines()
         if not lines:
             return None
-        return json.loads(lines[-1].strip())
+        metrics = json.loads(lines[-1].strip())
+        flattened_metrics = {k.split("/")[-1]: v for k, v in metrics.items()}
+        return Metrics(**flattened_metrics).model_dump()
 
 
 def get_settings():

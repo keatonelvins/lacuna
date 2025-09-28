@@ -25,18 +25,18 @@ class Lacuna(App):
     }
 
     RedlineWidget {
-        border: solid red;
+        border: solid white;
         column-span: 2;
         height: 100%;
     }
 
     CurvesWidget {
-        border: solid cornflowerblue;
+        border: solid white;
         height: 100%;
     }
 
     IOWidget {
-        border: solid yellow;
+        border: solid white;
         height: 100%;
     }
     """

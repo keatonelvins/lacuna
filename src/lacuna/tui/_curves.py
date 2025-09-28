@@ -13,9 +13,7 @@ class CurvesWidget(Static):
     def update_content(self) -> None:
         latest = get_latest_metrics()
         if latest:
-            content = f"Loss: {latest['loss']:.4f}\n"
-            content += f"LR: {latest['lr']:.2e}\n"
-            content += f"Grad Norm: {latest['grad_norm']:.2f}"
+            content = f"Loss: {latest['loss']:.4f} | LR: {latest['lr']:.2e} | Grad Norm: {latest['grad_norm']:.2f}"
             self.update(content)
         else:
             self.update("No active run")

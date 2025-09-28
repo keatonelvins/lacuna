@@ -28,13 +28,6 @@ class SplashScreen(ModalScreen):
         width: auto;
         height: auto;
     }
-
-    #loading-text {
-        text-align: center;
-        margin-top: 2;
-        color: $text-muted;
-        width: auto;
-    }
     """
 
     def __init__(self):
