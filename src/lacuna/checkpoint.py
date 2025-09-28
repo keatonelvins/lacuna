@@ -64,10 +64,7 @@ class TrainerState(Stateful):
         self.dataloader.load_state_dict(state_dict["dataloader"])
 
 
-def save_hf_weights_dtensor(
-    model: torch.nn.Module,
-    output_dir: Path,
-) -> None:
+def save_hf_weights_dtensor(model: torch.nn.Module, output_dir: Path) -> None:
     sharded_sd = model.state_dict()
     cpu_state: dict[str, torch.Tensor] = {}
 

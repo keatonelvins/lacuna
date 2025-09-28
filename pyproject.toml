@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-train = "lacuna.cli:lacuna"
+train = "lacuna.cli:run_train"
 lacuna = "lacuna.tui.app:main"
 
 [dependency-groups]

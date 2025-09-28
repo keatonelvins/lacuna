@@ -83,7 +83,7 @@ class LacunaDataset:
         ]
 
     def _build_dataset(self):
-        """Master process does all hf hub calls and builds dataset. Other processes wait then load from local cache."""
+        """Master process does all hf hub calls and builds dataset first. Others wait then load from local cache."""
         tokenizer = get_tokenizer(self.config)
         ds = concatenate_datasets(self._load_datasets())
         cfg = self.config.data

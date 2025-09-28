@@ -20,11 +20,8 @@ from .config import LacunaConfig
 
 
 def init_dist(config: LacunaConfig) -> None:
-    """Initialize distributed process group."""
+    """Initialize distributed process group and return world size."""
     set_seed(config.trainer.seed)
-
-    if not dist.is_available():
-        return
 
     if "LOCAL_RANK" not in os.environ:
         return

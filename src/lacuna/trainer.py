@@ -13,9 +13,9 @@ from .data import LacunaDataset
 from .scheduler import setup_scheduler
 from .model import setup_model
 from .optim import setup_optimizer
-from .utils import display_config, log_training_metrics, setup_env, cleanup_env, setup_metrics_processor
+from .utils import log_training_metrics, setup_env, cleanup_env, setup_metrics_processor
 from .wandb import init_wandb, log_wandb_metrics, finish
-from .distributed import get_world_size, init_dist, setup_dist, destroy_dist
+from .distributed import init_dist, setup_dist, destroy_dist
 
 
 @record
@@ -23,17 +23,11 @@ from .distributed import get_world_size, init_dist, setup_dist, destroy_dist
 def train(config: LacunaConfig) -> None:
     init_dist(config)
     run_dir = setup_env(config)
-    display_config(config)
-
     wandb_run = init_wandb(config)
-    world_size = get_world_size()
-
-    logger.info(f"GPU setup: {world_size} GPUs")
 
     gc_handler = utils.GarbageCollection(gc_freq=10)
 
     try:
-        logger.info("Setting up model")
         model = setup_model(config)
         model, amp_manager, mesh = setup_dist(model, config)
 
@@ -71,7 +65,7 @@ def train(config: LacunaConfig) -> None:
                 epoch += 1
                 dataset.set_epoch(epoch)
 
-            gc_handler.run(step)
+            gc_handler.run(step)  # TODO: may need to tune
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
@@ -95,8 +89,7 @@ def train(config: LacunaConfig) -> None:
             }
 
             with amp_manager:
-                outputs = model(**model_inputs)
-                loss = outputs.loss
+                loss = model(**model_inputs).loss
 
             loss.backward()
             grad_norm = clip(model.parameters(), config.optimizer.max_norm)

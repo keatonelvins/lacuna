@@ -4,6 +4,7 @@ import os
 import shutil
 import torch
 from pathlib import Path
+from datetime import datetime
 from typing import Literal, Optional
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings
@@ -83,7 +84,7 @@ class OptimizerConfig(StrictModel):
     type: Literal["adamw"] = Field("adamw", description="Optimizer type (adamw only for now)")
     lr: float = Field(3e-4, gt=0, description="Peak learning rate")
     weight_decay: float = Field(0.01, ge=0, description="Weight decay (not applied to embeddings etc.)")
-    betas: tuple[float, float] = Field((0.9, 0.98), description="Adam betas")
+    betas: tuple[float, float] = Field((0.9, 0.95), description="Adam betas")
     eps: float = Field(1e-8, ge=0, description="Adam eps")
     max_norm: float = Field(1.0, gt=0, description="Gradient clipping norm ")
 
@@ -92,7 +93,7 @@ class SchedulerConfig(StrictModel):
     """LR Scheduler config"""
 
     warmup_ratio: float = Field(0.05, ge=0, le=1, description="Warmup ratio over total steps")
-    decay_ratio: float = Field(0.05, ge=0, le=1, description="Decay ratio over total steps")
+    decay_ratio: float = Field(0.20, ge=0, le=1, description="Decay ratio over total steps")
     min_lr_ratio: float = Field(0, ge=0, le=1, description="Minimum LR as ratio of max LR")
     decay_type: Literal["linear", "cosine"] = "linear"
 
@@ -101,11 +102,13 @@ class CheckpointConfig(StrictModel):
     """Checkpoint saving config"""
 
     save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
-    save_dir: Path = Field(Path("weights"), description="Directory to save checkpoints")
+    save_dir: Path = Field(None, description="Directory to save checkpoints to")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
 
     def prepare_save_dir(self) -> None:
         """Clear save_dir if not resuming from checkpoint."""
+        self.save_dir = self.save_dir or Path("weights") / self.timestamp
+
         if not self.resume_from and self.save_dir.exists():
             shutil.rmtree(self.save_dir, ignore_errors=True)
 
@@ -167,3 +170,5 @@ class LacunaConfig(BaseSettings):
     dist: DistributedConfig = DistributedConfig()
     ac: ActivationCheckpointConfig = ActivationCheckpointConfig()
     wandb: WandbConfig = WandbConfig()
+
+    timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
