@@ -134,6 +134,7 @@ class DistributedConfig(StrictModel):
     dp_replicate: int = Field(None, ge=1, description="Number of replicated DP groups (defaults to nnodes)")
     dp_shard: int = Field(None, ge=1, description="Number of shards per replica (defaults to nproc_per_node)")
     cpu_offload: bool = Field(False, description="Offload params to CPU (enable if OOM, FSDP only)")
+    reshard_after_forward: bool = Field(None, description="Reshard after forward pass (default is True except for root module)")
 
 
 class ActivationCheckpointConfig(StrictModel):

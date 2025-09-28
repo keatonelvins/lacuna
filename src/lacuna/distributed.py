@@ -115,13 +115,16 @@ def setup_dist(model: PreTrainedModel, config: LacunaConfig) -> tuple[PreTrained
 def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
     mp_policy = MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32)
     offload = CPUOffloadPolicy() if config.dist.cpu_offload else None
+    reshard = config.dist.reshard_after_forward
 
-    for i, block in enumerate(model.model.layers):
-        # last block, don't reshard since FSDP prefetches (see docs)
-        reshard = i < len(model.model.layers) - 1
+    for block in model.model.layers:
         fully_shard(block, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=reshard)
 
-    model = fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=False)
+    if not model.config.tie_word_embeddings:
+        fully_shard(model.model.embed_tokens, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)
+        fully_shard([model.lm_head, model.model.norm], mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)   
 
-    logger.info(f"Model sharding complete (cpu_offload={config.dist.cpu_offload})")
+    fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=reshard)
+
+    logger.info(f"Model sharding complete (cpu_offload={config.dist.cpu_offload}, reshard_after_forward={reshard})")
     return model
