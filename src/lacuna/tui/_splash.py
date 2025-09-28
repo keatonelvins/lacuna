@@ -43,8 +43,8 @@ class SplashScreen(ModalScreen):
     def _create_logo(self) -> Text:
         """Create static ASCII art logo."""
         logo = Text()
-        logo.append("█░ ▄▀▄ ▄▀▀ █░█ ▄▀█ ▄▀▄\n", style="cyan")
-        logo.append("█▄ █▀█ ▀▄▄ ▀▄█ █░█ █▀█\n", style="cyan")
+        logo.append("█░ ▄▀▄ ▄▀▀ █░█ ▄▀█ ▄▀▄\n", style="white")
+        logo.append("█▄ █▀█ ▀▄▄ ▀▄█ █░█ █▀█\n", style="white")
         return logo
 
     def compose(self) -> ComposeResult:
@@ -53,7 +53,7 @@ class SplashScreen(ModalScreen):
                 yield Static(self._create_logo(), id="ascii-art")
 
     def on_mount(self) -> None:
-        """Auto-dismiss after 2 seconds."""
+        """Auto-dismiss after 1 second."""
         self.set_timer(1.0, lambda: self.post_message(self.DismissScreen()))
 
     def on_splash_screen_dismiss_screen(self) -> None:
