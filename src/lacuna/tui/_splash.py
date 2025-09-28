@@ -43,16 +43,8 @@ class SplashScreen(ModalScreen):
     def _create_logo(self) -> Text:
         """Create static ASCII art logo."""
         logo = Text()
-        logo.append("╔═══════════════════════════════════════════════════════╗\n", style="cyan")
-        logo.append("║                                                       ║\n", style="cyan")
-        logo.append("║  ██╗      █████╗  ██████╗██╗   ██╗███╗   ██╗ █████╗   ║\n", style="cyan bold")
-        logo.append("║  ██║     ██╔══██╗██╔════╝██║   ██║████╗  ██║██╔══██╗  ║\n", style="cyan bold")
-        logo.append("║  ██║     ███████║██║     ██║   ██║██╔██╗ ██║███████║  ║\n", style="cyan bold")
-        logo.append("║  ██║     ██╔══██║██║     ██║   ██║██║╚██╗██║██╔══██║  ║\n", style="cyan bold")
-        logo.append("║  ███████╗██║  ██║╚██████╗╚██████╔╝██║ ╚████║██║  ██║  ║\n", style="cyan bold")
-        logo.append("║  ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝  ║\n", style="cyan bold")
-        logo.append("║                                                       ║\n", style="cyan")
-        logo.append("╚═══════════════════════════════════════════════════════╝", style="cyan")
+        logo.append("█░ ▄▀▄ ▄▀▀ █░█ ▄▀█ ▄▀▄\n", style="cyan")
+        logo.append("█▄ █▀█ ▀▄▄ ▀▄█ █░█ █▀█\n", style="cyan")
         return logo
 
     def compose(self) -> ComposeResult:
