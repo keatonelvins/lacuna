@@ -21,10 +21,10 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from .config import LacunaConfig
-from .data import get_tokenizer
-from .distributed import is_master
-from .utils import save_settings
+from lacuna.config import LacunaConfig
+from lacuna.data import get_tokenizer
+from lacuna.distributed import is_master
+from lacuna.utils import save_settings
 
 
 # ref: https://docs.pytorch.org/tutorials/recipes/distributed_async_checkpoint_recipe.html

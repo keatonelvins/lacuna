@@ -1,13 +1,13 @@
 """Pydantic settings for jobs."""
 
 import os
-import shutil
 import torch
+import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class StrictModel(BaseModel):

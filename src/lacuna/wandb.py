@@ -3,8 +3,8 @@
 import wandb
 from wandb.sdk.wandb_run import Run
 
-from .config import LacunaConfig
-from .utils import master_only
+from lacuna.config import LacunaConfig
+from lacuna.utils import master_only
 
 
 @master_only

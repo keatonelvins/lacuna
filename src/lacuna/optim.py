@@ -5,7 +5,7 @@ from torch.optim import Optimizer, AdamW
 from transformers import PreTrainedModel
 from transformers.trainer_pt_utils import get_parameter_names
 
-from .config import LacunaConfig
+from lacuna.config import LacunaConfig
 
 
 # ref: https://github.com/huggingface/transformers/blob/main/src/transformers/trainer.py

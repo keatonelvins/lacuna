@@ -7,15 +7,15 @@ from torchtitan.tools import utils
 from torch.distributed.elastic.multiprocessing.errors import record
 from torchtitan.distributed.utils import dist_mean, clip_grad_norm_ as clip
 
-from .checkpoint import save_checkpoint, load_checkpoint
-from .config import LacunaConfig
-from .data import LacunaDataset
-from .scheduler import setup_scheduler
-from .model import setup_model
-from .optim import setup_optimizer
-from .utils import log_training_metrics, setup_env, cleanup_env, setup_metrics_processor
-from .wandb import init_wandb, log_wandb_metrics, finish
-from .distributed import init_dist, setup_dist, destroy_dist
+from lacuna.checkpoint import save_checkpoint, load_checkpoint
+from lacuna.config import LacunaConfig
+from lacuna.data import LacunaDataset
+from lacuna.scheduler import setup_scheduler
+from lacuna.model import setup_model
+from lacuna.optim import setup_optimizer
+from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor
+from lacuna.wandb import init_wandb, log_wandb_metrics, finish
+from lacuna.distributed import init_dist, setup_dist, destroy_dist
 
 
 @record

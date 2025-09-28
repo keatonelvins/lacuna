@@ -4,7 +4,7 @@ from loguru import logger
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, LRScheduler, SequentialLR
 
-from .config import SchedulerConfig
+from lacuna.config import SchedulerConfig
 
 
 # inspired by https://github.com/PrimeIntellect-ai/prime-rl/blob/main/src/prime_rl/trainer/scheduler.py

@@ -7,9 +7,9 @@ from datasets import load_dataset, concatenate_datasets
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
-from .utils import pack_bfd
-from .config import LacunaConfig, DatasetConfig
-from .distributed import get_rank, get_world_size, is_master, get_dp_params
+from lacuna.utils import pack_bfd
+from lacuna.config import LacunaConfig, DatasetConfig
+from lacuna.distributed import get_rank, get_world_size, is_master, get_dp_params
 
 
 def _encode(examples, tokenizer, column):

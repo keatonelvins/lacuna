@@ -2,21 +2,17 @@
 
 import os
 import time
-import random
-import numpy as np
-import contextlib
 import torch
+import random
+import contextlib
+import numpy as np
 import torch.distributed as dist
-from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
-from torch.distributed.fsdp import (
-    CPUOffloadPolicy,
-    MixedPrecisionPolicy,
-    fully_shard,
-)
 from transformers import PreTrainedModel
+from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
+from torch.distributed.fsdp import CPUOffloadPolicy, MixedPrecisionPolicy, fully_shard
 from loguru import logger
 
-from .config import LacunaConfig
+from lacuna.config import LacunaConfig
 
 
 def init_dist(config: LacunaConfig) -> None:
@@ -121,7 +117,7 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
         fully_shard(model.model.embed_tokens, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)
         fully_shard([model.lm_head, model.model.norm], mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)   
 
-    fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=reshard)
+    fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=False)
 
     logger.info(f"Model sharding complete (cpu_offload={config.dist.cpu_offload}, reshard_after_forward={reshard})")
     return model

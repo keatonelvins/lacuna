@@ -10,12 +10,12 @@ from transformers import PreTrainedModel, AutoModelForCausalLM
 from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
 
 
-from .config import (
+from lacuna.config import (
     ActivationCheckpointConfig,
     ModelConfig,
     LacunaConfig,
 )
-from .models import AutoLacunaModelForCausalLM
+from lacuna.models import AutoLacunaModelForCausalLM
 
 ATTN_IMPL_MAP = {
     "FA3": "kernels-community/flash-attn3",

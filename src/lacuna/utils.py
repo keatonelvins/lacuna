@@ -15,8 +15,8 @@ from collections import defaultdict, deque
 from torchtitan.components.metrics import build_device_memory_monitor
 from torchtitan.tools.utils import get_peak_flops
 
-from .distributed import is_master
-from .config import LacunaConfig
+from lacuna.distributed import is_master
+from lacuna.config import LacunaConfig
 
 
 def setup_env(config: LacunaConfig) -> Path:
