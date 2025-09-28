@@ -1,13 +1,14 @@
 """Weights and Biases logging."""
 
 import wandb
+from wandb.sdk.wandb_run import Run
 
 from .config import LacunaConfig
 from .utils import master_only
 
 
 @master_only
-def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
+def init_wandb(config: LacunaConfig) -> Run | None:
     if not config.wandb.project:
         return None
 
@@ -23,19 +24,8 @@ def init_wandb(config: LacunaConfig) -> wandb.sdk.wandb_run.Run | None:
 
 
 @master_only
-def log_wandb_metrics(
-    step: int,
-    loss: float,
-    grad_norm: float,
-    lr: float,
-    run: wandb.sdk.wandb_run.Run | None,
-) -> None:
+def log_wandb_metrics(step: int, metrics: dict, run: Run | None) -> None:
     if run:
-        metrics = {
-            "train/loss": loss,
-            "train/lr": lr,
-            "train/grad_norm": grad_norm,
-        }
         wandb.log(metrics, step=step)
 
 

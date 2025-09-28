@@ -95,8 +95,8 @@ def display_config(config: LacunaConfig) -> None:
 
 
 @master_only
-def save_metrics_jsonl(run_dir: Path, step: int, loss: float, grad_norm: float, lr: float) -> None:
-    metrics_data = {"step": step, "loss": loss, "grad_norm": float(grad_norm), "lr": lr, "timestamp": datetime.now().isoformat()}
+def save_metrics_jsonl(run_dir: Path, metrics: dict) -> None:
+    metrics_data = {"timestamp": datetime.now().isoformat(), **metrics}
 
     metrics_file = run_dir / "metrics.jsonl"
     with metrics_file.open("a") as f:
@@ -111,23 +111,17 @@ def save_settings(path: Path, config: LacunaConfig) -> None:
 
 
 @master_only
-def log_training_metrics(
-    step: int,
-    loss: float,
-    grad_norm: float,
-    lr: float,
-    run_dir: Path = None,
-) -> None:
+def log_training_metrics(step: int, metrics: dict, run_dir: Path) -> None:
     log_parts = [
         f"Step {step:>6}",
-        f"Loss: {loss:7.4f}",
-        f"Grad: {grad_norm:8.4f}",
-        f"LR: {lr:9.2e}",
+        f"Loss: {metrics['train/loss']:7.4f}",
+        f"Grad: {metrics['train/grad_norm']:8.4f}",
+        f"LR: {metrics['train/lr']:9.2e}",
+        f"MFU: {metrics['perf/mfu(%)']:6.2f}%",
+        f"Mem: {metrics['memory/max_active(GiB)']:6.2f}GiB",
     ]
     logger.info(" | ".join(log_parts))
-
-    if run_dir:
-        save_metrics_jsonl(run_dir, step, loss, grad_norm, lr)
+    save_metrics_jsonl(run_dir, metrics)
 
 
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
@@ -144,9 +138,8 @@ def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, in
 
 # ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/components/metrics.py
 class MetricsProcessor:
-    def __init__(self, config: LacunaConfig, run_dir: Path):
+    def __init__(self, config: LacunaConfig):
         self.config = config
-        self.run_dir = run_dir
         self.device_memory_monitor = build_device_memory_monitor()
         self.gpu_peak_flops = get_peak_flops(self.device_memory_monitor.device_name)
         self.ntokens_since_last_log = 0
@@ -154,7 +147,7 @@ class MetricsProcessor:
         self.time_last_log = time.perf_counter()
         self.device_memory_monitor.reset_peak_stats()
 
-    def log(self):
+    def get_metrics(self) -> dict:
         time_delta = time.perf_counter() - self.time_last_log
         tps = self.ntokens_since_last_log / time_delta
         mfu = 100 * self.num_flops_per_token * tps / self.gpu_peak_flops
@@ -165,9 +158,9 @@ class MetricsProcessor:
         device_mem_stats = self.device_memory_monitor.get_peak_stats()
 
         metrics = {
-            "throughput(tps)": tps,
-            "tflops": tflops,
-            "mfu(%)": mfu,
+            "perf/throughput(tps)": tps,
+            "perf/tflops": tflops,
+            "perf/mfu(%)": mfu,
             "time_metrics/end_to_end(s)": time_end_to_end,
             "time_metrics/data_loading(s)": time_data_loading,
             "time_metrics/data_loading(%)": time_data_loading_pct,
@@ -179,17 +172,16 @@ class MetricsProcessor:
             "memory/num_ooms": device_mem_stats.num_ooms,
         }
 
-        with open(self.run_dir / "perf.jsonl", "a") as f:
-            f.write(json.dumps(metrics) + "\n")
-
         self.ntokens_since_last_log = 0
         self.data_loading_times.clear()
         self.time_last_log = time.perf_counter()
         self.device_memory_monitor.reset_peak_stats()
 
+        return metrics
 
-def setup_metrics_processor(config: LacunaConfig, model: torch.nn.Module, run_dir: Path) -> MetricsProcessor:
-    processor = MetricsProcessor(config, run_dir)
+
+def setup_metrics_processor(config: LacunaConfig, model: torch.nn.Module) -> MetricsProcessor:
+    processor = MetricsProcessor(config)
     processor.num_flops_per_token = calculate_model_flops(model, config.trainer.seq_len)
     return processor
 

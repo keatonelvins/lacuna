@@ -49,7 +49,7 @@ def train(config: LacunaConfig) -> None:
 
         optimizer = setup_optimizer(model, config)
         scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
-        metrics_processor = setup_metrics_processor(config, model, run_dir)
+        metrics_processor = setup_metrics_processor(config, model)
 
         step, epoch = 0, 0
 
@@ -105,11 +105,17 @@ def train(config: LacunaConfig) -> None:
 
             if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
+                current_grad_norm = grad_norm.item()  # already reduced
                 current_loss = dist_mean(loss.detach(), mesh) if mesh else loss.item()
 
-                metrics_processor.log()
-                log_training_metrics(step, current_loss, grad_norm, current_lr, run_dir)
-                log_wandb_metrics(step, current_loss, grad_norm, current_lr, wandb_run)
+                metrics = {
+                    "train/loss": current_loss,
+                    "train/lr": current_lr,
+                    "train/grad_norm": current_grad_norm,
+                    **metrics_processor.get_metrics(),
+                }
+                log_training_metrics(step, metrics, run_dir)
+                log_wandb_metrics(step, metrics, wandb_run)
 
             if config.checkpoint.save_every:
                 if step > 0 and step % config.checkpoint.save_every == 0:
