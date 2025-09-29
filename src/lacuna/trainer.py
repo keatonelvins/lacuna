@@ -13,9 +13,10 @@ from lacuna.data import LacunaDataset
 from lacuna.scheduler import setup_scheduler
 from lacuna.model import setup_model
 from lacuna.optim import setup_optimizer
-from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor
+from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics
 from lacuna.wandb import init_wandb, log_wandb_metrics, finish
 from lacuna.distributed import init_dist, setup_dist, destroy_dist
+from lacuna.eval import run_eval
 
 
 @record
@@ -131,6 +132,12 @@ def train(config: LacunaConfig) -> None:
             dataloader=dataset.dataloader,
             final=True,
         )
+
+        if config.evals.datasets:
+            logger.info("Running eval")
+            eval_metrics = run_eval(config, model, amp_manager, mesh)
+            log_eval_metrics(step, eval_metrics, run_dir)
+            log_wandb_metrics(step, eval_metrics, wandb_run)
     except KeyboardInterrupt:
         logger.info("Training interrupted :(")
     finally:

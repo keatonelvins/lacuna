@@ -96,19 +96,11 @@ def display_config(config: LacunaConfig) -> None:
 
 
 @master_only
-def save_metrics_jsonl(run_dir: Path, metrics: dict) -> None:
+def append_jsonl(run_dir: Path, metrics: dict, name: str = "metrics") -> None:
     metrics_data = {"timestamp": datetime.now().isoformat(), **metrics}
-
-    metrics_file = run_dir / "metrics.jsonl"
+    metrics_file = run_dir / f"{name}.jsonl"
     with metrics_file.open("a") as f:
         f.write(json.dumps(metrics_data) + "\n")
-
-
-@master_only
-def save_settings(path: Path, config: LacunaConfig) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    with (path / "settings.json").open("w") as f:
-        f.write(config.model_dump_json(indent=4))
 
 
 @master_only
@@ -122,7 +114,26 @@ def log_training_metrics(step: int, metrics: dict, run_dir: Path) -> None:
         f"Mem: {metrics['memory/max_active(GiB)']:6.2f}GiB",
     ]
     logger.info(" | ".join(log_parts))
-    save_metrics_jsonl(run_dir, metrics)
+    append_jsonl(run_dir, metrics, "metrics")
+
+
+@master_only
+def log_eval_metrics(step: int, metrics: dict, run_dir: Path) -> None:
+    log_parts = [
+        f"Step {step:>6}",
+        f"Eval Loss: {metrics['eval/loss']:7.4f}",
+        f"Perplexity: {metrics['eval/perplexity']:9.3f}",
+        f"Token Acc: {metrics['eval/token_accuracy'] * 100:6.2f}%",
+    ]
+    logger.info(" | ".join(log_parts))
+    append_jsonl(run_dir, {"step": step, **metrics}, "eval")
+
+
+@master_only
+def save_settings(path: Path, config: LacunaConfig) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    with (path / "settings.json").open("w") as f:
+        f.write(config.model_dump_json(indent=4))
 
 
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
