@@ -26,9 +26,9 @@ def run_eval(
     model.eval()
 
     batch_count = 0
-    loss_sum = torch.zeros(1, dtype=torch.float64)
-    token_sum = torch.zeros(1, dtype=torch.float64)
-    correct_sum = torch.zeros(1, dtype=torch.float64)
+    loss_sum = None
+    token_sum = None
+    correct_sum = None
 
     for _ in range(dataset.length):
         batch = next(data_iter)
@@ -40,6 +40,7 @@ def run_eval(
             "input_ids": batch["input_ids"].cuda(),
             "position_ids": batch["position_ids"].cuda(),
             "labels": labels.cuda(),
+            "accum_dtype": torch.float32,
         }
 
         labels_gpu = model_inputs["labels"]
@@ -61,6 +62,12 @@ def run_eval(
         predictions = logits.argmax(dim=-1)
         correct_tokens = (predictions.eq(labels_gpu) & mask).sum().to(torch.float64)
 
+        if loss_sum is None:
+            device = loss_value.device
+            loss_sum = torch.zeros(1, dtype=torch.float64, device=device)
+            token_sum = torch.zeros(1, dtype=torch.float64, device=device)
+            correct_sum = torch.zeros(1, dtype=torch.float64, device=device)
+
         loss_sum += loss_value
         token_sum += token_count
         correct_sum += correct_tokens
@@ -68,6 +75,9 @@ def run_eval(
 
     if was_training:
         model.train()
+
+    if loss_sum is None:
+        return {}
 
     if mesh:
         total_loss = dist_sum(loss_sum, mesh)
@@ -82,9 +92,6 @@ def run_eval(
         total_tokens = token_sum.item()
         total_correct = correct_sum.item()
         total_batches = float(batch_count)
-
-    if total_tokens == 0:
-        return {}
 
     mean_loss = total_loss / total_tokens
     perplexity = math.exp(mean_loss)
