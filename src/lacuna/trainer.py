@@ -98,7 +98,7 @@ def train(config: LacunaConfig) -> None:
             optimizer.step()
             scheduler.step()
 
-            local_loss = float(loss.detach().item())
+            local_loss = loss.detach().item()
             if prev_loss is not None and local_loss > prev_loss * 3.0:
                 log_loss_spikes(step, local_loss, model_inputs, run_dir)
             prev_loss = local_loss
@@ -106,7 +106,7 @@ def train(config: LacunaConfig) -> None:
             if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
                 current_grad_norm = grad_norm.item()  # already reduced
-                current_loss = dist_mean(loss.detach(), mesh) if mesh else loss.detach().item()
+                current_loss = dist_mean(loss.detach(), mesh) if mesh else local_loss
 
                 metrics = {
                     "train/loss": current_loss,
