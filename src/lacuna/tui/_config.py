@@ -1,6 +1,6 @@
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
-from textual.widgets import Tree
+from textual.widgets import Tree, Static
 
 from lacuna.tui.utils import get_settings
 
@@ -13,6 +13,11 @@ class ConfigScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         config = get_settings()
+
+        if config is None:
+            yield Static("No active run")
+            return
+
         tree: Tree[str] = Tree("config")
         tree.root.expand()
 
