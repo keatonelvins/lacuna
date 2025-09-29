@@ -1,7 +1,11 @@
 """Evaluation loop for trainer."""
 
-import math
+import time
 import torch
+import math
+import subprocess
+import verifiers as vf
+from openai import OpenAI
 from torchtitan.distributed.utils import dist_sum
 from torch.distributed.device_mesh import DeviceMesh
 from transformers import PreTrainedModel
@@ -104,3 +108,23 @@ def run_eval(
         "eval/num_tokens": float(total_tokens),
         "eval/num_batches": float(total_batches),
     }
+
+
+def run_vf_envs(config: LacunaConfig) -> dict[str, float]:
+    if not config.evals.envs:
+        return {}
+
+    vf_metrics = {}
+    client = OpenAI(api_key="TEOEOT", base_url="http://127.0.0.1:8000/v1")
+    server_proc = subprocess.Popen(["transformers", "serve"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(10)
+
+    for env_cfg in config.evals.envs:
+        env = vf.load_environment(env_cfg.name)
+        results = env.evaluate(client, config.model.name_or_path)
+        vf_metrics[f"eval/{env_cfg.name}/reward_mean"] = float(sum(results.reward) / len(results.reward))
+
+    server_proc.terminate()
+    server_proc.wait()
+
+    return vf_metrics

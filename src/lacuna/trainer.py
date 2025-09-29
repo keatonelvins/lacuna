@@ -13,10 +13,10 @@ from lacuna.data import LacunaDataset
 from lacuna.scheduler import setup_scheduler
 from lacuna.model import setup_model
 from lacuna.optim import setup_optimizer
-from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics
+from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics, log_loss_spikes
 from lacuna.wandb import init_wandb, log_wandb_metrics, finish
 from lacuna.distributed import init_dist, setup_dist, destroy_dist
-from lacuna.eval import run_eval
+from lacuna.eval import run_eval, run_vf_envs
 
 
 @record
@@ -47,6 +47,7 @@ def train(config: LacunaConfig) -> None:
         metrics_processor = setup_metrics_processor(config, model)
 
         step, epoch = 0, 0
+        prev_loss = None
 
         if config.checkpoint.resume_from is not None:
             logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
@@ -97,10 +98,15 @@ def train(config: LacunaConfig) -> None:
             optimizer.step()
             scheduler.step()
 
+            local_loss = float(loss.detach().item())
+            if prev_loss is not None and local_loss > prev_loss * 3.0:
+                log_loss_spikes(step, local_loss, model_inputs, run_dir)
+            prev_loss = local_loss
+
             if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
                 current_grad_norm = grad_norm.item()  # already reduced
-                current_loss = dist_mean(loss.detach(), mesh) if mesh else loss.item()
+                current_loss = dist_mean(loss.detach(), mesh) if mesh else loss.detach().item()
 
                 metrics = {
                     "train/loss": current_loss,
@@ -136,6 +142,7 @@ def train(config: LacunaConfig) -> None:
         if config.evals.datasets:
             logger.info("Running eval")
             eval_metrics = run_eval(config, model, amp_manager, mesh)
+            eval_metrics.update(run_vf_envs(config))
             log_eval_metrics(step, eval_metrics, run_dir)
             log_wandb_metrics(step, eval_metrics, wandb_run)
     except KeyboardInterrupt:

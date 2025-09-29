@@ -72,10 +72,17 @@ class DataConfig(StrictModel):
         return chat_template
 
 
+class EnvConfig(StrictModel):
+    """Env config"""
+
+    name: str = Field(description="Env name")
+
+
 class EvalsConfig(StrictModel):
     """Evals config"""
 
     datasets: list[DatasetConfig] = Field(default_factory=list, description="Datasets to use for eval")
+    envs: list[EnvConfig] = Field(default_factory=list, description="vf environments to use for eval")
 
 
 class OptimizerConfig(StrictModel):

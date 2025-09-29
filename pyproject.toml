@@ -17,7 +17,8 @@ dependencies = [
     "torch>=2.8.0",
     "torchdata>=0.11.0",
     "torchtitan",
-    "transformers>=4.56.2",
+    "transformers[serving]>=4.56.2",
+    "verifiers>=0.1.4",
     "wandb>=0.22.0",
 ]
 

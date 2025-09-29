@@ -136,6 +136,11 @@ def save_settings(path: Path, config: LacunaConfig) -> None:
         f.write(config.model_dump_json(indent=4))
 
 
+def log_loss_spikes(step: int, loss: float, model_inputs: dict, run_dir: Path) -> None:
+    spiky_inputs = model_inputs["input_ids"].detach().cpu().tolist()
+    append_jsonl(run_dir, {"step": step, "loss": loss, "model_inputs": spiky_inputs}, name="loss_spikes")
+
+
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
     """Get parameter count and FLOPs/token at seq_len (very approximate currently)."""
     config = model.config
