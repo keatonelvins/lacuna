@@ -1,6 +1,7 @@
 """Pydantic settings for jobs."""
 
 import os
+import wandb
 import torch
 import shutil
 from pathlib import Path
@@ -152,6 +153,12 @@ class WandbConfig(StrictModel):
     name: str = Field(None, description="wandb run name")
     entity: str = Field(None, description="wandb entity (team/user)")
     offline: bool = Field(False, description="Enable running wandb in offline mode")
+
+    @field_validator("project", mode="after")
+    @classmethod
+    def validate_wandb_login(cls, project: str) -> None:
+        if project and not wandb.api.api_key:
+            raise RuntimeError("wandb project specified but no api key found, please login first.")
 
 
 class LacunaConfig(BaseSettings):
