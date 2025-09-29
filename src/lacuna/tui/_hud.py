@@ -3,7 +3,6 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid
 
-from ._config import ConfigScreen
 from ._curves import CurvesWidget
 from ._i_o import IOWidget
 from ._redline import RedlineWidget

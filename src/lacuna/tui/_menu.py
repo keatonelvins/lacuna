@@ -1,13 +1,12 @@
-import os
-import subprocess
 from pathlib import Path
+from pydantic import BaseModel
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Static, OptionList
-from textual.widgets.option_list import Option
+from textual.widgets import Static, Input
 from textual.containers import Vertical, Center
-from textual import events
 from rich.text import Text
+from textual_autocomplete import AutoComplete, DropdownItem
+from lacuna.config import LacunaConfig
 
 ascii_art = """
 ░  ░░░░░░░░░      ░░░░      ░░░  ░░░░  ░░   ░░░  ░░░      ░░
@@ -16,6 +15,17 @@ ascii_art = """
 █  ████████        ██  ████  ██  ████  ██  ██    ██        █
 █        ██  ████  ███      ████      ███  ███   ██  ████  █
 """.strip()
+
+def _flatten_pydantic_fields(model: type[BaseModel], prefix: str = "") -> list[str]:
+    fields = []
+    for name, field_info in model.model_fields.items():
+        field_name = f"{prefix}.{name}" if prefix else name
+        annotation = field_info.annotation
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            fields.extend(_flatten_pydantic_fields(annotation, field_name))
+        else:
+            fields.append(f"--{field_name}")
+    return fields
 
 class MenuScreen(Screen):
     CSS = """
@@ -29,20 +39,9 @@ class MenuScreen(Screen):
         margin-bottom: 2;
     }
 
-    OptionList {
+    Input {
         border: solid white;
         width: 60%;
-        height: auto;
-        max-height: 20;
-    }
-
-    OptionList > .option-list--option {
-        color: white;
-    }
-
-    OptionList > .option-list--option-highlighted {
-        background: #333333;
-        color: white;
     }
     """
 
@@ -50,51 +49,26 @@ class MenuScreen(Screen):
         with Vertical():
             yield Static(Text(ascii_art))
             with Center():
-                yield OptionList(id="config_list")
+                input_widget = Input(placeholder="configs/model.toml --flag.value (or enter to skip)", id="train_input")
+                yield input_widget
+                yield AutoComplete(input_widget, candidates=self._get_candidates())
 
-    def on_mount(self) -> None:
-        self._load_config_files()
-
-    def _load_config_files(self) -> None:
-        option_list = self.query_one("#config_list", OptionList)
+    def _get_candidates(self) -> list[DropdownItem]:
+        candidates = []
         configs_dir = Path("configs")
-
         if configs_dir.exists() and configs_dir.is_dir():
-            toml_files = list(configs_dir.glob("*.toml"))
-            if toml_files:
-                for toml_file in sorted(toml_files):
-                    display_name = toml_file.stem
-                    option_list.add_option(Option(display_name, id=str(toml_file)))
+            candidates.extend([DropdownItem(str(f)) for f in sorted(configs_dir.glob("*.toml"))])
+        candidates.extend([DropdownItem(flag) for flag in _flatten_pydantic_fields(LacunaConfig)])
+        return candidates
 
-        option_list.add_option(Option("continue...", id="__continue__"))
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if event.option.disabled:
-            return
-
-        config_path = event.option.id
-        if config_path == "__continue__":
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        command = event.value.strip()
+        if not command:
             self.app.push_screen("hud")
-        elif config_path:
-            self._run_training(config_path)
+        else:
+            from lacuna.tui._confirm import ConfirmScreen
+            self.app.push_screen(ConfirmScreen(command), self._on_confirm)
 
-    def _run_training(self, config_path: str) -> None:
-        try:
-            subprocess.Popen([
-                "tmux", "new-session", "-d", "-s", f"lacuna_train_{os.getpid()}",
-                "uv", "run", "train", config_path
-            ])
+    def _on_confirm(self, confirmed: bool) -> None:
+        if confirmed:
             self.app.push_screen("hud")
-        except Exception as e:
-            pass
-
-    def on_key(self, event: events.Key) -> None:
-        if event.key == "enter":
-            option_list = self.query_one("#config_list", OptionList)
-            if option_list.highlighted is not None:
-                option = option_list.get_option_at_index(option_list.highlighted)
-                if option and not option.disabled and option.id:
-                    if option.id == "__continue__":
-                        self.app.push_screen("hud")
-                    else:
-                        self._run_training(option.id)
