@@ -17,9 +17,8 @@ from lacuna.config import LacunaConfig
 
 def init_dist(config: LacunaConfig) -> None:
     """Initialize distributed process group and return world size."""
-    set_seed(config.trainer.seed)
-
     if "LOCAL_RANK" not in os.environ:
+        set_seed(config.trainer.seed)
         return
 
     backend = "cuda:nccl,cpu:gloo" if config.dist.cpu_offload else "nccl"
@@ -27,6 +26,7 @@ def init_dist(config: LacunaConfig) -> None:
     torch.cuda.set_device(local_rank)
 
     dist.init_process_group(backend=backend, device_id=local_rank)
+    set_seed(config.trainer.seed)
 
 
 def destroy_dist() -> None:
@@ -115,7 +115,7 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
 
     if not model.config.tie_word_embeddings:
         fully_shard(model.model.embed_tokens, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)
-        fully_shard([model.lm_head, model.model.norm], mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)   
+        fully_shard([model.lm_head, model.model.norm], mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)
 
     fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=False)
 

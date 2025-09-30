@@ -117,7 +117,17 @@ def run_vf_envs(config: LacunaConfig) -> dict[str, float]:
     vf_metrics = {}
     client = OpenAI(api_key="TEOEOT", base_url="http://127.0.0.1:8000/v1")
     server_proc = subprocess.Popen(["transformers", "serve"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    time.sleep(10)
+
+    server_started = False
+    for _ in range(10):
+        time.sleep(3)
+        response = client.list_models()
+        if response.data:
+            server_started = True
+            break
+
+    if not server_started:
+        raise Exception("Timeout waiting for server to start")
 
     for env_cfg in config.evals.envs:
         env = vf.load_environment(env_cfg.name)
