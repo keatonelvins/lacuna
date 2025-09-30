@@ -2,10 +2,9 @@ import os
 import subprocess
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
-from textual.widgets import Tree, Static
+from textual.widgets import Static
 from textual.containers import Vertical
-from rich.text import Text
-from lacuna.config import LacunaConfig
+
 
 class ConfirmScreen(ModalScreen):
     CSS = """
@@ -21,21 +20,29 @@ class ConfirmScreen(ModalScreen):
         background: $background;
     }
 
-    Static {
+    .title {
         text-align: center;
+        text-style: bold;
+        color: white;
         margin-bottom: 1;
     }
 
-    Tree {
-        height: auto;
-        max-height: 30;
-        scrollbar-size: 1 1;
+    .command {
+        text-align: center;
+        color: cyan;
+        margin-bottom: 2;
+    }
+
+    .hint {
+        text-align: center;
+        text-style: dim;
     }
     """
 
     BINDINGS = [
         ("enter", "confirm", "Confirm"),
         ("escape", "cancel", "Cancel"),
+        ("ctrl+c", "exit", "Exit"),
     ]
 
     def __init__(self, command: str):
@@ -44,28 +51,9 @@ class ConfirmScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Static(Text(f"[bold white]Run Command:[/]\n[cyan]{self.command}[/]", justify="center"))
-            yield Static(Text("[dim]press enter to confirm, escape to cancel[/]", justify="center"))
-            tree = self._build_config_tree()
-            yield tree
-
-    def _build_config_tree(self) -> Tree:
-        parts = self.command.split()
-        config_args = ["--cli_parse_args=true"] + parts
-        config = LacunaConfig(_cli_parse_args=config_args)
-
-        tree: Tree[str] = Tree("configuration")
-        tree.root.expand()
-
-        for section_name, section_data in config.model_dump().items():
-            section_node = tree.root.add(f"[bold]{section_name}[/]", expand=False)
-            if isinstance(section_data, dict):
-                for key, value in section_data.items():
-                    section_node.add_leaf(f"[cyan]{key}[/]: [white]{value}[/]")
-            else:
-                section_node.add_leaf(f"[white]{section_data}[/]")
-
-        return tree
+            yield Static("Run Command:", classes="title")
+            yield Static(self.command, classes="command")
+            yield Static("press enter to confirm, escape to cancel", classes="hint")
 
     def action_confirm(self) -> None:
         parts = self.command.split()
@@ -74,3 +62,6 @@ class ConfirmScreen(ModalScreen):
 
     def action_cancel(self) -> None:
         self.dismiss(False)
+
+    def action_exit(self) -> None:
+        self.app.exit()
