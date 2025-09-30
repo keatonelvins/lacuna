@@ -818,7 +818,7 @@ class Qwen3MoeForCausalLM(Qwen3MoePreTrainedModel, GenerationMixin):
         hidden_states = outputs.last_hidden_state
 
         loss, logits = None, None
-        if kwargs.pop("materialize_logits", False):
+        if not self.training:
             logits = self.lm_head(hidden_states if logits_to_keep is None else hidden_states[:, -logits_to_keep:])
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=self.flce.ignore_index)
