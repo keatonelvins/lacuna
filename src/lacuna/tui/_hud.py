@@ -39,6 +39,7 @@ class HudScreen(Screen):
         Binding("c", "config", "Config"),
         Binding("l", "logs", "Logs"),
         Binding("escape", "menu", "Menu"),
+        Binding("ctrl+c", "quit", "Quit"),
     ]
 
     def compose(self) -> ComposeResult:

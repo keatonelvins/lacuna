@@ -35,7 +35,7 @@ class ConfigScreen(ModalScreen):
     BINDINGS = [
         Binding("escape", "dismiss", "Close", priority=True),
         Binding("c", "dismiss", "Close", priority=True),
-        Binding("ctrl+c", "dismiss", "Close", priority=True),
+        Binding("ctrl+c", "quit", "Quit", priority=True),
     ]
 
     def compose(self) -> ComposeResult:
