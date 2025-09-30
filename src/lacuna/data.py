@@ -71,6 +71,7 @@ class LacunaDataset:
             num_workers=self.config.data.num_workers,
             sampler=self.sampler,
         )
+        self.set_epoch(0)
 
     def _load_datasets(self):
         return [
