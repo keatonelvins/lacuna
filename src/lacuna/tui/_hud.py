@@ -7,6 +7,7 @@ from ._curves import CurvesWidget
 from ._i_o import IOWidget
 from ._redline import RedlineWidget
 
+
 class HudScreen(Screen):
     CSS = """
     Grid {
@@ -36,6 +37,7 @@ class HudScreen(Screen):
 
     BINDINGS = [
         Binding("c", "config", "Config"),
+        Binding("l", "logs", "Logs"),
         Binding("escape", "menu", "Menu"),
     ]
 
@@ -48,6 +50,9 @@ class HudScreen(Screen):
 
     def action_config(self) -> None:
         self.app.push_screen("config")
+
+    def action_logs(self) -> None:
+        self.app.push_screen("logs")
 
     def action_menu(self) -> None:
         self.app.pop_screen()

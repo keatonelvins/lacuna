@@ -33,7 +33,7 @@ def get_latest_metrics():
         if not lines:
             return None
         metrics = json.loads(lines[-1].strip())
-        flattened_metrics = {k.split("/")[-1]: v for k, v in metrics.items()}
+        flattened_metrics = {k.split("/")[-1].split("(")[0]: v for k, v in metrics.items()}
         return Metrics(**flattened_metrics).model_dump()
 
 
@@ -51,7 +51,7 @@ def get_gpu_hardware():
     """Get GPU hardware metrics using pynvml."""
     try:
         pynvml.nvmlInit()
-    except:
+    except OSError:
         return []
 
     device_count = pynvml.nvmlDeviceGetCount()
@@ -71,14 +71,16 @@ def get_gpu_hardware():
         mem_used_gb = mem_info.used / (1024**3)
         mem_total_gb = mem_info.total / (1024**3)
 
-        gpus.append({
-            'gpu_util': gpu_util,
-            'mem_util': mem_util,
-            'temp': temp,
-            'power': power,
-            'mem_used_gb': mem_used_gb,
-            'mem_total_gb': mem_total_gb
-        })
+        gpus.append(
+            {
+                "gpu_util": gpu_util,
+                "mem_util": mem_util,
+                "temp": temp,
+                "power": power,
+                "mem_used_gb": mem_used_gb,
+                "mem_total_gb": mem_total_gb,
+            }
+        )
 
     pynvml.nvmlShutdown()
     return gpus

@@ -2,6 +2,7 @@ from textual.app import App
 from textual.binding import Binding
 
 from ._config import ConfigScreen
+from ._logs import LogScreen
 from ._menu import MenuScreen
 from ._hud import HudScreen
 
@@ -11,6 +12,7 @@ class Lacuna(App):
         "menu": MenuScreen,
         "hud": HudScreen,
         "config": ConfigScreen,
+        "logs": LogScreen,
     }
 
     BINDINGS = [
