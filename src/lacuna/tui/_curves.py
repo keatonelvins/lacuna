@@ -5,10 +5,10 @@ from .utils import get_latest_metrics
 class CurvesWidget(Static):
     def __init__(self) -> None:
         super().__init__()
-        self.update_content()
 
     def on_mount(self) -> None:
-        self.set_interval(1, self.update_content)
+        self.set_interval(0.5, self.update_content)
+        self.update_content()
 
     def update_content(self) -> None:
         latest = get_latest_metrics()
