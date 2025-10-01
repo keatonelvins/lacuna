@@ -69,6 +69,7 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
 
     torch._dynamo.config.cache_size_limit = 256
     torch._dynamo.config.suppress_errors = True
+    torch._dynamo.config.capture_scalar_outputs = True
 
     for layer in model.model.layers:
         layer.compile(mode=config.model.compile_mode)
