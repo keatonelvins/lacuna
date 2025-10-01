@@ -17,10 +17,6 @@ from lacuna.config import (
 )
 from lacuna.models import AutoLacunaModelForCausalLM
 
-ATTN_IMPL_MAP = {
-    "FA3": "kernels-community/flash-attn3",
-}
-
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:
     """Load and fully configure model for training."""
@@ -41,7 +37,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     model = model_factory.from_pretrained(
         model_path,
         dtype=torch.bfloat16,
-        attn_implementation=ATTN_IMPL_MAP[config.model.attention],
+        attn_implementation=config.model.attention,
     )
     model.config.use_cache = False  # needed for ac to work
 

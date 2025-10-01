@@ -19,7 +19,7 @@ class ModelConfig(StrictModel):
 
     name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or (local?) path")
     backend: Literal["hf", "lacuna", "liger"] = Field("hf", description="Modeling backend")
-    attention: Literal["FA3"] = Field("FA3", description="Attention backend (FA3 only for now)")
+    attention: str = Field("kernels-community/flash-attn3", description="Attention backend")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
     compile_mode: Literal["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"] = Field(
         None, description="Compile mode (if omitted, torch.compile will not be used)"
