@@ -77,7 +77,7 @@ class LacunaDataset:
         return [
             load_dataset(
                 **dataset.model_dump(),
-                num_proc=self.config.data.num_proc,
+                num_proc=self.config.data.tok_num_proc,
                 download_mode="force_redownload" if self.config.data.redownload else None,
             )
             for dataset in self.datasets
@@ -93,15 +93,15 @@ class LacunaDataset:
         ds = ds.map(
             partial(_encode, tokenizer=tokenizer, column=cfg.column),
             batched=True,
-            num_proc=cfg.num_proc,
-            batch_size=cfg.map_bs,
+            batch_size=cfg.tok_bs,
+            num_proc=cfg.tok_num_proc,
             remove_columns=ds.column_names,
         ).with_format("arrow")
         ds = ds.map(
             partial(pack_bfd, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
             batched=True,
             batch_size=cfg.pack_bs,
-            num_proc=cfg.num_proc,
+            num_proc=cfg.pack_num_proc,
             remove_columns=ds.column_names,
         ).with_format("torch")
 

@@ -9,7 +9,7 @@ def test_dataset_cache_reuse():
     """Test that LacunaDataset reuses cache when built with same config."""
     config = SimpleNamespace(
         model=ModelConfig(),
-        data=DataConfig(datasets=[DatasetConfig(split="train[:10]")], num_proc=1),
+        data=DataConfig(datasets=[DatasetConfig(split="train[:10]")], tok_num_proc=1),
         trainer=TrainerConfig(seq_len=128, seed=42),
     )
 
@@ -33,7 +33,7 @@ def test_data_parallel_unique_splits():
     """Test that different DP ranks get unique data splits."""
     config = SimpleNamespace(
         model=ModelConfig(),
-        data=DataConfig(datasets=[DatasetConfig()], num_proc=1),
+        data=DataConfig(datasets=[DatasetConfig()], tok_num_proc=1),
         trainer=TrainerConfig(seq_len=128, seed=42, steps=125),
     )
 
@@ -59,7 +59,7 @@ def test_shuffle_changes_order():
     """Test that shuffle produces different order than sequential."""
     config = SimpleNamespace(
         model=ModelConfig(),
-        data=DataConfig(datasets=[DatasetConfig(split="train[:100]")], num_proc=1),
+        data=DataConfig(datasets=[DatasetConfig(split="train[:100]")], tok_num_proc=1),
         trainer=TrainerConfig(seq_len=128, seed=42, steps=50),
     )
 
@@ -79,7 +79,7 @@ def test_epoch_reshuffling():
     """Test that set_epoch changes sample order across epochs."""
     config = SimpleNamespace(
         model=ModelConfig(),
-        data=DataConfig(datasets=[DatasetConfig(split="train[:10]")], num_proc=1),
+        data=DataConfig(datasets=[DatasetConfig(split="train[:10]")], tok_num_proc=1),
         trainer=TrainerConfig(seq_len=128, seed=42, steps=5),
     )
 

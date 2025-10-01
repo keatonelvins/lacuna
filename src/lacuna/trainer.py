@@ -112,6 +112,7 @@ def train(config: LacunaConfig) -> None:
                     "train/loss": current_loss,
                     "train/lr": current_lr,
                     "train/grad_norm": current_grad_norm,
+                    "train/ntokens_batch": ntokens_batch,
                     **metrics_processor.get_metrics(),
                 }
                 log_training_metrics(step, metrics, run_dir)

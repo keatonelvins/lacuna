@@ -56,9 +56,10 @@ class DataConfig(StrictModel):
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
     tokenizer_override: str = Field(None, description="Model name to override the default tokenizer (for caching purposes)")
     redownload: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
-    map_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
-    pack_bs: int = Field(10000, description="Batch size to use when packing the dataset")
-    num_proc: int = Field(os.cpu_count(), description="Number of processes to use for dataset.map()")
+    tok_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
+    tok_num_proc: int = Field(os.cpu_count(), description="Number of processes to use while tokenizing")
+    pack_bs: int = Field(1000000, description="Batch size to use when packing the dataset")
+    pack_num_proc: int = Field(1, description="Number of processes to use while packing")
     num_workers: int = Field(1, description="Number of workers to use for the torch DataLoader")
 
     @field_validator("chat_template", mode="after")
