@@ -33,11 +33,6 @@ class Qwen3LacunaForCausalLM(Qwen3ForCausalLM):
         logits_to_keep: Union[int, torch.Tensor] = 0,
         **kwargs: Unpack[TransformersKwargs],
     ) -> CausalLMOutputWithPast:
-        """
-        During training, FLCE does not materialize the logits to save a huge amount of memory.
-
-        During eval, we materialize them anyway so that perplexity can be computed.
-        """
         outputs: BaseModelOutputWithPast = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -52,8 +47,11 @@ class Qwen3LacunaForCausalLM(Qwen3ForCausalLM):
         hidden_states = outputs.last_hidden_state
 
         loss, logits = None, None
+
+        # with FLCE, we don't materialize the logits during training to save memory
         if not self.training:
             logits = self.lm_head(hidden_states if logits_to_keep is None else hidden_states[:, -logits_to_keep:])
+
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=self.flce.ignore_index)
             shifted_labels = labels[..., 1:].contiguous().to(hidden_states.device)
