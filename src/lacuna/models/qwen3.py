@@ -51,7 +51,8 @@ class Qwen3LacunaForCausalLM(Qwen3ForCausalLM):
 
         # with FLCE, we don't materialize the logits during training to save memory
         if not self.training:
-            logits = self.lm_head(hidden_states if logits_to_keep is None else hidden_states[:, -logits_to_keep:])
+            slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
+            logits = self.lm_head(hidden_states[:, slice_indices, :])
 
         if labels is not None:
             labels = nn.functional.pad(labels, (0, 1), value=self.flce.ignore_index)
