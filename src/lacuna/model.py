@@ -68,7 +68,7 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
 
     for idx, layer in enumerate(model.model.layers):
         if idx % ac_config.stride == 0:
-            model.model.layers[idx] = checkpoint_wrapper(layer)
+            model.model.layers[idx] = checkpoint_wrapper(layer, preserve_rng_state=False)
 
     return model
 
