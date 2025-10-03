@@ -167,6 +167,7 @@ class WandbConfig(StrictModel):
     def validate_wandb_login(cls, project: str) -> None:
         if project and not wandb.api.api_key:
             raise RuntimeError("wandb project specified but no api key found, please login first.")
+        return project
 
 
 class LacunaConfig(BaseSettings):
