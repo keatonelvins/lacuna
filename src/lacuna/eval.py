@@ -20,19 +20,19 @@ def run_eval(
     amp_manager,
     mesh: DeviceMesh | None,
 ) -> dict[str, float]:
+    """Calcuate eval metrics on held out data (perplexity, token accuracy, etc.)."""
     if not config.evals.datasets:
         return {}
 
     dataset = LacunaDataset(config, datasets=config.evals.datasets)
     data_iter = iter(dataset.dataloader)
-
-    was_training = model.training
     model.eval()
 
     batch_count = 0
-    loss_sum = None
-    token_sum = None
-    correct_sum = None
+    device = torch.cuda.current_device()
+    loss_sum = torch.zeros(1, dtype=torch.float64, device=device)
+    token_sum = torch.zeros(1, dtype=torch.float64, device=device)
+    correct_sum = torch.zeros(1, dtype=torch.float64, device=device)
 
     for _ in range(dataset.length):
         batch = next(data_iter)
@@ -66,22 +66,10 @@ def run_eval(
         predictions = logits.argmax(dim=-1)
         correct_tokens = (predictions.eq(labels_gpu) & mask).sum().to(torch.float64)
 
-        if loss_sum is None:
-            device = loss_value.device
-            loss_sum = torch.zeros(1, dtype=torch.float64, device=device)
-            token_sum = torch.zeros(1, dtype=torch.float64, device=device)
-            correct_sum = torch.zeros(1, dtype=torch.float64, device=device)
-
         loss_sum += loss_value
         token_sum += token_count
         correct_sum += correct_tokens
         batch_count += 1
-
-    if was_training:
-        model.train()
-
-    if loss_sum is None:
-        return {}
 
     if mesh:
         total_loss = dist_sum(loss_sum, mesh)

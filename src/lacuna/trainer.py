@@ -26,7 +26,7 @@ def train(config: LacunaConfig) -> None:
     run_dir = setup_env(config)
     wandb_run = init_wandb(config)
 
-    gc_handler = utils.GarbageCollection(gc_freq=10)
+    gc_handler = utils.GarbageCollection()
 
     try:
         model = setup_model(config)
@@ -62,12 +62,11 @@ def train(config: LacunaConfig) -> None:
         logger.info("Starting training!")
 
         while step < total_steps:
-            step += 1
-            if step % dataset.length == 0:
+            if step > 0 and step % dataset.length == 0:
                 epoch += 1
                 dataset.set_epoch(epoch)
 
-            gc_handler.run(step)  # TODO: may need to tune
+            gc_handler.run(step)
             optimizer.zero_grad()
 
             data_load_start = time.perf_counter()
@@ -120,7 +119,6 @@ def train(config: LacunaConfig) -> None:
 
             if config.checkpoint.save_every:
                 if step > 0 and step % config.checkpoint.save_every == 0:
-                    logger.info(f"Saving checkpoint at step {step}")
                     save_checkpoint(
                         step=step,
                         config=config,
@@ -129,6 +127,8 @@ def train(config: LacunaConfig) -> None:
                         scheduler=scheduler,
                         dataloader=dataset.dataloader,
                     )
+
+            step += 1
 
         save_checkpoint(
             step=step,
@@ -143,9 +143,10 @@ def train(config: LacunaConfig) -> None:
         if config.evals.datasets:
             logger.info("Running eval")
             eval_metrics = run_eval(config, model, amp_manager, mesh)
-            eval_metrics.update(run_vf_envs(config))
+            eval_metrics.update(run_vf_envs(config))  # TODO: clear model from GPU first
             log_eval_metrics(step, eval_metrics, run_dir)
             log_wandb_metrics(step, eval_metrics, wandb_run)
+
     except KeyboardInterrupt:
         logger.info("Training interrupted :(")
     finally:

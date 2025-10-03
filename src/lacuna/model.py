@@ -15,7 +15,7 @@ from lacuna.config import (
     ModelConfig,
     LacunaConfig,
 )
-from lacuna.models import AutoLacunaModelForCausalLM
+from lacuna.models.auto_model import AutoLacunaModelForCausalLM
 
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:

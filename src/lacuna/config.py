@@ -17,7 +17,7 @@ class StrictModel(BaseModel):
 class ModelConfig(StrictModel):
     """Modeling and patching config"""
 
-    name: str = Field("Qwen/Qwen2.5-0.5B", description="HuggingFace model name or (local?) path")
+    name: str = Field("Qwen/Qwen3-0.6B-Base", description="HuggingFace model name or (local?) path")
     backend: Literal["hf", "lacuna", "liger"] = Field("hf", description="Modeling backend")
     attention: str = Field("kernels-community/flash-attn3", description="Attention backend")
     kernelize: bool = Field(False, description="Enable Hugging Face kernels.kernelize(model)")
