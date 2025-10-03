@@ -12,6 +12,7 @@ from fla.modules.mlp import GatedMLP
 from liger_kernel.transformers.rope import liger_rotary_pos_emb
 from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
 
+from transformers.models.qwen3 import modeling_qwen3
 from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
 
@@ -68,8 +69,6 @@ class Qwen3LacunaForCausalLM(Qwen3ForCausalLM):
 
 def lacuna_patch_qwen3() -> None:
     """Path Qwen3 ops with kernels from fla-core and liger kernel"""
-    from transformers.models.qwen3 import modeling_qwen3
-
     modeling_qwen3.apply_rotary_pos_emb = liger_rotary_pos_emb
     modeling_qwen3.Qwen3RMSNorm = RMSNorm
     modeling_qwen3.Qwen3ForCausalLM = Qwen3LacunaForCausalLM
