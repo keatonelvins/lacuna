@@ -66,7 +66,7 @@ class DataConfig(StrictModel):
     @classmethod
     def validate_chat_template(cls, chat_template: str | None) -> str:
         """If chat_template is a file path, read the template from the file."""
-        if chat_template and isinstance(chat_template, os.PathLike):
+        if chat_template and chat_template.endswith(".jinja"):
             maybe_template_path = Path(chat_template)
             if maybe_template_path.exists() and maybe_template_path.is_file():
                 return maybe_template_path.read_text()
