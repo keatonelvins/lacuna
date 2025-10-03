@@ -1,5 +1,6 @@
 """Data loading, tokenization, and packing for training."""
 
+from loguru import logger
 from functools import partial
 from torch import distributed as dist
 from torch.utils.data import DistributedSampler
@@ -44,7 +45,7 @@ class LacunaDataset:
 
         if dist.is_initialized():
             if is_master():
-                self._build_dataset()  # warm cache on master first
+                self._build_dataset(override=self.config.data.override_cache)  # warm cache on master first
             dist.barrier()
 
         self._dataset = self._build_dataset()
@@ -73,21 +74,21 @@ class LacunaDataset:
         )
         self.set_epoch(0)
 
-    def _load_datasets(self):
+    def _load_datasets(self, override: bool = False):
         return [
             load_dataset(
                 **dataset.model_dump(),
                 num_proc=self.config.data.tok_num_proc,
-                download_mode="force_redownload" if self.config.data.override_cache else None,
+                download_mode="force_redownload" if override else None,
             )
             for dataset in self.datasets
         ]
 
-    def _build_dataset(self):
+    def _build_dataset(self, override: bool = False):
         """Master process does all hf hub calls and builds dataset first. Others wait then load from local cache."""
         try:
             tokenizer = get_tokenizer(self.config)
-            ds = concatenate_datasets(self._load_datasets())
+            ds = concatenate_datasets(self._load_datasets(override=override))
             cfg = self.config.data
 
             # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
@@ -102,7 +103,7 @@ class LacunaDataset:
                 partial(pack_bfd, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
                 batched=True,
                 batch_size=cfg.pack_bs,
-                num_proc=cfg.pack_num_proc or len(ds) // cfg.pack_bs,
+                num_proc=cfg.pack_num_proc or (len(ds) // cfg.pack_bs) + 1,
                 remove_columns=ds.column_names,
             ).with_format("torch")
         except Exception as e:
