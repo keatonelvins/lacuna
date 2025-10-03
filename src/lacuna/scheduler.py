@@ -24,13 +24,15 @@ def setup_scheduler(optimizer: Optimizer, config: SchedulerConfig, total_steps: 
     if warmup_steps > 0:
         warmup_scheduler = LinearLR(optimizer, start_factor=1e-8, end_factor=1.0, total_iters=warmup_steps)
         schedulers.append(warmup_scheduler)
-        milestones.append(warmup_steps)
+        if constant_steps > 0 or decay_steps > 0:
+            milestones.append(warmup_steps)
 
     # Phase 2: Constant (if any)
     if constant_steps > 0:
         constant_scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=1.0, total_iters=constant_steps)
         schedulers.append(constant_scheduler)
-        milestones.append(decay_start_step)
+        if decay_steps > 0:
+            milestones.append(decay_start_step)
 
     # Phase 3: Final decay (if any)
     if decay_steps > 0:
