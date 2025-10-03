@@ -115,7 +115,10 @@ def setup_fsdp2(model, config, mesh) -> PreTrainedModel:
 
     if not model.config.tie_word_embeddings:
         fully_shard(model.model.embed_tokens, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)
-        fully_shard([model.lm_head, model.model.norm], mesh=mesh, mp_policy=mp_policy, reshard_after_forward=reshard)
+        if config.model.backend != "hf": # liger/lacuna use flce and don't run lm_head directly
+            fully_shard(model.model.norm, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=False)
+        else:
+            fully_shard([model.lm_head, model.model.norm], mesh=mesh, mp_policy=mp_policy, reshard_after_forward=False)
 
     fully_shard(model, mesh=mesh, mp_policy=mp_policy, offload_policy=offload, reshard_after_forward=False)
 
