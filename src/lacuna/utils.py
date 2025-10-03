@@ -142,17 +142,86 @@ def log_loss_spikes(step: int, loss: float, model_inputs: dict, run_dir: Path) -
     append_jsonl(run_dir, {"step": step, "loss": loss, "model_inputs": spiky_inputs}, name="loss_spikes")
 
 
-def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> tuple[int, int]:
-    """Get parameter count and FLOPs/token at seq_len (very approximate currently)."""
+# ref: https://github.com/PrimeIntellect-ai/prime-rl/blob/main/src/prime_rl/trainer/perf.py
+def get_active_mm_params(config) -> float:
+    """Get number of active parameters per token involved in matmuls"""
+    vocab_size = config.vocab_size
+    hidden_size = config.hidden_size
+    intermediate_size = config.intermediate_size
+    head_dim = config.head_dim
+    num_attention_heads = config.num_attention_heads
+    num_hidden_layers = config.num_hidden_layers
+
+    ## Attention
+    if hasattr(config, "q_lora_rank") and hasattr(config, "kv_lora_rank"):
+        # MLA
+        q_params = num_hidden_layers * (
+            hidden_size * config.q_lora_rank + config.q_lora_rank * num_attention_heads * config.qk_head_dim
+        )
+        kv_params = num_hidden_layers * (
+            hidden_size * (config.kv_lora_rank + config.qk_rope_head_dim)
+            + config.kv_lora_rank * num_attention_heads * (config.qk_nope_head_dim + config.v_head_dim)
+        )
+        o_params = num_hidden_layers * (num_attention_heads * config.v_head_dim * hidden_size)
+    else:
+        # GQA
+        num_key_value_heads = config.num_key_value_heads
+        q_params = num_hidden_layers * hidden_size * num_attention_heads * head_dim
+        kv_params = 2 * num_hidden_layers * hidden_size * num_key_value_heads * head_dim
+        o_params = num_hidden_layers * hidden_size * num_attention_heads * head_dim
+
+    ## MLP
+    if hasattr(config, "first_k_dense_replace"):
+        num_dense_layers = config.first_k_dense_replace
+        num_sparse_layers = config.num_hidden_layers - num_dense_layers
+    elif hasattr(config, "num_experts_per_tok"):
+        num_dense_layers = 0
+        num_sparse_layers = config.num_hidden_layers
+    else:
+        num_dense_layers = config.num_hidden_layers
+        num_sparse_layers = 0
+
+    dense_mlp_params = num_dense_layers * 3 * intermediate_size * hidden_size
+    sparse_mlp_params = 0
+    if hasattr(config, "num_shared_experts"):  # Shared experts
+        sparse_mlp_params += (
+            num_sparse_layers * config.num_shared_experts * 3 * config.moe_intermediate_size * hidden_size
+        )
+    if hasattr(config, "num_experts_per_tok"):  # Routed experts
+        sparse_mlp_params += (
+            num_sparse_layers * config.num_experts_per_tok * 3 * config.moe_intermediate_size * hidden_size
+        )
+    if hasattr(config, "n_routed_experts"):  # DeepSeek Router
+        sparse_mlp_params += num_sparse_layers * config.n_routed_experts * hidden_size
+    elif hasattr(config, "num_experts"):  # Qwen Router
+        sparse_mlp_params += num_sparse_layers * config.num_experts * hidden_size
+    else:
+        sparse_mlp_params = 0
+
+    ## LM Head
+    lm_head_params = vocab_size * hidden_size
+    ## Total
+    return q_params + kv_params + o_params + dense_mlp_params + sparse_mlp_params + lm_head_params
+
+
+def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> int:
+    """Get parameter count and FLOPs/token at seq_len."""
     config = model.config
-    num_params = sum(p.numel() for p in model.parameters())
-    head_dim = config.hidden_size // config.num_attention_heads
+    l, h, q, t = (
+        config.num_hidden_layers,
+        config.num_attention_heads,
+        config.hidden_size // config.num_attention_heads,
+        seq_len,
+    )
+    # Reasoning behind the factor of 12 for the self-attention part of the formula:
+    # 1. each self-attention has 2 matmul in the forward and 4 in the backward (6)
+    # 2. the flash attention does 1 more matmul recomputation in the backward
+    #    but recomputation should not be counted in calculating MFU           (+0)
+    # 3. each matmul performs 1 multiplication and 1 addition                 (*2)
+    # 4. we follow the convention and do not account for sparsity in causal attention
+    flop_per_token = 6 * get_active_mm_params(config) + 12 * l * h * q * t
 
-    attn_flops = 12 * config.num_hidden_layers * config.num_attention_heads * head_dim * seq_len
-    flops_per_token = 6 * num_params + attn_flops
-
-    return int(flops_per_token)
-
+    return int(flop_per_token)
 
 # ref: https://github.com/pytorch/torchtitan/blob/main/torchtitan/components/metrics.py
 class MetricsProcessor:
