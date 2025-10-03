@@ -21,7 +21,7 @@ Kernelize -> AC -> torch.compile -> FSDP
 - We will tokenize and pack using `.map()` from `datasets` which automatically fingerprints and caches the final dataset
     - This means you only need to tokenize and pack once! Subsequent runs will stream directly from the cache under `HF_HOME`.
     - Also, changing the seq_len will only re-pack instead of also re-tokenizing :)
-    - If you change models but want to use the cache, you can pass in data.tokenizer_override to force cache use
+    - If you change models but want to use the cache, you can pass in data.override_tokenizer to force cache use
 - The DatasetConfig is passed directly through to `load_dataset`, so you can load datasets directly from s3 with s3fs:
     ```toml
     [[data.datasets]]

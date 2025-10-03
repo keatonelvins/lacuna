@@ -54,8 +54,8 @@ class DataConfig(StrictModel):
     truncate: bool = Field(True, description="Whether to truncate long examples to context_len (above) or just drop them")
     chat_template: str = Field(None, description="Chat template to use (either a string or a path to a file)")
     eos_token: str = Field(None, description="New eos token (required if adding a chat template to a base model)")
-    tokenizer_override: str = Field(None, description="Model name to override the default tokenizer (for caching purposes)")
-    redownload: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
+    override_tokenizer: str = Field(None, description="Model name to override the default tokenizer (for caching purposes)")
+    override_cache: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
     tok_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     tok_num_proc: int = Field(os.cpu_count(), description="Number of processes to use while tokenizing")
     pack_bs: int = Field(1000000, description="Batch size to use when packing the dataset")
@@ -89,9 +89,9 @@ class EvalsConfig(StrictModel):
 class OptimizerConfig(StrictModel):
     """Optimizer config"""
 
-    type: Literal["adamw"] = Field("adamw", description="Optimizer type (adamw only for now)")
+    name: Literal["adamw"] = Field("adamw", description="Optimizer name (adamw only for now)")
     lr: float = Field(3e-4, gt=0, description="Peak learning rate")
-    weight_decay: float = Field(0.01, ge=0, description="Weight decay (not applied to embeddings etc.)")
+    weight_decay: float = Field(0.1, ge=0, description="Weight decay (not applied to embeddings etc.)")
     betas: tuple[float, float] = Field((0.9, 0.95), description="Adam betas")
     eps: float = Field(1e-8, ge=0, description="Adam eps")
     max_norm: float = Field(1.0, gt=0, description="Gradient clipping norm ")

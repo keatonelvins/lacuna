@@ -17,7 +17,7 @@ uv run train --help
 # Load args from a toml (w/ temp overrides)
 uv run train path/to/config.toml
 uv run train path/to/config.toml --optimizer.lr 1e-5
-uv run train path/to/config.toml --data.redownload
+uv run train path/to/config.toml --data.override_cache
 
 # Pass args directly
 uv run train --model.name Qwen/Qwen3-8B --trainer.steps 100

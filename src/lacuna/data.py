@@ -27,7 +27,7 @@ def _encode(examples, tokenizer, column):
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
-    tokenizer = AutoTokenizer.from_pretrained(config.data.tokenizer_override or config.model.name, model_max_length=int(1e10))
+    tokenizer = AutoTokenizer.from_pretrained(config.data.override_tokenizer or config.model.name, model_max_length=int(1e10))
     if config.data.chat_template:
         tokenizer.chat_template = config.data.chat_template
     if config.data.eos_token:
@@ -78,7 +78,7 @@ class LacunaDataset:
             load_dataset(
                 **dataset.model_dump(),
                 num_proc=self.config.data.tok_num_proc,
-                download_mode="force_redownload" if self.config.data.redownload else None,
+                download_mode="force_redownload" if self.config.data.override_cache else None,
             )
             for dataset in self.datasets
         ]

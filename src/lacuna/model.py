@@ -20,10 +20,7 @@ from lacuna.models.auto_model import AutoLacunaModelForCausalLM
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:
     """Load and fully configure model for training."""
-    model_path = config.model.name
-
-    if config.checkpoint.resume_from:
-        model_path = config.checkpoint.resume_from
+    model_path = config.checkpoint.resume_from or config.model.name
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
 
@@ -46,6 +43,20 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     model = apply_torch_compile(model, config)
 
     model.train()
+
+    return model
+
+
+def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
+    """Apply HuggingFace kernels.kernelize if enabled."""
+    if not config.kernelize:
+        return model
+
+    mode = Mode.TRAINING
+    if config.compile_mode:
+        mode |= Mode.TORCH_COMPILE
+
+    model = kernelize(model, mode=mode)
 
     return model
 
@@ -73,19 +84,5 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
 
     for layer in model.model.layers:
         layer.compile(mode=config.model.compile_mode)
-
-    return model
-
-
-def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Apply HuggingFace kernels.kernelize if enabled."""
-    if not config.kernelize:
-        return model
-
-    mode = Mode.TRAINING
-    if config.compile_mode:
-        mode |= Mode.TORCH_COMPILE
-
-    model = kernelize(model, mode=mode)
 
     return model
