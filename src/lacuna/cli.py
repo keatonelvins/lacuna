@@ -4,6 +4,8 @@ import os
 import sys
 import torch
 import tomllib
+import subprocess
+import itertools
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -17,12 +19,14 @@ def launch_torchrun(config: LacunaConfig) -> None:
     cmd = ["torchrun", f"--nproc_per_node={config.torchrun.nproc_per_node}"]
 
     if config.torchrun.node_rank is not None:
-        cmd.extend([
-            f"--nnodes={config.torchrun.nnodes}",
-            f"--master_addr={config.torchrun.master_addr}",
-            f"--master_port={config.torchrun.master_port}",
-            f"--node_rank={config.torchrun.node_rank}",
-        ])
+        cmd.extend(
+            [
+                f"--nnodes={config.torchrun.nnodes}",
+                f"--master_addr={config.torchrun.master_addr}",
+                f"--master_port={config.torchrun.master_port}",
+                f"--node_rank={config.torchrun.node_rank}",
+            ]
+        )
     elif config.torchrun.nnodes > 1:
         print(f"Error: For multi-node training (nnodes={config.torchrun.nnodes}) must specify node_rank")
         print("Example: uv run train configs/multi_node.toml --torchrun.node_rank 0")
@@ -54,6 +58,58 @@ def parse_argv() -> LacunaConfig:
         launch_torchrun(config)
 
     return config
+
+
+def parse_sweep_value(value: str) -> list:
+    if ":" in value:
+        parts = value.split(":")
+        start, stop = float(parts[0]), float(parts[1])
+        step = float(parts[2]) if len(parts) > 2 else 1
+        return [start + i * step for i in range(int((stop - start) / step) + 1)]
+    return value.split(",")
+
+
+def parse_sweep_args(args: list[str]) -> tuple[str | None, dict[str, list], dict[str, str]]:
+    config_path = None if not args or args[0].startswith("--") else args[0]
+    sweeps = {}
+    fixed = {}
+
+    i = 0 if config_path is None else 1
+    while i < len(args):
+        if args[i].startswith("--"):
+            key = args[i][2:]
+            value = args[i + 1] if i + 1 < len(args) else ""
+            if "," in value or ":" in value:
+                sweeps[key] = parse_sweep_value(value)
+            else:
+                fixed[key] = value
+            i += 2
+        else:
+            i += 1
+
+    return config_path, sweeps, fixed
+
+
+def run_sweeps(config_path: str | None, sweeps: dict[str, list], fixed: dict[str, str]) -> None:
+    keys, values = list(sweeps.keys()), list(sweeps.values())
+
+    for combo in itertools.product(*values):
+        sweep_overrides = [f"--{k}={v}" for k, v in zip(keys, combo)]
+        fixed_overrides = [f"--{k}={v}" for k, v in fixed.items()]
+        run_name = "_".join(f"{k.split('.')[-1]}={v}" for k, v in zip(keys, combo))
+
+        cmd = ["uv", "run", "train"]
+        if config_path:
+            cmd.append(config_path)
+        cmd.extend(sweep_overrides + fixed_overrides + [f"--wandb.name={run_name}"])
+
+        print(f"\n{'=' * 60}\nRunning: {run_name}\n{'=' * 60}")
+        subprocess.run(cmd, check=True)
+
+
+def sweep():
+    config_path, sweeps, fixed = parse_sweep_args(sys.argv[1:])
+    run_sweeps(config_path, sweeps, fixed)
 
 
 def run_train():

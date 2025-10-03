@@ -22,6 +22,9 @@ uv run train path/to/config.toml --data.override_cache
 # Pass args directly
 uv run train --model.name Qwen/Qwen3-8B --trainer.steps 100
 
+# Run a sweep
+uv run sweep path/to/config.toml --trainer.steps 10 --optimizer.lr 1e-5:5e-5:1e-5
+
 # Run TUI
 uv run lacuna
 

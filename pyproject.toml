@@ -25,6 +25,7 @@ dependencies = [
 
 [project.scripts]
 train = "lacuna.cli:run_train"
+sweep = "lacuna.cli:sweep"
 lacuna = "lacuna.tui.app:main"
 
 [dependency-groups]
