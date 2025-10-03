@@ -85,25 +85,29 @@ class LacunaDataset:
 
     def _build_dataset(self):
         """Master process does all hf hub calls and builds dataset first. Others wait then load from local cache."""
-        tokenizer = get_tokenizer(self.config)
-        ds = concatenate_datasets(self._load_datasets())
-        cfg = self.config.data
+        try:
+            tokenizer = get_tokenizer(self.config)
+            ds = concatenate_datasets(self._load_datasets())
+            cfg = self.config.data
 
-        # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
-        ds = ds.map(
-            partial(_encode, tokenizer=tokenizer, column=cfg.column),
-            batched=True,
-            batch_size=cfg.tok_bs,
-            num_proc=cfg.tok_num_proc,
-            remove_columns=ds.column_names,
-        ).with_format("arrow")
-        ds = ds.map(
-            partial(pack_bfd, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
-            batched=True,
-            batch_size=cfg.pack_bs,
-            num_proc=cfg.pack_num_proc,
-            remove_columns=ds.column_names,
-        ).with_format("torch")
+            # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
+            ds = ds.map(
+                partial(_encode, tokenizer=tokenizer, column=cfg.column),
+                batched=True,
+                batch_size=cfg.tok_bs,
+                num_proc=cfg.tok_num_proc,
+                remove_columns=ds.column_names,
+            ).with_format("arrow")
+            ds = ds.map(
+                partial(pack_bfd, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
+                batched=True,
+                batch_size=cfg.pack_bs,
+                num_proc=cfg.pack_num_proc,
+                remove_columns=ds.column_names,
+            ).with_format("torch")
+        except Exception as e:
+            logger.error(f"Error building dataset: {e}")
+            raise e
 
         return ds
 
