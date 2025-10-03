@@ -225,6 +225,7 @@ class IntSucc:
 
 
 def _take(arr, idx):
+    idx = np.asarray(idx, dtype=np.int32)
     out = pc.take(arr, pa.array(idx, type=pa.int32()))
     return out.combine_chunks() if isinstance(out, pa.ChunkedArray) else out
 

@@ -102,7 +102,7 @@ class LacunaDataset:
                 partial(pack_bfd, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
                 batched=True,
                 batch_size=cfg.pack_bs,
-                num_proc=cfg.pack_num_proc,
+                num_proc=cfg.pack_num_proc or len(ds) // cfg.pack_bs,
                 remove_columns=ds.column_names,
             ).with_format("torch")
         except Exception as e:

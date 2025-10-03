@@ -58,8 +58,8 @@ class DataConfig(StrictModel):
     override_cache: bool = Field(False, description="Force redownload of the dataset to avoid cache reuse")
     tok_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     tok_num_proc: int = Field(os.cpu_count(), description="Number of processes to use while tokenizing")
-    pack_bs: int = Field(1000000, description="Batch size to use when packing the dataset")
-    pack_num_proc: int = Field(1, description="Number of processes to use while packing")
+    pack_bs: int = Field(100000, description="Batch size to use when packing the dataset")
+    pack_num_proc: int = Field(None, description="Number of processes to use while packing (defaults to dataset.length / pack_bs)")
     num_workers: int = Field(1, description="Number of workers to use for the torch DataLoader")
 
     @field_validator("chat_template", mode="after")
