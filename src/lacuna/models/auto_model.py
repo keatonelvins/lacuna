@@ -2,6 +2,7 @@ from transformers import AutoConfig
 from transformers import AutoModelForCausalLM
 
 from lacuna.models.qwen3 import lacuna_patch_qwen3
+from lacuna.models.qwen3_moe import lacuna_patch_qwen3_moe
 
 
 class AutoLacunaModelForCausalLM(AutoModelForCausalLM):
@@ -12,6 +13,8 @@ class AutoLacunaModelForCausalLM(AutoModelForCausalLM):
 
         if model_type == "qwen3":
             lacuna_patch_qwen3()
+        elif model_type == "qwen3_moe":
+            lacuna_patch_qwen3_moe()
         else:
             raise ValueError(f"Model type {model_type} not supported")
 
