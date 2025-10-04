@@ -167,7 +167,6 @@ class MetricsProcessor:
         self.device_memory_monitor.reset_peak_stats()
 
     def get_metrics(self) -> dict:
-        torch.cuda.synchronize()
         time_delta = time.perf_counter() - self.time_last_log
         tps = self.ntokens_since_last_log / time_delta
         mfu = 100 * self.num_flops_per_token * tps / self.gpu_peak_flops
