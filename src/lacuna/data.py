@@ -94,7 +94,7 @@ class LacunaDataset:
             # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
             ds = ds.map(
                 partial(_encode, tokenizer=tokenizer, column=cfg.column),
-                desc=f"Tokenizing data with batch size {cfg.tok_bs} per process",
+                desc=f"Tokenizing data with (bs={cfg.tok_bs})",
                 batched=True,
                 batch_size=cfg.tok_bs,
                 num_proc=cfg.tok_num_proc,
@@ -102,7 +102,7 @@ class LacunaDataset:
             ).with_format("arrow")
             ds = ds.map(
                 partial(pack_bfd, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
-                desc=f"Packing data with batch size {cfg.pack_bs} per process",
+                desc=f"Packing data with (bs={cfg.pack_bs})",
                 batched=True,
                 batch_size=cfg.pack_bs,
                 num_proc=cfg.pack_num_proc or (len(ds) // cfg.pack_bs) + 1,
