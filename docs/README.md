@@ -10,7 +10,7 @@ Kernelize -> AC -> torch.compile -> FSDP
 - Don't apply weight decay to embeddings/layer norms/biases (https://github.com/karpathy/minGPT/pull/24#issuecomment-679316025)
 - Prefer regional (layer-wise) over full model compilation (https://docs.pytorch.org/tutorials/recipes/regional_compilation.html)
 - For FSDP, we fully shard the layers individually, then finally the root model (https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html#how-to-use-fsdp2)
-- Use fp32 for accum! Liger Kernel doesn't do this by default, but our FLCE comes from fla-core which does (in liger 0.6.2 you can pass through accum_dtype)
+- Use fp32 for accum! Liger Kernel doesn't do this by default.
 - AdamW params taken from https://arxiv.org/pdf/2509.02046 but you should tune!!
 - When using the DistributedSampler, you must call .set_epoch() BEFORE casting the dataloader to an iterable, otherwise epoch reshuffles won't work.
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking

@@ -15,7 +15,6 @@ from lacuna.config import (
     ModelConfig,
     LacunaConfig,
 )
-from lacuna.models.auto_model import AutoLacunaModelForCausalLM
 
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:
@@ -24,9 +23,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
 
-    if config.model.backend == "lacuna":
-        model_factory = AutoLacunaModelForCausalLM
-    elif config.model.backend == "liger":
+    if config.model.backend == "liger":
         model_factory = AutoLigerKernelForCausalLM
     else:
         model_factory = AutoModelForCausalLM
