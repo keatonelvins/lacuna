@@ -36,7 +36,7 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
 
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
-    model = apply_torch_compile(model, config)
+    model = apply_torch_compile(model, config.model)
 
     model.train()
 
@@ -69,9 +69,9 @@ def apply_activation_checkpointing(model: PreTrainedModel, ac_config: Activation
     return model
 
 
-def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrainedModel:
+def apply_torch_compile(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
     """Apply torch.compile if enabled."""
-    if not config.model.compile_mode:
+    if not config.compile_mode:
         return model
 
     torch._dynamo.config.cache_size_limit = 256
@@ -79,6 +79,6 @@ def apply_torch_compile(model: PreTrainedModel, config: LacunaConfig) -> PreTrai
     torch._dynamo.config.capture_scalar_outputs = True
 
     for layer in model.model.layers:
-        layer.compile(mode=config.model.compile_mode)
+        layer.compile(mode=config.compile_mode)
 
     return model

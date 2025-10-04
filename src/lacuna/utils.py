@@ -312,7 +312,7 @@ def pack_bfd(examples: pa.Table, seq_len: int, context_len: int | None = None, t
         sample_lens = pc.list_value_length(examples["input_ids"])
         long_sample_mask = pc.less_equal(sample_lens, context_len)
         num_kept, num_total = pc.sum(long_sample_mask).as_py(), len(sample_lens)
-        logger.info(f"Dropped {num_total - num_kept} examples longer than context_len={context_len}")
+        logger.info(f"Rank {get_rank()}: dropped {num_total - num_kept} examples longer than context_len={context_len}")
         ids = pc.filter(examples["input_ids"], long_sample_mask)
         masks = pc.filter(examples["assistant_masks"], long_sample_mask) if has_masks else None
 
