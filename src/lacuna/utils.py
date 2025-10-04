@@ -207,10 +207,11 @@ def get_active_mm_params(config) -> float:
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> int:
     """Get parameter count and FLOPs/token at seq_len."""
     config = model.config
-    l, h, q = (
+    l, h, q, t = (
         config.num_hidden_layers,
         config.num_attention_heads,
         config.hidden_size // config.num_attention_heads,
+        seq_len,
     )
     # Reasoning behind the factor of 12 for the self-attention part of the formula:
     # 1. each self-attention has 2 matmul in the forward and 4 in the backward (6)
@@ -218,7 +219,7 @@ def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> int:
     #    but recomputation should not be counted in calculating MFU           (+0)
     # 3. each matmul performs 1 multiplication and 1 addition                 (*2)
     # 4. we follow the convention and do not account for sparsity in causal attention
-    flop_per_token = 6 * get_active_mm_params(config) + 12 * l * h * q
+    flop_per_token = 6 * get_active_mm_params(config) + 12 * l * h * q * t
 
     return int(flop_per_token)
 
@@ -234,6 +235,7 @@ class MetricsProcessor:
         self.device_memory_monitor.reset_peak_stats()
 
     def get_metrics(self) -> dict:
+        torch.cuda.synchronize()
         time_delta = time.perf_counter() - self.time_last_log
         tps = self.ntokens_since_last_log / time_delta
         mfu = 100 * self.num_flops_per_token * tps / self.gpu_peak_flops
