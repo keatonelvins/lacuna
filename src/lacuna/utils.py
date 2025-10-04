@@ -112,7 +112,7 @@ def log_training_metrics(step: int, metrics: dict, run_dir: Path) -> None:
         f"LR: {metrics['train/lr']:9.2e}",
         f"MFU: {metrics['perf/mfu(%)']:6.2f}%",
         f"Mem: {metrics['memory/max_active(GiB)']:6.2f}GiB",
-        f"Toks: {metrics['train/ntokens_batch']:4d}",
+        f"Toks: {metrics['train/ntokens_micro_batch']:4d}",
     ]
     logger.info(" | ".join(log_parts))
     append_jsonl(run_dir, metrics, "metrics")
