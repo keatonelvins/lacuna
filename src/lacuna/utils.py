@@ -207,11 +207,10 @@ def get_active_mm_params(config) -> float:
 def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> int:
     """Get parameter count and FLOPs/token at seq_len."""
     config = model.config
-    l, h, q, t = (
+    l, h, q = (
         config.num_hidden_layers,
         config.num_attention_heads,
         config.hidden_size // config.num_attention_heads,
-        seq_len,
     )
     # Reasoning behind the factor of 12 for the self-attention part of the formula:
     # 1. each self-attention has 2 matmul in the forward and 4 in the backward (6)
@@ -219,7 +218,7 @@ def calculate_model_flops(model: torch.nn.Module, seq_len: int) -> int:
     #    but recomputation should not be counted in calculating MFU           (+0)
     # 3. each matmul performs 1 multiplication and 1 addition                 (*2)
     # 4. we follow the convention and do not account for sparsity in causal attention
-    flop_per_token = 6 * get_active_mm_params(config) + 12 * l * h * q * t
+    flop_per_token = 6 * get_active_mm_params(config) + 12 * l * h * q
 
     return int(flop_per_token)
 
@@ -302,7 +301,7 @@ def _take(arr, idx):
 def pack_bfd(examples: pa.Table, seq_len: int, context_len: int | None = None, truncate: bool = True) -> pa.Table:
     """Drop or truncate examples longer than context_len then pack into long samples up to seq_len."""
     has_masks = "assistant_masks" in examples.column_names
-    context_len = context_len or seq_len
+    context_len = context_len or seq_len  # default to seq_len if context_len is not provided
 
     if truncate:
         ids = pc.list_slice(examples["input_ids"], 0, context_len)
