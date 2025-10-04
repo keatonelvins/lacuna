@@ -9,7 +9,6 @@ from kernels import kernelize, Mode
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
 
-
 from lacuna.config import (
     ActivationCheckpointConfig,
     ModelConfig,
