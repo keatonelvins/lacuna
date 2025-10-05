@@ -28,6 +28,7 @@ Kernelize -> AC -> torch.compile -> FSDP
     path = "parquet"
     data_files = "s3://path/to/data/train/*.parquet"
     ```
+- You can train on a subset of examples with slice notation, e.g. `split = "train[:1000]"`
 
 ## Tokenization
 - HF tokenization is littered with footguns, highly recommend Quentin's post on this:
