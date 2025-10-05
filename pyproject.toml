@@ -55,7 +55,7 @@ addopts = [
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128" }]
-torchtitan = { git = "https://github.com/pytorch/torchtitan", rev = "82a9530" }
+torchtitan = { git = "https://github.com/pytorch/torchtitan", rev = "96149f6" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
