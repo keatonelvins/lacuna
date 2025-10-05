@@ -5,13 +5,13 @@ from transformers.models.qwen3_moe.modeling_qwen3_moe import (
     Qwen3MoeConfig
 )
 
-from liger_kernel.transformers.monkey_patch import AutoLigerKernelForCausalLM
+from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
 from torchtitan.models.moe import MoE, MoEArgs
 
 
 class Qwen3MoeLacunaDecoderLayer(Qwen3MoeDecoderLayer):
     def __init__(self, config: Qwen3MoeConfig, layer_idx: int):
-        super().__init__()
+        super().__init__(config, layer_idx)
 
         moe_args = MoEArgs(
             num_experts=config.num_experts,
