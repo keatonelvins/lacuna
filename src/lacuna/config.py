@@ -112,6 +112,10 @@ class CheckpointConfig(StrictModel):
     save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
     save_dir: Optional[Path] = Field(None, description="Directory to save checkpoints to")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
+    exclude_from_loading: list[str] = Field(
+        default_factory=list,
+        description="Components to exclude from checkpoint loading: 'optimizer', 'scheduler', 'dataloader'"
+    )
 
     def prepare_save_dir(self, timestamp: str) -> None:
         """Clear save_dir if not resuming from checkpoint."""

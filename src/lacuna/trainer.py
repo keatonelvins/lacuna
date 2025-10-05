@@ -46,24 +46,31 @@ def train(config: LacunaConfig) -> None:
         scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
         metrics_processor = setup_metrics_processor(config, model)
 
-        step, epoch = 0, 0
+        step = 0
         prev_loss = None
 
-        if config.checkpoint.resume_from is not None:
-            logger.info(f"Resuming from checkpoint: {config.checkpoint.resume_from}")
-            load_checkpoint(
+        if config.checkpoint.resume_from:
+            exclude = config.checkpoint.exclude_from_loading
+            step = load_checkpoint(
                 model=model,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                dataloader=dataset.dataloader,
+                optimizer=None if "optimizer" in exclude else optimizer,
+                scheduler=None if "scheduler" in exclude else scheduler,
+                dataloader=None if "dataloader" in exclude else dataset.dataloader,
                 path=config.checkpoint.resume_from,
             )
+            logger.info(f"Resumed from step {step}")
 
-        logger.info("Starting training!")
+            if "scheduler" in exclude:
+                logger.info(f"Scheduler excluded - resetting step from {step} to 0 for fresh training phase")
+                step = 0
+
+        logger.info(f"Starting training at step {step + 1}")
 
         while step < total_steps:
-            if step > 0 and step % dataset.length == 0:
-                epoch += 1
+            step += 1
+            epoch = step // dataset.length
+
+            if step % dataset.length == 1:
                 dataset.set_epoch(epoch)
 
             gc_handler.run(step)
@@ -117,18 +124,15 @@ def train(config: LacunaConfig) -> None:
                 log_training_metrics(step, metrics, run_dir)
                 log_wandb_metrics(step, metrics, wandb_run)
 
-            if config.checkpoint.save_every:
-                if step > 0 and step % config.checkpoint.save_every == 0:
-                    save_checkpoint(
-                        step=step,
-                        config=config,
-                        model=model,
-                        optimizer=optimizer,
-                        scheduler=scheduler,
-                        dataloader=dataset.dataloader,
-                    )
-
-            step += 1
+            if config.checkpoint.save_every and step % config.checkpoint.save_every == 0:
+                save_checkpoint(
+                    step=step,
+                    config=config,
+                    model=model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    dataloader=dataset.dataloader,
+                )
 
         save_checkpoint(
             step=step,

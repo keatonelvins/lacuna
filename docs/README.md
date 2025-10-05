@@ -17,6 +17,83 @@ Kernelize -> AC -> torch.compile -> FSDP
     - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!
 
+## Checkpointing, Steps, and Epochs
+
+Training can be configured with either `steps` OR `epochs` (not both):
+```toml
+[trainer]
+steps = 100      # Train for exactly 100 steps (overrides epochs)
+# OR
+epochs = 3       # Train for 3 full passes through the dataset
+```
+
+### Checkpoint Resumption Behavior
+
+| Config | Scheduler Loaded? | Dataloader Loaded? | Step Behavior |
+|--------|------------------|-------------------|---------------|
+| **Initial training with `steps`** | N/A | N/A | Steps: 1 → N |
+| **Initial training with `epochs`** | N/A | N/A | Steps: 1 → (dataset.length × epochs) |
+| **Resume + scheduler + dataloader** | ✅ Yes | ✅ Yes | Continues from checkpoint (e.g., 100 → 101) |
+| **Resume + scheduler - dataloader** | ✅ Yes | ❌ No | Continues from checkpoint, fresh data |
+| **Resume - scheduler + dataloader** | ❌ No | ✅ Yes | **RESETS to 0** → 1 → N (see note below) |
+| **Resume - scheduler - dataloader** | ❌ No | ❌ No | **RESETS to 0** → 1 → N (annealing mode) |
+
+**Important:** Excluding the scheduler **resets the step counter to 0**. This enables fresh training phases where the new scheduler needs to start from scratch for warmup/decay to work correctly. Use this for annealing or multi-stage training.
+
+### Advanced: Excluding Components
+
+You can exclude specific components from loading to enable advanced training scenarios:
+
+#### Exclude Dataloader Only
+Resume with new data while keeping optimizer momentum and LR schedule:
+```toml
+[checkpoint]
+resume_from = "weights/step_100"
+exclude_from_loading = ["dataloader"]
+```
+
+**Behavior:**
+- Step counter continues (e.g., 100 → 101 → ...)
+- Optimizer state preserved (momentum, variance)
+- Scheduler continues from checkpoint position
+- Fresh dataloader starts from beginning of new dataset
+
+**Use cases:**
+- Fine-tuning on different data
+- Switching dataset splits
+- Continuing training on new data sources
+
+See `configs/test_checkpoint_finetune.toml` for an example.
+
+#### Exclude Scheduler + Dataloader (Annealing)
+Start a fresh training phase with new scheduler and data:
+```toml
+[checkpoint]
+resume_from = "weights/step_100"
+exclude_from_loading = ["scheduler", "dataloader"]
+
+[trainer]
+steps = 50  # New phase: 50 steps
+
+[scheduler]
+warmup_ratio = 0.2  # Fresh warmup schedule
+```
+
+**Behavior:**
+- **Step counter RESETS to 0** (enables fresh training phase!)
+- New scheduler starts from scratch (warmup, constant, decay)
+- Fresh dataloader with new data
+- Model weights and optimizer state preserved
+
+**Use cases:**
+- Annealing with fresh LR schedule and lower base LR
+- Multi-stage training (pretrain → anneal → fine-tune)
+- Resetting warmup for stability after checkpoint resume
+
+**Important:** Excluding the scheduler triggers a step reset. This is intentional - the new scheduler needs to start from step 0 for warmup/decay to work correctly.
+
+See `configs/test_checkpoint_anneal.toml` for an example.
+
 ## Datasets
 - We will tokenize and pack using `.map()` from `datasets` which automatically fingerprints and caches the final dataset
     - This means you only need to tokenize and pack once! Subsequent runs will stream directly from the cache under `HF_HOME`.

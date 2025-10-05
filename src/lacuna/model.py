@@ -6,7 +6,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
 from kernels import kernelize, Mode
-from transformers import PreTrainedModel, AutoModelForCausalLM
+from transformers import PreTrainedModel, AutoModelForCausalLM, AutoConfig
 from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
 from lacuna.moe import AutoLacunaModelForCausalLM
 
@@ -19,9 +19,7 @@ from lacuna.config import (
 
 def setup_model(config: LacunaConfig) -> PreTrainedModel:
     """Load and fully configure model for training."""
-    model_path = config.checkpoint.resume_from or config.model.name
-
-    logger.info(f"Loading model: {model_path} with {config.model.attention}")
+    logger.info(f"Loading model: {config.model.name} with {config.model.attention}")
 
     if config.model.backend == "lacuna":
         model_factory = AutoLacunaModelForCausalLM
@@ -30,12 +28,21 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
     else:
         model_factory = AutoModelForCausalLM
 
-    model = model_factory.from_pretrained(
-        model_path,
-        dtype=torch.bfloat16,
-        attn_implementation=config.model.attention,
-    )
-    model.config.use_cache = False  # needed for ac to work
+    if config.checkpoint.resume_from:  # dcp will load weights later
+        model_config = AutoConfig.from_pretrained(
+            config.model.name,
+            attn_implementation=config.model.attention,
+        )
+        model_config.use_cache = False
+        model = model_factory.from_config(model_config, dtype=torch.bfloat16)
+        logger.info(f"Initialized model structure for checkpoint resume from {config.checkpoint.resume_from}")
+    else:
+        model = model_factory.from_pretrained(
+            config.model.name,
+            dtype=torch.bfloat16,
+            attn_implementation=config.model.attention,
+        )
+        model.config.use_cache = False
 
     model = apply_kernelize(model, config.model)
     model = apply_activation_checkpointing(model, config.ac)
