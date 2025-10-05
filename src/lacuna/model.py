@@ -8,6 +8,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 from kernels import kernelize, Mode
 from transformers import PreTrainedModel, AutoModelForCausalLM
 from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
+from lacuna.moe import AutoLacunaModelForCausalLM
 
 from lacuna.config import (
     ActivationCheckpointConfig,
@@ -22,7 +23,9 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
 
     logger.info(f"Loading model: {model_path} with {config.model.attention}")
 
-    if config.model.backend == "liger":
+    if config.model.backend == "lacuna":
+        model_factory = AutoLacunaModelForCausalLM
+    elif config.model.backend == "liger":
         model_factory = AutoLigerKernelForCausalLM
     else:
         model_factory = AutoModelForCausalLM
