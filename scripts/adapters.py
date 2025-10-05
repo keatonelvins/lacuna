@@ -2,7 +2,7 @@
 NOTE: only qwen3_moe supported for now. deepseek arch (glm, longcat, etc.) uses shared experts and has a e_score_correction_bias
 
 Example Usage:
-uv run scripts/adapters.py --input-path Qwen/Qwen3-30B-A3B-Base --output-path keatone/Qwen3-30B-A3B-Base-Lacuna
+uv run scripts/adapters.py --input-path Qwen/Qwen3-30B-A3B-Base --output-path keatone/Qwen3-30B-A3B-Base-Lacuna --push-to-hub
 uv run scripts/adapters.py --to-hf --input-path keatone/Qwen3-30B-A3B-Base-Lacuna --output-path keatone/Qwen3-30B-A3B-Base
 """
 
