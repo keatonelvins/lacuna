@@ -35,7 +35,6 @@ def train(config: LacunaConfig) -> None:
         logger.info("Setting up dataloader")
         dataset = LacunaDataset(config)
         logger.info(f"Packed dataset length: {dataset.length}")
-        data_iter = iter(dataset.dataloader)
 
         if config.trainer.steps:
             total_steps = config.trainer.steps
@@ -65,12 +64,15 @@ def train(config: LacunaConfig) -> None:
 
         logger.info(f"Starting training at step {step + 1}")
 
+        data_iter = iter(dataset.dataloader)
+
         while step < total_steps:
             step += 1
             epoch = step // dataset.length
 
             if step % dataset.length == 1:
                 dataset.set_epoch(epoch)
+                data_iter = iter(dataset.dataloader)
 
             gc_handler.run(step)
             optimizer.zero_grad()
