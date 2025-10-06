@@ -50,18 +50,17 @@ def train(config: LacunaConfig) -> None:
         prev_loss = None
 
         if config.checkpoint.resume_from:
-            exclude = config.checkpoint.exclude_from_loading
             step = load_checkpoint(
                 model=model,
-                optimizer=None if "optimizer" in exclude else optimizer,
-                scheduler=None if "scheduler" in exclude else scheduler,
-                dataloader=None if "dataloader" in exclude else dataset.dataloader,
+                optimizer=optimizer,
+                scheduler=scheduler if config.checkpoint.full_state else None,
+                dataloader=dataset.dataloader if config.checkpoint.full_state else None,
                 path=config.checkpoint.resume_from,
             )
-            logger.info(f"Resumed from step {step}")
-
-            if "scheduler" in exclude:
-                logger.info(f"Scheduler excluded - resetting step from {step} to 0 for fresh training phase")
+            if config.checkpoint.full_state:
+                logger.info(f"Resumed from step {step} (full state)")
+            else:
+                logger.info("Loaded model+optimizer from checkpoint, setting step=0")
                 step = 0
 
         logger.info(f"Starting training at step {step + 1}")
@@ -141,7 +140,6 @@ def train(config: LacunaConfig) -> None:
             optimizer=optimizer,
             scheduler=scheduler,
             dataloader=dataset.dataloader,
-            final=True,
         )
 
         if config.evals.datasets:

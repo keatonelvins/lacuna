@@ -59,7 +59,7 @@ class DataConfig(StrictModel):
     tok_bs: int = Field(10000, description="Batch size to use when tokenizing the dataset")
     tok_num_proc: int = Field(os.cpu_count(), description="Number of processes to use while tokenizing")
     pack_bs: int = Field(100000, description="Batch size to use when packing the dataset")
-    pack_num_proc: int = Field(None, description="Number of processes to use while packing (defaults to dataset.length / pack_bs)")
+    pack_num_proc: int = Field(None, description="Num processes to use while packing (defaults to len(dataset) / pack_bs)")
     num_workers: int = Field(1, description="Number of workers to use for the torch DataLoader")
 
     @field_validator("chat_template", mode="after")
@@ -112,10 +112,7 @@ class CheckpointConfig(StrictModel):
     save_every: int = Field(None, gt=0, description="Steps between checkpoint saves (default no checkpointing)")
     save_dir: Optional[Path] = Field(None, description="Directory to save checkpoints to")
     resume_from: Optional[Path] = Field(None, description="Checkpoint path to resume from")
-    exclude_from_loading: list[str] = Field(
-        default_factory=list,
-        description="Components to exclude from checkpoint loading: 'optimizer', 'scheduler', 'dataloader'"
-    )
+    full_state: bool = Field(True, description="Whether to load the full state of the checkpoint or just model/optim")
 
     def prepare_save_dir(self, timestamp: str) -> None:
         """Clear save_dir if not resuming from checkpoint."""

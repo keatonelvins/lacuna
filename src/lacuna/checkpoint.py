@@ -8,9 +8,7 @@ from loguru import logger
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.state_dict import (
     get_state_dict,
-    get_model_state_dict,
     set_state_dict,
-    set_model_state_dict,
     StateDictOptions,
 )
 from torch.optim.lr_scheduler import LRScheduler
@@ -27,7 +25,7 @@ class TrainerState(Stateful):
     def __init__(
         self,
         model: torch.nn.Module,
-        optimizer: Optimizer | None = None,
+        optimizer: Optimizer,
         scheduler: LRScheduler | None = None,
         dataloader: StatefulDataLoader | None = None,
         step: int = 0,
@@ -40,14 +38,9 @@ class TrainerState(Stateful):
 
     def state_dict(self) -> dict[str, Any]:
         state_dict = {"step": self.step}
-        options = StateDictOptions(cpu_offload=True)
-
-        if self.optimizer is not None:
-            model_sd, optim_sd = get_state_dict(self.model, self.optimizer, options=options)
-            state_dict["model"] = model_sd
-            state_dict["optimizer"] = optim_sd
-        else:
-            state_dict["model"] = get_model_state_dict(self.model, options=options)
+        state_dict["model"], state_dict["optimizer"] = get_state_dict(
+            self.model, self.optimizer, options=StateDictOptions(cpu_offload=True)
+        )
 
         if self.scheduler is not None:
             state_dict["scheduler"] = self.scheduler.state_dict()
@@ -59,15 +52,12 @@ class TrainerState(Stateful):
     def load_state_dict(self, state_dict: dict[str, Any]):
         self.step = state_dict.get("step", 0)
 
-        if "model" in state_dict and "optimizer" in state_dict and self.optimizer is not None:
-            set_state_dict(
-                self.model,
-                self.optimizer,
-                model_state_dict=state_dict["model"],
-                optim_state_dict=state_dict["optimizer"],
-            )
-        elif "model" in state_dict:
-            set_model_state_dict(self.model, state_dict["model"])
+        set_state_dict(
+            self.model,
+            self.optimizer,
+            model_state_dict=state_dict["model"],
+            optim_state_dict=state_dict["optimizer"],
+        )
 
         if "scheduler" in state_dict and self.scheduler is not None:
             self.scheduler.load_state_dict(state_dict["scheduler"])
@@ -82,10 +72,9 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer | None,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
     dataloader: StatefulDataLoader | None,
-    final: bool = False,
 ) -> None:
     """Save DCP checkpoint. Pass None to exclude components."""
-    path = config.checkpoint.save_dir / ("final" if final else f"step_{step}")
+    path = config.checkpoint.save_dir / f"step_{step}"
     logger.info(f"Saving checkpoint to {path}")
 
     trainer_state = TrainerState(model, optimizer, scheduler, dataloader, step)
