@@ -142,12 +142,12 @@ def train(config: LacunaConfig) -> None:
             optimizer=optimizer,
             scheduler=scheduler,
             dataloader=dataset.dataloader,
+            final=True,
         )
 
         if config.evals.datasets:
             logger.info("Running eval")
             eval_metrics = run_eval(config, model, amp_manager, mesh)
-            eval_metrics.update(run_vf_envs(config))  # TODO: clear model from GPU first
             log_eval_metrics(step, eval_metrics, run_dir)
             log_wandb_metrics(step, eval_metrics, wandb_run)
 

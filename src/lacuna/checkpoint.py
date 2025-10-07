@@ -3,6 +3,7 @@
 from typing import Any
 from pathlib import Path
 import torch
+import torch.distributed as dist
 import torch.distributed.checkpoint as dcp
 from loguru import logger
 from torch.distributed.checkpoint.stateful import Stateful
@@ -65,6 +66,25 @@ class TrainerState(Stateful):
             self.dataloader.load_state_dict(state_dict["dataloader"])
 
 
+def save_hf_weights_dtensor(model: torch.nn.Module, output_dir: Path) -> None:
+    sharded_sd = model.state_dict()
+    cpu_state: dict[str, torch.Tensor] = {}
+
+    for name, shard in sharded_sd.items():
+        full_tensor = shard.full_tensor() if hasattr(shard, "full_tensor") else shard
+
+        if is_master():
+            cpu_state[name] = full_tensor.detach().cpu()
+        else:
+            del full_tensor
+
+    if dist.is_initialized():
+        dist.barrier(device_ids=[torch.cuda.current_device()])
+
+    if is_master():
+        model.save_pretrained(output_dir, state_dict=cpu_state)
+
+
 def save_checkpoint(
     step: int,
     config: LacunaConfig,
@@ -72,6 +92,7 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer | None,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
     dataloader: StatefulDataLoader | None,
+    final: bool = False,
 ) -> None:
     """Save DCP checkpoint. Pass None to exclude components."""
     path = config.checkpoint.save_dir / f"step_{step}"
@@ -84,6 +105,15 @@ def save_checkpoint(
         get_tokenizer(config).save_pretrained(path)
         model.config.save_pretrained(path)
         save_settings(path, config)
+
+    if final:
+        final_path = config.checkpoint.save_dir / "final"
+        logger.info(f"Saving final checkpoint to {final_path}")
+        save_hf_weights_dtensor(model, final_path)
+        if is_master():
+            get_tokenizer(config).save_pretrained(final_path)
+            model.config.save_pretrained(final_path)
+            save_settings(final_path, config)
 
 
 def load_checkpoint(
