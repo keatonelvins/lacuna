@@ -24,7 +24,6 @@ def setup_env(config: LacunaConfig) -> Path:
     """Setup environment and output artifacts for a run."""
     # high -> TF32, highest -> FP32
     torch.set_float32_matmul_precision("high")
-    os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_dir = setup_run_dir(config, timestamp)

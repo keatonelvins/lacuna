@@ -16,6 +16,7 @@ Kernelize -> AC -> torch.compile -> FSDP
 - Follow https://arxiv.org/pdf/2404.10830 for best-fit packing and intra-document masking
     - This means each minibatch is converted to one long sample with no padding and masking support via varlen attention.
     - Also supported by https://arxiv.org/pdf/2503.15450!
+- If right on the border of ooming, can try `PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" uv run train`
 
 ## Checkpointing, Steps, and Epochs
 
