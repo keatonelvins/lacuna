@@ -141,8 +141,7 @@ def train(config: LacunaConfig) -> None:
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            dataloader=dataset.dataloader,
-            final=True,
+            dataloader=dataset.dataloader
         )
 
         if config.evals.datasets:

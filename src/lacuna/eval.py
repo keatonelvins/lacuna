@@ -6,6 +6,7 @@ import math
 import subprocess
 import verifiers as vf
 from openai import OpenAI
+from tqdm import tqdm
 from torchtitan.distributed.utils import dist_sum
 from torch.distributed.device_mesh import DeviceMesh
 from transformers import PreTrainedModel
@@ -34,7 +35,7 @@ def run_eval(
     token_sum = torch.zeros(1, dtype=torch.float64, device=device)
     correct_sum = torch.zeros(1, dtype=torch.float64, device=device)
 
-    for _ in range(dataset.length):
+    for _ in tqdm(range(dataset.length), desc="Collecting eval metrics"):
         batch = next(data_iter)
         labels = batch["input_ids"].clone()
         if "assistant_masks" in batch:
