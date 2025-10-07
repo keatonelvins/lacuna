@@ -13,7 +13,7 @@ from lacuna.data import LacunaDataset
 from lacuna.scheduler import setup_scheduler
 from lacuna.model import setup_model
 from lacuna.optim import setup_optimizer
-from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics, log_loss_spikes
+from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics, log_loss_spikes, get_moe_load_balance_stats
 from lacuna.wandb import init_wandb, log_wandb_metrics, finish
 from lacuna.distributed import init_dist, setup_dist, destroy_dist
 from lacuna.eval import run_eval, run_vf_envs
@@ -121,6 +121,7 @@ def train(config: LacunaConfig) -> None:
                     "train/grad_norm": current_grad_norm,
                     "train/ntokens_micro_batch": ntokens_batch,
                     **metrics_processor.get_metrics(),
+                    **get_moe_load_balance_stats(model, config),
                 }
                 log_training_metrics(step, metrics, run_dir)
                 log_wandb_metrics(step, metrics, wandb_run)

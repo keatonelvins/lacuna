@@ -206,6 +206,26 @@ def setup_metrics_processor(config: LacunaConfig, model: torch.nn.Module) -> Met
     return processor
 
 
+# ref: https://github.com/PrimeIntellect-ai/prime-rl/tree/main/src/prime_rl/trainer/model.py
+def get_moe_load_balance_stats(model: torch.nn.Module, config: LacunaConfig) -> dict:
+    """Collect MoE load balance metrics from torchtitan MoE layers."""
+    if config.model.backend != "lacuna":
+        return {}
+
+    per_layer_max_vio = []
+    for layer in model.model.layers:
+        if not hasattr(layer.mlp, "tokens_per_expert"):
+            continue
+        tokens_per_expert = layer.mlp.tokens_per_expert
+
+        balanced_load = tokens_per_expert.mean()
+        max_vio = (tokens_per_expert.max() - balanced_load) / balanced_load
+        per_layer_max_vio.append(max_vio.item())
+        tokens_per_expert.zero_()
+
+    return {"moe/load_balance_max_vio": torch.tensor(per_layer_max_vio).mean().item()}
+
+
 # some gpt-5 code for bfd packing
 class IntSucc:
     __slots__ = ("N", "bits")
