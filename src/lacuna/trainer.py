@@ -13,7 +13,7 @@ from lacuna.data import LacunaDataset
 from lacuna.scheduler import setup_scheduler
 from lacuna.model import setup_model
 from lacuna.optim import setup_optimizer
-from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics, log_loss_spikes, get_moe_load_balance_stats
+from lacuna.utils import setup_env, cleanup_env, log_training_metrics, setup_metrics_processor, log_eval_metrics, get_moe_load_balance_stats
 from lacuna.wandb import init_wandb, log_wandb_metrics, finish
 from lacuna.distributed import init_dist, setup_dist, destroy_dist
 from lacuna.eval import run_eval, run_vf_envs
@@ -37,16 +37,13 @@ def train(config: LacunaConfig) -> None:
         logger.info(f"Packed dataset length: {dataset.length}")
 
         if config.trainer.steps:
-            total_steps = config.trainer.steps
+            step, total_steps = 0, config.trainer.steps
         else:
-            total_steps = dataset.length * config.trainer.epochs
+            step, total_steps = 0, dataset.length * config.trainer.epochs
 
         optimizer = setup_optimizer(model, config)
         scheduler = setup_scheduler(optimizer, config.scheduler, total_steps)
         metrics_processor = setup_metrics_processor(config, model)
-
-        step = 0
-        prev_loss = None
 
         if config.checkpoint.resume_from:
             step = load_checkpoint(
@@ -59,12 +56,11 @@ def train(config: LacunaConfig) -> None:
             if config.checkpoint.full_state:
                 logger.info(f"Resumed from step {step} (full state)")
             else:
-                logger.info("Loaded model+optimizer from checkpoint, setting step=0")
+                logger.info("Loaded model+optimizer from checkpoint, resetting step=0")
                 step = 0
 
-        logger.info(f"Starting training at step {step + 1}")
-
         data_iter = iter(dataset.dataloader)
+        logger.info(f"Starting training at step {step + 1}")
 
         while step < total_steps:
             step += 1
@@ -105,15 +101,10 @@ def train(config: LacunaConfig) -> None:
             optimizer.step()
             scheduler.step()
 
-            local_loss = loss.detach().item()
-            if prev_loss is not None and local_loss > prev_loss * 3.0:
-                log_loss_spikes(step, local_loss, model_inputs, run_dir)
-            prev_loss = local_loss
-
             if step % config.metrics.log_every == 0:
                 current_lr = scheduler.get_last_lr()[0]
                 current_grad_norm = grad_norm.item()  # already reduced
-                current_loss = dist_mean(loss.detach(), mesh) if mesh else local_loss
+                current_loss = dist_mean(loss.detach(), mesh) if mesh else loss.detach().item()
 
                 metrics = {
                     "train/loss": current_loss,
