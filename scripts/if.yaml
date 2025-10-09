@@ -1,0 +1,23 @@
+# uv run --no-project --with mergekit scripts/if.yaml
+
+merge_method: della_linear
+base_model: path/to/base_model
+models:
+  - model: path/to/model
+    parameters:
+      weight: 1.0
+      density: 0.95
+      epsilon: 0.03
+
+  - model: path/to/model
+    parameters:
+      weight: 0.9
+      density: 0.35
+      epsilon: 0.035
+
+parameters:
+  normalize: false
+  rescale: true
+  lambda: 1.0
+
+dtype: bfloat16  

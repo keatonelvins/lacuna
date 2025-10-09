@@ -1,6 +1,6 @@
 # lacuna
 
-Tiny, memory-efficient trainer for continued pretraining and finetuning of popular HF models.
+Small, clean model training framework written for fun. With a hot hot tui!!
 
 ## Quick Start
 
