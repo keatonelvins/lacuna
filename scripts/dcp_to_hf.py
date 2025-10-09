@@ -15,10 +15,6 @@ import torch
 import torch.distributed.checkpoint as dcp
 from loguru import logger
 from huggingface_hub import save_torch_state_dict
-from transformers import AutoConfig, AutoModelForCausalLM
-
-from lacuna.checkpoint import TrainerState
-from lacuna.moe import AutoLacunaModelForCausalLM
 
 
 def load_dcp_checkpoint(ckpt_dir: Path) -> dict[str, torch.Tensor]:
