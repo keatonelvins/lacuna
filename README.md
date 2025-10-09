@@ -7,14 +7,12 @@ Small, clean model training framework written for fun. With a hot hot tui!!
 ```bash
 # Install (or clone + `uv sync`) and test (requires ~5GB VRAM)
 curl -sSL https://raw.githubusercontent.com/keatonelvins/lacuna/main/scripts/install.sh | bash
-uv run train
 
 # See all config options
 uv run train --help
 
 # Load args from a toml (w/ temp overrides)
 uv run train path/to/config.toml
-uv run train path/to/config.toml --optimizer.lr 1e-5
 uv run train path/to/config.toml --data.override_cache
 
 # Pass args directly
@@ -25,10 +23,6 @@ uv run sweep path/to/config.toml --trainer.steps 10,20 --optimizer.lr 1e-5:5e-5:
 
 # Run TUI
 uv run lacuna
-
-# Log runs + access gated repos
-uv run wandb login
-uv run hf auth login
 ```
 
 ## Development
