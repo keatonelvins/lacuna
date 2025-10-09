@@ -1,5 +1,8 @@
 """
-Usage: uv run scripts/make_tiny_model.py Qwen/Qwen3-30B-A3B-Base keatone/Qwen3-MoE-Tiny --push
+Make a tiny model from a base model arch.
+
+Usage:
+uv run scripts/make_tiny_model.py Qwen/Qwen3-30B-A3B-Base keatone/Qwen3-MoE-Tiny --push
 """
 
 import sys

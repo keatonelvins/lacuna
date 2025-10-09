@@ -1,4 +1,7 @@
 """
+Benchmark tps, mfu, time, and memory for all configs in a given directory.
+
+Usage: 
 uv run scripts/benchmark.py path/to/configs/
 """
 

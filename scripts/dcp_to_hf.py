@@ -1,7 +1,7 @@
 """
 Convert local DCP checkpoints to HuggingFace format.
 
-Example Usage:
+Usage: 
 uv run scripts/dcp_to_hf.py --ckpt-dir weights/model_name/step_5 --output-dir model_name_hf
 """
 
