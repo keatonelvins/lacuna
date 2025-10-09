@@ -29,6 +29,9 @@ def setup_model(config: LacunaConfig) -> PreTrainedModel:
         model_factory = AutoModelForCausalLM
 
     if config.checkpoint.resume_from:  # dcp will load weights later
+        if config.model.backend == "lacuna":
+            raise ValueError("Cannot resume from checkpoint for Lacuna model")
+
         model_config = AutoConfig.from_pretrained(
             config.model.name,
             attn_implementation=config.model.attention,

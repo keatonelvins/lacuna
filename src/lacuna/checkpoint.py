@@ -69,11 +69,11 @@ def save_checkpoint(
     step: int,
     config: LacunaConfig,
     model: torch.nn.Module,
-    optimizer: torch.optim.Optimizer | None,
+    optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
     dataloader: StatefulDataLoader | None
 ) -> None:
-    """Save DCP checkpoint. Pass None to exclude components."""
+    """Save Trainer state to DCP checkpoint (scheduler and dataloader are optional)."""
     path = config.checkpoint.save_dir / f"step_{step}"
     logger.info(f"Saving checkpoint to {path}")
 
@@ -88,12 +88,12 @@ def save_checkpoint(
 
 def load_checkpoint(
     model: torch.nn.Module,
-    optimizer: torch.optim.Optimizer | None,
+    optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None,
     dataloader: StatefulDataLoader | None,
     path: Path,
 ) -> int:
-    """Load DCP checkpoint. Pass None to skip components. Returns step."""
+    """Load trainer state from DCP checkpoint (scheduler and dataloader can be skipped)."""
     if not (path / ".metadata").exists():
         raise ValueError(f"Not a DCP checkpoint: {path}")
 

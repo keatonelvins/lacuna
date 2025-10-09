@@ -16,6 +16,7 @@ load_dotenv()
 
 
 def launch_torchrun(config: LacunaConfig) -> None:
+    """CLI wrapper to relaunch trainer using torchrun."""
     cmd = ["torchrun", f"--nproc_per_node={config.torchrun.nproc_per_node}"]
 
     if config.torchrun.node_rank is not None:
@@ -39,6 +40,7 @@ def launch_torchrun(config: LacunaConfig) -> None:
 
 
 def parse_argv() -> LacunaConfig:
+    """Parse cli args and load config from pydantic settings object."""
     args = sys.argv[1:]
 
     if args and not args[0].startswith("--"):  # load from toml
@@ -61,6 +63,7 @@ def parse_argv() -> LacunaConfig:
 
 
 def parse_sweep_value(value: str) -> list:
+    """Parse sweep values (e.g. "1:10:1" -> [1, 2, ..., 10])."""
     if ":" in value:
         parts = value.split(":")
         start, stop = float(parts[0]), float(parts[1])
@@ -70,6 +73,7 @@ def parse_sweep_value(value: str) -> list:
 
 
 def parse_sweep_args(args: list[str]) -> tuple[str | None, dict[str, list], dict[str, str]]:
+    """Parse sweep args and return config path, sweeped args, and fixed args."""
     config_path = None if not args or args[0].startswith("--") else args[0]
     sweeps = {}
     fixed = {}
@@ -91,6 +95,7 @@ def parse_sweep_args(args: list[str]) -> tuple[str | None, dict[str, list], dict
 
 
 def run_sweeps(config_path: str | None, sweeps: dict[str, list], fixed: dict[str, str]) -> None:
+    """Run consecutive trains, sweeping over the given args."""
     keys, values = list(sweeps.keys()), list(sweeps.values())
 
     for combo in itertools.product(*values):
@@ -108,6 +113,7 @@ def run_sweeps(config_path: str | None, sweeps: dict[str, list], fixed: dict[str
 
 
 def sweep():
+    """Main entry point for sweeps."""
     config_path, sweeps, fixed = parse_sweep_args(sys.argv[1:])
     run_sweeps(config_path, sweeps, fixed)
 

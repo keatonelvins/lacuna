@@ -14,6 +14,7 @@ from lacuna.distributed import get_rank, get_world_size, is_master, get_dp_param
 
 
 def _encode(examples, tokenizer, column):
+    """Batch tokenize input text (for messages input, apply chat template and return assistant masks)."""
     if column == "messages":
         out = tokenizer.apply_chat_template(
             examples["messages"],
@@ -28,6 +29,7 @@ def _encode(examples, tokenizer, column):
 
 
 def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
+    """Get tokenizer object and patch with config values."""
     tokenizer = AutoTokenizer.from_pretrained(config.data.override_tokenizer or config.model.name, model_max_length=int(1e10))
     if config.data.chat_template:
         tokenizer.chat_template = config.data.chat_template
@@ -39,6 +41,8 @@ def get_tokenizer(config: LacunaConfig) -> PreTrainedTokenizerBase:
 
 
 class LacunaDataset:
+    """Dataset class for training."""
+
     def __init__(self, config: LacunaConfig, datasets: list[DatasetConfig] | None = None):
         self.config = config
         self.datasets = datasets or self.config.data.datasets
