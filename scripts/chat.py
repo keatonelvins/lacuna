@@ -39,8 +39,8 @@ def create_demo():
         gr.Markdown("# LLM Chat Interface")
 
         with gr.Row():
-            endpoint_input = gr.Textbox(label="Endpoint", value="0.0.0.0:8000", placeholder="localhost:8000")
-            model_input = gr.Textbox(label="Model", value="Qwen/Qwen3-8B", placeholder="model-name")
+            endpoint_input = gr.Textbox(label="Endpoint", placeholder="localhost:8000")
+            model_input = gr.Textbox(label="Model", placeholder="model-name")
 
         gr.ChatInterface(
             fn=chat_function,
