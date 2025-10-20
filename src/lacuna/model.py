@@ -1,97 +1,73 @@
-"""Model setup and optimization utils."""
+"""Model loading and initialization."""
+
+from types import SimpleNamespace
 
 import torch
 from loguru import logger
-from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
-    checkpoint_wrapper,
-)
-from kernels import kernelize, Mode
-from transformers import PreTrainedModel, AutoModelForCausalLM, AutoConfig
-from liger_kernel.transformers.auto_model import AutoLigerKernelForCausalLM
-from lacuna.moe import AutoLacunaModelForCausalLM
+from transformers import AutoConfig, AutoModelForCausalLM
+from liger_kernel.transformers.monkey_patch import _apply_liger_kernel as apply_liger
+from torchtitan.config.job_config import Float8Linear
+from torchtitan.components.quantization.float8 import Float8LinearConverter
 
-from lacuna.config import (
-    ActivationCheckpointConfig,
-    ModelConfig,
-    LacunaConfig,
-)
+from lacuna.config import TrainConfig
+from lacuna.moe import apply_tt_moe
 
 
-def setup_model(config: LacunaConfig) -> PreTrainedModel:
-    """Load and fully configure model for training."""
-    logger.info(f"Loading model: {config.model.name} with {config.model.attention}")
+def build_model(config: TrainConfig) -> tuple[torch.nn.Module, object | None]:
+    """Build model on meta device (no memory allocation). Returns (model, fp8_converter)."""
+    logger.info(f"Building model: {config.model.name}")
+    model_config = AutoConfig.from_pretrained(config.model.name, attn_implementation=config.model.attn)
+    model_config.use_cache = False  # necessary for ac
 
-    if config.model.backend == "lacuna":
-        model_factory = AutoLacunaModelForCausalLM
-    elif config.model.backend == "liger":
-        model_factory = AutoLigerKernelForCausalLM
-    else:
-        model_factory = AutoModelForCausalLM
+    with torch.device("meta"):
+        if config.model.lacuna:
+            apply_liger(model_config.model_type)
+            apply_tt_moe(model_config.model_type)
+        model = AutoModelForCausalLM.from_config(model_config)
 
-    if config.checkpoint.resume_from:  # dcp will load weights later
-        if config.model.backend == "lacuna":
-            raise ValueError("Cannot resume from checkpoint for Lacuna model")
+    logger.info("Uninitialized model built on meta device!")
+    fp8_converter = apply_fp8(model, config)
 
-        model_config = AutoConfig.from_pretrained(
-            config.model.name,
-            attn_implementation=config.model.attention,
-        )
-        model_config.use_cache = False
-        model = model_factory.from_config(model_config, dtype=torch.bfloat16)
-        logger.info(f"Initialized model structure for checkpoint resume from {config.checkpoint.resume_from}")
-    else:
-        model = model_factory.from_pretrained(
-            config.model.name,
-            dtype=torch.bfloat16,
-            attn_implementation=config.model.attention,
-        )
-        model.config.use_cache = False
-
-    model = apply_kernelize(model, config.model)
-    model = apply_activation_checkpointing(model, config.ac)
-    model = apply_torch_compile(model, config.model)
-
-    model.train()
-
-    return model
+    return model, fp8_converter
 
 
-def apply_kernelize(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Apply HuggingFace kernels.kernelize if enabled."""
-    if not config.kernelize:
-        return model
+def initialize_buffers(model: torch.nn.Module) -> None:
+    """Initialize buffers after to_empty() since they contain uninitialized memory."""
+    seen_buffers = {name: False for name, _ in model.named_buffers()}
 
-    mode = Mode.TRAINING
-    if config.compile_mode:
-        mode |= Mode.TORCH_COMPILE
+    for name, buf in model.named_buffers():
+        if "mlp.tokens_per_expert" in name or "mlp.expert_bias" in name:
+            buf.zero_()
+            seen_buffers[name] = True
+        elif "model.rotary_emb.inv_freq" == name:
+            logger.info(f"Initializing rotary_emb.inv_freq for {name}")
+            model_emb = model.model.rotary_emb
+            inv_freq, model_emb.attention_scaling = model_emb.rope_init_fn(model_emb.config, model_emb.inv_freq.device)
+            model_emb.inv_freq.copy_(inv_freq)
+            seen_buffers[name] = True
 
-    model = kernelize(model, mode=mode)
-
-    return model
-
-
-def apply_activation_checkpointing(model: PreTrainedModel, ac_config: ActivationCheckpointConfig) -> PreTrainedModel:
-    """Apply activation checkpointing if enabled."""
-    if ac_config.stride == 0:
-        return model
-
-    for idx, layer in enumerate(model.model.layers):
-        if idx % ac_config.stride == 0:
-            model.model.layers[idx] = checkpoint_wrapper(layer, preserve_rng_state=False)
-
-    return model
+    # make sure we handled all buffers that may need initialization
+    assert all(seen_buffers.values()), f"Unknown buffers detected that may need initialization: {seen_buffers}"
 
 
-def apply_torch_compile(model: PreTrainedModel, config: ModelConfig) -> PreTrainedModel:
-    """Apply torch.compile if enabled."""
-    if not config.compile_mode:
-        return model
+def apply_fp8(model: torch.nn.Module, config: TrainConfig):
+    """Apply FP8 quantization (tensorwise with FSDP optimization). Returns converter for post-optimizer hook."""
+    if not config.model.fp8:
+        return None
 
-    torch._dynamo.config.cache_size_limit = 256
-    torch._dynamo.config.suppress_errors = True
-    torch._dynamo.config.capture_scalar_outputs = True
+    logger.info("NOTE: FP8 is untested, may need ao nightly or significant tuning")
 
-    for layer in model.model.layers:
-        layer.compile(mode=config.compile_mode)
+    # spoof the torchtitan job config
+    enable_fsdp = config.dist.dp_shard > 1
+    fp8_config = Float8Linear(
+        enable_fsdp_float8_all_gather=enable_fsdp, precompute_float8_dynamic_scale_for_fsdp=enable_fsdp
+    )
+    job_config = SimpleNamespace(
+        quantize=SimpleNamespace(linear=SimpleNamespace(float8=fp8_config)),
+        compile=SimpleNamespace(enable=True, components=["model"]),
+    )
+    parallel_dims = SimpleNamespace(dp_shard_enabled=enable_fsdp)
 
-    return model
+    converter = Float8LinearConverter(job_config, parallel_dims)
+    converter.convert(model)
+    return converter

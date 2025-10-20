@@ -1,46 +1,58 @@
 [project]
 name = "lacuna"
 version = "0.1.0"
-description = "pretrain and finetune hf models"
+description = "autodidactic genesis"
 readme = "README.md"
+authors = [
+    { name = "k", email = "keaton@camfer.dev" }
+]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "datasets>=4.1.1",
-    "kernels>=0.10.2",
-    "liger-kernel>=0.6.2",
-    "loguru>=0.7.3",
-    "nvidia-ml-py>=13.580.82",
-    "pydantic-settings>=2.10.1",
-    "s3fs>=2025.9.0",
-    "textual>=6.1.0",
-    "textual-autocomplete>=4.0.6",
-    "torch>=2.8.0",
-    "torchdata>=0.11.0",
+    "dion",
+    "torch",
     "torchtitan",
+    "modal>=1.2.0",
+    "ruff>=0.14.0",
+    "pytest>=8.4.2",
+    "loguru>=0.7.3",
+    "wandb>=0.22.2",
+    "s3fs>=2025.9.0",
+    "tomli-w>=1.2.0",
+    "torchao>=0.14.0",
+    "kernels>=0.10.4",
+    "verifiers>=0.1.5",
+    "pre-commit>=4.3.0",
+    "liger-kernel>=0.6.2",
+    "pydantic-settings>=2.11.0",
     "transformers[serving]>=4.57.0",
-    "verifiers>=0.1.4",
-    "wandb>=0.22.0",
 ]
 
 [project.scripts]
-train = "lacuna.cli:run_train"
-sweep = "lacuna.cli:sweep"
-lacuna = "lacuna.tui.app:main"
-
-[dependency-groups]
-dev = [
-    "pre-commit>=4.3.0",
-    "pytest>=8.4.1",
-    "ruff>=0.12.11",
-    "ty>=0.0.1a19",
-]
+chat = "lacuna:chat"
+merge = "lacuna:merge"
+train = "lacuna:train"
+sweep = "lacuna:sweep"
+slurm = "lacuna:slurm"
+serve = "lacuna:serve"
+fuse = "lacuna.scripts.fuse:main"
+adapters = "lacuna.scripts.adapters:main"
 
 [build-system]
-requires = ["uv_build>=0.8.11,<0.9.0"]
+requires = ["uv_build>=0.9.1,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
-line-length = 130
+line-length = 120
+
+[tool.uv.sources]
+torch = [{ index = "pytorch", marker = "sys_platform != 'darwin'"}]
+dion = [{ git = "https://github.com/microsoft/dion.git", rev = "0360f9b" }]
+torchtitan = { git = "https://github.com/pytorch/torchtitan", rev = "92ed8b3" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -51,13 +63,8 @@ addopts = [
     "--tb=short",
     "--disable-warnings",
     "-ra",
+    "--strict-markers"
 ]
-
-[tool.uv.sources]
-torch = [{ index = "pytorch-cu128" }]
-torchtitan = { git = "https://github.com/pytorch/torchtitan", rev = "96149f6" }
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
+markers = [
+    "gpu: marks tests that require a CUDA device (deselect with '-m \"not gpu\"')",
+]

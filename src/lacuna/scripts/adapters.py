@@ -1,9 +1,7 @@
 """
-NOTE: only qwen3_moe supported for now. deepseek arch (glm, longcat, etc.) uses shared experts and has a e_score_correction_bias
+Adapt torchtitan moe layers to/from hf format. (default hf -> tt, --to-hf means tt -> hf)
 
-Usage:
-uv run scripts/adapters.py --input-path Qwen/Qwen3-30B-A3B-Base --output-path keatone/Qwen3-30B-A3B-Base-Lacuna --push-to-hub
-uv run scripts/adapters.py --to-hf --input-path keatone/Qwen3-30B-A3B-Base-Lacuna --output-path keatone/Qwen3-30B-A3B-Base
+NOTE: only qwen3_moe supported for now. deepseek arch (glm, longcat, etc.) uses shared experts and has a e_score_correction_bias
 """
 
 import re
@@ -14,7 +12,7 @@ from pathlib import Path
 import torch
 from loguru import logger
 from safetensors import safe_open
-from huggingface_hub import snapshot_download, save_torch_state_dict, HfApi
+from huggingface_hub import snapshot_download, save_torch_state_dict
 
 
 # ref: https://github.com/PrimeIntellect-ai/prime-rl/blob/main/scripts/convert_moe_to_hf.py
@@ -22,8 +20,12 @@ def get_max_layer_num(state_dict: dict[str, torch.Tensor]) -> int:
     return max(int(i.split(".")[2]) for i in state_dict.keys() if "model.layers." in i) + 1
 
 
-def convert_lacuna_moe_to_hf(state_dict: dict[str, torch.Tensor]):
-    logger.info("Converting lacuna MoE layers to HF format")
+def is_config_file(p: Path) -> bool:
+    return p.is_file() and "safetensors" not in str(p) and ".distcp" not in str(p)
+
+
+def convert_tt_moe_to_hf(state_dict: dict[str, torch.Tensor]):
+    logger.info("Converting tt MoE layers to HF format")
     num_layers = get_max_layer_num(state_dict)
     for i in range(num_layers):
         if f"model.layers.{i}.mlp.router.gate.weight" not in state_dict:
@@ -54,8 +56,8 @@ def convert_lacuna_moe_to_hf(state_dict: dict[str, torch.Tensor]):
             del state_dict[f"model.layers.{i}.mlp.experts.w3"]
 
 
-def convert_hf_moe_to_lacuna(state_dict: dict[str, torch.Tensor]):
-    logger.info("Converting HF MoE layers to lacuna format")
+def convert_hf_moe_to_tt(state_dict: dict[str, torch.Tensor]):
+    logger.info("Converting HF MoE layers to torchtitan format")
     num_layers = get_max_layer_num(state_dict)
 
     for i in range(num_layers):
@@ -96,7 +98,7 @@ def convert_hf_moe_to_lacuna(state_dict: dict[str, torch.Tensor]):
             del state_dict[gate_key]
 
 
-def save_sharded_model(state_dict: dict[str, torch.Tensor], input_path: str, output_path: str, push_to_hub: bool = False):
+def save_sharded_model(state_dict: dict[str, torch.Tensor], input_path: str, output_path: str):
     output_dir = Path(output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -109,20 +111,10 @@ def save_sharded_model(state_dict: dict[str, torch.Tensor], input_path: str, out
         safe_serialization=True,
     )
 
-    utils_paths = [p for p in Path(input_path).glob("*") if "safetensors" not in str(p) and p.is_file()]
+    utils_paths = [p for p in Path(input_path).glob("*") if is_config_file(p)]
     logger.info(f"Copying {len(utils_paths)} config files to {output_dir}")
     for path in utils_paths:
         shutil.copy(path, output_dir / path.name)
-
-    if push_to_hub:
-        logger.info(f"Pushing model to HuggingFace Hub: {output_path}")
-        api = HfApi()
-        api.create_repo(repo_id=output_path, exist_ok=True, repo_type="model")
-        api.upload_folder(
-            folder_path=output_dir,
-            repo_id=output_path,
-            repo_type="model",
-        )
 
 
 def load_state_dict(input_path: str) -> tuple[dict[str, torch.Tensor], str]:
@@ -140,21 +132,36 @@ def load_state_dict(input_path: str) -> tuple[dict[str, torch.Tensor], str]:
     return state_dict, input_path
 
 
-def main(input_path: str, output_path: str, to_hf: bool, push_to_hub: bool):
+def convert(input_path: str, output_path: str | None, to_hf: bool):
+    if output_path is None:
+        input_parent = Path(input_path).parent
+        suffix = "hf" if to_hf else "lacuna"
+        output_path = str(input_parent / suffix)
+
     state_dict, input_path = load_state_dict(input_path)
     if to_hf:
-        convert_lacuna_moe_to_hf(state_dict)
+        convert_tt_moe_to_hf(state_dict)
     else:
-        convert_hf_moe_to_lacuna(state_dict)
-    save_sharded_model(state_dict, input_path, output_path, push_to_hub)
+        convert_hf_moe_to_tt(state_dict)
+    save_sharded_model(state_dict, input_path, output_path)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Handle torchtitan moe layer adaption")
+    parser.add_argument("input_path", type=str, help="Input model path")
+    parser.add_argument(
+        "output_path",
+        type=str,
+        default=None,
+        help="Output path. Defaults to '/lacuna' or '/hf' in save dir (depending on --to-hf).",
+    )
+    parser.add_argument(
+        "--to-hf", action="store_true", help="Convert from lacuna (tt moe) to HF format, otherwise hf -> lacuna"
+    )
+    args = parser.parse_args()
+
+    convert(args.input_path, args.output_path, args.to_hf)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input-path", type=str, required=True)
-    parser.add_argument("--output-path", type=str, required=True)
-    parser.add_argument("--to-hf", action="store_true", help="Convert from lacuna to HF format, otherwise do HF to lacuna")
-    parser.add_argument("--push-to-hub", action="store_true", help="Push to HuggingFace Hub instead of saving locally")
-    args = parser.parse_args()
-
-    main(args.input_path, args.output_path, args.to_hf, args.push_to_hub)
+    main()
