@@ -18,9 +18,11 @@ initialize_buffers(model)  # Initialize non-persistent buffers
 
 ## Tips
 
-- Use `@record` header to propogate dist errors: https://docs.pytorch.org/docs/stable/elastic/errors.html
+- Use `@record` header to propagate dist errors: https://docs.pytorch.org/docs/stable/elastic/errors.html
 - Compile args: https://docs.pytorch.org/docs/stable/generated/torch.compile.html
 - `PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" uv run train ...` can save a few gb if you are close to OOMing
 - Also potential speedups by setting `OMP_NUM_THREADS=...` to physical cores // num processes
 - For HSDP (2D mesh), use `mesh["dp"]` for loss reduction (`mesh.ndim > 1` detects HSDP vs FSDP)
-- Lots of tricks with compile: https://chaimrand.medium.com/maximizing-ai-ml-model-performance-with-pytorch-compilation-7cdf840202e6
+- Lots of tricks with compile: 
+    - https://docs.google.com/document/d/1y5CRfMLdwEoF1nTk9q8qEu1mgMUuUtvhklPKJ2emLU8
+    - https://chaimrand.medium.com/maximizing-ai-ml-model-performance-with-pytorch-compilation-7cdf840202e6
