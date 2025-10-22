@@ -22,9 +22,9 @@ dependencies = [
     "kernels>=0.10.4",
     "verifiers>=0.1.5",
     "pre-commit>=4.3.0",
-    "liger-kernel>=0.6.2",
     "pydantic-settings>=2.11.0",
     "transformers[serving]>=4.57.0",
+    "liger-kernel>=0.6.2; sys_platform != 'darwin'",
 ]
 
 [project.scripts]
