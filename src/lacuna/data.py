@@ -102,18 +102,21 @@ class PackedDataset:
     def _build_dataset(self, skip_cache: bool = False):
         """Concat datasets, tokenize, pack, and convert to tensors. Will load from local cache if available."""
         tokenizer = get_tokenizer(self.config)
-        ds = concatenate_datasets(self._load_datasets(skip_cache=skip_cache))
         cfg = self.config.data
+        datasets = [
+            ds.map(
+                partial(encode, tokenizer=tokenizer, column=cfg.column, template=cfg.chat_template is not None),
+                desc=f"Tokenizing data with (bs={cfg.tok_bs})",
+                batched=True,
+                batch_size=cfg.tok_bs,
+                num_proc=cfg.tok_num_proc,
+                remove_columns=ds.column_names,
+            )
+            for ds in self._load_datasets(skip_cache=skip_cache)
+        ]
 
         # batch tokenize -> convert to arrow table -> fast bfd packing -> convert to tensors for model forward
-        ds = ds.map(
-            partial(encode, tokenizer=tokenizer, column=cfg.column, template=cfg.chat_template is not None),
-            desc=f"Tokenizing data with (bs={cfg.tok_bs})",
-            batched=True,
-            batch_size=cfg.tok_bs,
-            num_proc=cfg.tok_num_proc,
-            remove_columns=ds.column_names,
-        ).with_format("arrow")
+        ds = concatenate_datasets(datasets).with_format("arrow")
         ds = ds.map(
             partial(pack, seq_len=self.config.trainer.seq_len, context_len=cfg.context_len, truncate=cfg.truncate),
             desc=f"Packing data with (bs={cfg.pack_bs})",
